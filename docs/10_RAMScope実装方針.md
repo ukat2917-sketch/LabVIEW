@@ -139,7 +139,7 @@ CLFN を置く前に、外部仕様書とヘッダから次を表にまとめる
   RAMScopeGT170SetExternalTrigger()  6.23 外部トリガ設定（GT170専用版）
   RAMScopeGT170SetMeasTrigger()      6.24 測定トリガ設定（GT170専用）
 
-  RAMScopeGT150GetBufferData()       GT150_IF データ読み出し★確定（MeasStart注記より）
+  RAMScopeGT150GetBufferData()       6.29 データ読み出し★プロトタイプ確定
 
 ■RAM書き込み/CAN（GT170専用）
   RAMScopeGT170ScenarioWriteStart()  6.36
@@ -469,6 +469,58 @@ long RAMScopeGT150PGT_SetMdlConfig(
 > 破棄して RAMScope ハードウェアの電源を OFF にすること（仕様書の指示）。
 > TestStand の Cleanup ではこのエラーコードを別途ハンドリングする。
 
+**`RAMScopeGT150GetBufferData` 関数仕様（6.29章・確定）：**
+
+```c
+/* 最新データ取得処理
+   RAMScopeVP API 内部の表示用データバッファに保存されている測定データを
+   パケット単位で取得する。
+   発行対象モジュール：RAM モニタ / CAN / アナログ入力
+   発行可否：オフライン=× / 測定中=○ / アイドル=○ */
+long RAMScopeGT150GetBufferData(
+    long   UnitNo,          /* [in]  発行対象ユニット（将来拡張用。現仕様では常に 0）*/
+    long   MdlNo,           /* [in]  発行対象モジュールのモジュール番号 */
+    void   *pData,          /* [out] 測定データの格納先。
+                                     (*pDataNum) * パケットサイズ分の容量を持つ
+                                     バッファの先頭アドレスを指定する */
+    long   *pDataNum,       /* [in/out] 要求パケット数(In) / 取得パケット数(Out)。
+                                     読み出し要求パケット数を格納した long 値への
+                                     ポインタを指定する。関数の正常終了後、
+                                     本引数には実際に読み出したパケット数を返す */
+    long   *pLostDataNum    /* [out] 測定動作中に表示用データバッファがあふれた
+                                     場合に、破棄したパケット数を返す */
+);
+```
+
+> **注意・制限事項（6.29.3節）：**
+> - 本関数の処理対象は `RAMScopeGT150SetLoggingInfo()` 関数で容量指定する **表示用データバッファ**。
+> - 取得する測定データはロギングトリガの有効/無効・動作状況に影響を受けない。
+> - パケットの構成は「7 測定データの構成」章を参照。
+> - DLL から取得したデータは、表示用データバッファがあふれないよう、
+>   **測定動作中に定期的に本関数を発行**すること（ポーリング必須）。
+>
+> **応答（6.29.5節）：**
+> | 戻り値 | 意味 |
+> |--------|------|
+> | `0x00000000` | 正常終了 |
+> | `0x30000001` | 関数内部で例外を検出 |
+> | `0x30000005` | `MdlNo` の指定値に誤りがある |
+> | `0x30000006` | （同上・詳細未記載）|
+> | `0x30000500` | `UnitNo` の指定値に誤りがある |
+> | `0x3000050E` | オフラインの状態で関数が呼び出された |
+> | `0x30100001` | 下位 DLL 内に必要な処理が見つからない（DLL ファイルのバージョン確認）|
+
+> **LabVIEW CLFN での `GetBufferData` の扱い**：
+> - `UnitNo` : I32（値 0）
+> - `MdlNo` : I32（対象モジュール番号）
+> - `pData` : `void *` → **Array Data Pointer**（U8 配列、`要求パケット数 × パケットサイズ` バイト分を事前確保）。
+>   パケットサイズはモジュール種別（RAM/CAN/ADC）ごとに「7 測定データの構成」章の定義に従う（別途確認要）。
+> - `pDataNum` : **Pointer to Value I32**（in/out）。呼び出し前に要求パケット数を書き込み、
+>   呼び出し後に実際の取得パケット数が上書きされる。
+> - `pLostDataNum` : **Pointer to Value I32**（out）。バッファあふれで破棄されたパケット数。
+> - `RAMScope_Read.vi` はループ内で本関数を定期ポーリングし、`pLostDataNum > 0` の場合は
+>   ロギング設定の見直し（バッファ容量拡大 or ポーリング周期短縮）を検討する。
+
 **AllInit エラーコード（確認済み）：**
 
 | 戻り値 | 意味 |
@@ -653,11 +705,11 @@ long RAMScopeGT150PGT_SetMdlConfig(
 | GT170_IF 完全関数一覧 | 6.1.2 章 | ✅ 確定 |
 | **測定開始 `RAMScopeGT150MeasStart(long)`** | 6.9 章 | ✅ プロトタイプ・エラーコード確定 |
 | **測定停止 `RAMScopeGT150MeasStop(long)`** | 6.10 章 | ✅ プロトタイプ・エラーコード確定 |
-| **データ読み出し `RAMScopeGT150GetBufferData`** | GT150_IF 表6-5・6.29章 | ✅ 関数名確定（引数は6.29章で要確認）|
+| **データ読み出し `RAMScopeGT150GetBufferData`** | 6.29 章（表 6-178〜180） | ✅ プロトタイプ・エラーコード確定（パケットサイズ定義=「7 測定データの構成」章のみ残） |
 | `RAMScopeGT170SetMeasCond` 引数・`MEASINFO_170` union | 6.13 章（表 6-74〜78） | ✅ RAM/ADC/CAN 構造体確定・周期範囲・SmpCnt 制約・互換性注記すべて確定 |
 | **`PGT_SetMdlConfig` 引数** | 6.7 章（表 6-38） | ✅ プロトタイプ確定（UnitNo/SlotErr[16]）|
 | **データ取得 API 一覧** | GT150_IF 表6-5 | ✅ GetBufferData(6.29)・GetLoggingData(6.31) ほか7関数確定 |
-| `GetBufferData` 引数詳細・バッファ構造 | 6.29 章 | ⬜ 要確認（最優先）|
+| 測定データパケット構造（RAM/CAN/ADC 別サイズ・フォーマット） | 「7 測定データの構成」章 | ⬜ 要確認（最優先。`pData` バッファサイズ計算に必須）|
 | `RAMScopeGT170SendCANDataFrame` 引数詳細 | 6.39 章 | ⬜ 未確認 |
 | **呼び出し規約**（`__stdcall` か `__cdecl` か） | 仕様書冒頭・任意の関数宣言行 | ⬜ 未確認 |
 | DLL の **ビット数**（32 / 64bit） | `dumpbin /headers` で確認 | ⬜ 未確認 |
