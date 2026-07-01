@@ -255,23 +255,80 @@ typedef struct MEASINFO_ADC170 {
 } MEASINFO_ADC170;
 /* サイズ = long×3 = 12 バイト */
 
-/* CAN モジュール用（表 6-77）：未確認。構造体定義は仕様書続きページで確認 */
-/* typedef struct MEASINFO_CAN170 { ... } MEASINFO_CAN170; */
+/* CAN モジュール用（表 6-77）*/
+typedef struct MEASINFO_CAN170 {
+    long             DummyInterval;  /* [将来拡張用] ダミーパケット生成周期(usec)。常に 100 */
+    char             isUseFDFormat;  /* パケットフォーマット：0=CAN 2.0B(GT150互換) / 1=CAN FD(推奨) */
+    /* ← char の後に 3 バイトパディングが入る（Ch の 4 バイトアライン） */
+    MEAS_CAN_CH_170  Ch[2];          /* 物理 Ch 毎の設定（Ch[0]=Ch1, Ch[1]=Ch2）*/
+} MEASINFO_CAN170;
+/* サイズ = 4(long) + 1(char) + 3(padding) + 32×2(Ch[2]) = 72 バイト */
+
+typedef struct MEAS_CAN_CH_170 {
+    long Enable;        /* CAN Ch 有効無効：0=無効 / 1=有効 */
+    long Terminate;     /* バスターミネータ挿入：0=挿入なし / 1=挿入あり */
+    long MonitorOnly;   /* 受信パケット応答：0=Ack応答（通常通信）/ 1=応答なし（モニタのみ） */
+    long BaudRate;      /* CAN 2.0B ボーレート or CAN FD アービトレーションレート：
+                           0x7=125kbps / 0x8=250kbps / 0x9=500kbps / 0xA=1Mbps / 0xB=800kbps */
+    long BaudRateHigh;  /* CAN FD データレート（FD のみ有効）：
+                           0x1=1Mbps / 0x2=2Mbps / 0x4=4Mbps / 0x5=5Mbps / 0x8=8Mbps */
+    long SmpCnt;        /* サンプリングポジション：0=60% / 1=65% / 2=70% / 3=75% / 4=80% */
+    long SmpCntHigh;    /* FD データレート用サンプリングポジション（SmpCnt と同範囲）*/
+    long BusMode;       /* バス動作モード：0=CAN 2.0B / 2=CAN FD(ISO) */
+} MEAS_CAN_CH_170;
+/* サイズ = long×8 = 32 バイト */
 ```
 
-> **使い方（RAM モニタの例）**：
+> **MEASINFO_170 union サイズ（確定）：**
+> - MEASINFO_RAM170 = 16 バイト
+> - MEASINFO_ADC170 = 12 バイト
+> - MEASINFO_CAN170 = **72 バイト**（最大）
+> - **union サイズ = 72 バイト**（CLFN で確保する U8 配列のサイズ）
+
+> **使い方例：**
 > ```c
+> /* RAM モニタの測定条件設定（module_type=0x0 のモジュールに対して発行）*/
 > MEASINFO_170 info;
-> info.RAM.DummyInterval   = 100;   // 固定
-> info.RAM.MeasPeri        = 1000;  // 1000 usec = 1ms 周期
-> info.RAM.MeasUnit        = 1;     // 1=usec
+> memset(&info, 0, sizeof(info));
+> info.RAM.DummyInterval    = 100;  // 固定
+> info.RAM.MeasPeri         = 1000; // 1000 usec = 1ms 周期
+> info.RAM.MeasUnit         = 1;    // 1=usec
 > info.RAM.MeasPeri_reserve = 1;    // 固定
 > RAMScopeGT170SetMeasCond(0, mdlNo_RAM, &info);
+>
+> /* CAN モジュールの測定条件設定（module_type=0x2 のモジュールに対して発行）*/
+> memset(&info, 0, sizeof(info));
+> info.CAN.DummyInterval    = 100;       // 固定
+> info.CAN.isUseFDFormat    = 1;         // CAN FD フォーマット推奨
+> info.CAN.Ch[0].Enable     = 1;         // Ch1 有効
+> info.CAN.Ch[0].MonitorOnly= 1;         // モニタのみ（Ack なし）
+> info.CAN.Ch[0].BaudRate   = 0x9;       // 500kbps（対象バスに合わせる）
+> info.CAN.Ch[0].BusMode    = 0;         // CAN 2.0B
+> RAMScopeGT170SetMeasCond(0, mdlNo_CAN, &info);
 > ```
 
-> **CLFN での union の扱い**：union のサイズは最大メンバのサイズ（`MEASINFO_CAN170` 確認後に確定）。
-> LabVIEW では **`Initialize Array`（U8 配列、union サイズ分）** を確保して各フィールドを
-> バイト順に埋め、`Array Data Pointer` で渡す。RAM モニタ用なら最低 16 バイト。
+> **CLFN での union の扱い（確定）**：
+> LabVIEW では **`Initialize Array`（U8 配列、72 要素）** を確保して各フィールドを
+> バイト順に埋め（`Insert Into Array` / 直接配線）、`Array Data Pointer` で渡す。
+> フィールドのオフセット計算は下記の通り（little-endian, 32bit long 前提）：
+>
+> | フィールド | オフセット | サイズ |
+> |-----------|-----------|--------|
+> | DummyInterval（RAM/ADC/CAN 共通先頭）| 0 | 4 |
+> | RAM: MeasPeri | 4 | 4 |
+> | RAM: MeasUnit | 8 | 4 |
+> | RAM: MeasPeri_reserve | 12 | 4 |
+> | CAN: isUseFDFormat | 4 | 1 |
+> | CAN: Ch[0].Enable | 8 | 4 |
+> | CAN: Ch[0].Terminate | 12 | 4 |
+> | CAN: Ch[0].MonitorOnly | 16 | 4 |
+> | CAN: Ch[0].BaudRate | 20 | 4 |
+> | CAN: Ch[0].BaudRateHigh | 24 | 4 |
+> | CAN: Ch[0].SmpCnt | 28 | 4 |
+> | CAN: Ch[0].SmpCntHigh | 32 | 4 |
+> | CAN: Ch[0].BusMode | 36 | 4 |
+> | CAN: Ch[1].Enable | 40 | 4 |
+> | （以降 Ch[1] メンバが +8〜+68）| … | … |
 
 **SYSINFO 構造体定義（`GetSysInfo` 用）：**
 
