@@ -422,7 +422,7 @@ long RAMScopeGT170SetMeasCond(
 
 **MEASINFO_170 共用体・構造体定義（`SetMeasCond` 用、表 6-74〜6-76／`.h` ヘッダで完全一致確認済み）：**
 
-> 🔴 **ヘッダファイル（`RAMScopeVP_API.h`、[docs/reference/RAMScopeVP_API.h](./reference/RAMScopeVP_API.h)）入手により、
+> 🔴 **ヘッダファイル（`RAMScopeVP.h`、[docs/reference/RAMScopeVP.h](./reference/RAMScopeVP.h)）入手により、
 > 以下 2 点の誤りが判明・修正済み：**
 > 1. `MEASINFO_RAM170.MeasPeri_reserve` は単一の `long` ではなく **`long MeasPeri_reserve[2]`（配列）**。
 >    サイズは 16 バイトではなく **20 バイト**が正しい。
@@ -1129,7 +1129,7 @@ pData → [ Packet[0] | Packet[1] | ... | Packet[M-1] ]
 
 ### 10.4.2c ヘッダファイル入手により新規確定した関数・構造体（`.h` ヘッダより）
 
-RAMScopeVP API のヘッダファイル `RAMScopeVP_API.h`（本リポジトリ [docs/reference/RAMScopeVP_API.h](./reference/RAMScopeVP_API.h) に保存済み）が入手できたため、
+RAMScopeVP API のヘッダファイル `RAMScopeVP.h`（本リポジトリ [docs/reference/RAMScopeVP.h](./reference/RAMScopeVP.h) に保存済み）が入手できたため、
 これまで仕様書 PDF の表からのみ関数名・章番号を把握していた関数群のプロトタイプ・構造体が
 全て確定した。ヘッダは関数ポインタ型（`typedef long (*XxxPtr)(...)`）として宣言されており、
 実行時に `GetProcAddress` 等で解決する設計だが、CLFN で使う分にはこの型定義から
@@ -1511,7 +1511,7 @@ long RAMScopeGT170SetAdcRange(long UnitNo, long MdlNo, long ChNum, long *pRange)
 | 実装方式 | **方式1（RAMScopeVP API / CLFN）** で進める |
 | DLL 入手 | ✅ `RAMScopeVP_API.dll` / `GT170.dll` 等 入手済み |
 | API 仕様書 | ✅ 入手済み（PDF。確認中） |
-| `.h` / サンプル | ✅ **入手済み**（`RAMScopeVP_API.h`。[docs/reference/RAMScopeVP_API.h](./reference/RAMScopeVP_API.h) に保存）。全構造体・全関数プロトタイプが確定し、仕様書からの手動転記による誤りを2件修正（10.4.2c 参照）|
+| `.h` / サンプル | ✅ **入手済み**（`RAMScopeVP.h`。[docs/reference/RAMScopeVP.h](./reference/RAMScopeVP.h) に保存）。全構造体・全関数プロトタイプが確定し、仕様書からの手動転記による誤りを2件修正（10.4.2c 参照）|
 | **CAN 操作 API** | ✅ **全確定**：`SendCANDataFrame`(6.39)／`ScenarioSendSet`(6.40)／`ScenarioSendStart`(6.41)／`ScenarioSendStop`(6.42) 全プロトタイプ・構造体・エラーコード確定 |
 | 接続・切断 API | ✅ `RAMScopeGT150DeviceInit` / `DeviceExit` 確定（プロトタイプ・エラーコード済） |
 | GT170 機能一覧 | ✅ 測定設定・トリガ・RAM 書込・CAN・アナログの関数名確定 |
