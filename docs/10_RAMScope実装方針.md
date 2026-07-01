@@ -344,9 +344,9 @@ long RAMScopeGT170SetMeasCond(
 ```c
 /* 共用体：モジュール種別に応じたメンバを使う */
 typedef union MEASINFO_170 {
-    MEASINFO_RAM170  RAM;   /* RAMモニタモジュール用（module_type=0x0） */
-    MEASINFO_ADC170  ADC;   /* アナログ入力モジュール用（module_type=0xE 相当） */
-    MEASINFO_CAN170  CAN;   /* CAN モジュール用（module_type=0x2） */
+    MEASINFO_RAM170  RAM;   /* RAMモニタモジュール用（module_type=0x00） */
+    MEASINFO_ADC170  ADC;   /* アナログ入力モジュール用（module_type=0x03。旧記述の 0xE は誤り。GTHard.h で確定）*/
+    MEASINFO_CAN170  CAN;   /* CAN モジュール用（module_type=0x02） */
 } MEASINFO_170;
 
 /* RAM モニタモジュール用（表 6-75。.h では MeasPeri_reserve[2] の配列） */
@@ -473,8 +473,9 @@ typedef struct MEAS_CAN_CH_170 {
 ```c
 typedef struct SYSINFO {
     long module;            /* モジュール番号 */
-    long module_type;       /* モジュールタイプ: 0x0=RAMモニタ/光RAMモニタ, 0x2=CAN,
-                               0xE=電源通信, 0xF=非接続 */
+    long module_type;       /* モジュールタイプ（`GTHard.h` で確定）:
+                               0x00=RAMモニタ / 0x02=CAN / 0x03=アナログ入力(AD) /
+                               0x0E=電源通信(CTRL_USB) / 0x0F=非接続 */
     long probe_id;          /* 接続プローブID（RAMモニタのみ） */
     long interface_id;      /* 将来拡張用（値は不定） */
     long version;           /* FPGAバージョン番号 */
@@ -493,6 +494,39 @@ typedef struct SYSINFO {
 > **CLFN での `GetSysInfo` の扱い**：`pSysInfo` は要素 16 の配列ポインタ。
 > LabVIEW では **`Initialize Array`（サイズ 960 の U8 配列）** を先に確保して
 > `Array Data Pointer` で渡し、後段で `Type Cast` / `Unflatten` して各フィールドを取り出す。
+
+**関連定数一覧（`GTHard.h`、[docs/reference/GTHard.h](./reference/GTHard.h) に保存済み）：**
+
+```c
+/* DeviceInit() の kind 出力パラメータ（機種判定） */
+#define TYPE_GTKIND_150   0   /* GT150 */
+#define TYPE_GTKIND_12x   1   /* GT12x */
+#define TYPE_GTKIND_170   2   /* GT170（本システムで使用）*/
+
+/* SYSINFO.module_type（上記で確定・修正済み） */
+#define TYPE_RAMMONITOR_MODULE   0x00
+#define TYPE_CAN_MODULE          0x02
+#define TYPE_AD_MODULE           0x03   /* アナログ入力。旧ドキュメントの「0xE相当」は誤り */
+#define TYPE_CTRL_USB_MODULE     0x0E   /* 電源通信モジュール（GT170U01 等）*/
+#define TYPE_MODULE_DISCONNECT   0x0F   /* 非接続 */
+
+/* モジュール数上限（GetSysInfo/SlotErr が要素数16を使う理由 = 全機種共通の最大値）*/
+#define NUM_MODULE_MAX       16   /* 全機種共通の配列サイズ（SYSINFO[16]、SlotErr[16] 等）*/
+#define NUM_MODULE_MAX_150   5    /* GT150 の実際の最大モジュール数 */
+#define NUM_MODULE_MAX_170   10   /* GT170 の実際の最大モジュール数（本システムで使用）*/
+
+/* チャンネル数上限（SetMeasCh のループ回数の上限チェックに使用）*/
+#define NUM_CH_MAX_RAM150   1024
+#define NUM_CH_MAX_ADC150   6
+#define NUM_CH_MAX_RAM170   2048  /* GT170 RAMモニタの最大チャンネル数 */
+#define NUM_CH_MAX_ADC170   4     /* GT170 アナログ入力の最大チャンネル数 */
+```
+
+> `DeviceInit()` の `kind` 出力値（10.4.2a で `0=GT150, 1=GT12x, 2=GT17x` と記載済み）は
+> この `TYPE_GTKIND_*` 定数と完全一致することが確定した。
+> また `GetSysInfo`／`PGT_SetMdlConfig`／`ScenarioSendSet` 等で配列サイズ **16** を
+> 一律使っていた理由は、`NUM_MODULE_MAX=16`（全機種共通の上限）を採用しているためと判明した
+> （GT170 自体の実際の上限は `NUM_MODULE_MAX_170=10`）。
 
 **MDLCFG 構造体定義（`SetMdlConfig` 用）：**
 
@@ -1432,7 +1466,9 @@ long RAMScopeGT170SetAdcRange(long UnitNo, long MdlNo, long ChNum, long *pRange)
 > 🔴 **`.h` ヘッダ入手による誤り修正（重要）**：
 > - `MEASINFO_RAM170.MeasPeri_reserve` は `long` 単体ではなく **`long[2]`（配列）** ＝ 20バイト（旧: 16バイトは誤り）
 > - `MEASINFO_CAN170.isUseFDFormat` は `char` ではなく **`long`** ＝ パディングなし（旧: 3バイトパディングは誤り）
-> - 詳細・修正版の構造体定義は 10.4.2a 内 `MEASINFO_170` セクション参照。
+> - `SYSINFO.module_type` の**アナログ入力モジュールは `0x03`**（`GTHard.h` で確定）。
+>   旧記述の「`0xE` 相当」は誤りで、`0x0E` は実際には**電源通信(CTRL_USB)モジュール**の値だった。
+> - 詳細・修正版の構造体定義は 10.4.2a 内 `MEASINFO_170`／`SYSINFO` セクション参照。
 
 ### 🔴 重大な問題：DLL が 32bit・LabVIEW が 64bit（アーキテクチャ不一致）
 
