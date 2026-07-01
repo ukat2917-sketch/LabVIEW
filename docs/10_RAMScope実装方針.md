@@ -56,12 +56,31 @@ RAMScopeVP API（DLL）を **Call Library Function Node（CLFN）** で呼び出
 
 `RAMScopeVP_API\lib`（10.1 の格納場所）の中身を確認する。
 
-| 入手物 | 用途 |
-|--------|------|
-| **DLL 本体**（`*.dll`） | CLFN から呼び出す実体 |
-| **API 外部仕様書** | 関数一覧・呼び出し順序（ライフサイクル）・引数/戻り値・エラーコードの一次情報 |
-| **インクルードファイル（`*.h`）** | 関数プロトタイプ・構造体・定数（モード値/エラーコード）の正確な定義 |
-| **サンプルプログラム（C 等）** | 正しい呼び出し順序・引数の渡し方の実例 |
+| 入手物 | 用途 | 入手状況 |
+|--------|------|---------|
+| **DLL 本体**（`*.dll`） | CLFN から呼び出す実体 | **✅ 入手済み** |
+| **API 外部仕様書** | 関数一覧・呼び出し順序・引数/戻り値・エラーコード | **✅ 入手済み**（確認中） |
+| **インクルードファイル（`*.h`）** | 関数プロトタイプ・構造体・定数の正確な定義 | ❌ 未同梱（要対応→下記） |
+| **サンプルプログラム（C 等）** | 正しい呼び出し順序・引数の渡し方の実例 | ❌ 未同梱（要対応→下記） |
+
+> **`.h` ／サンプルが同梱されていない場合の対処**
+> - 関数プロトタイプは **API 外部仕様書の「関数宣言」表**から読み取れる（C 言語宣言がそのまま掲載）。
+>   仕様書が手元にあれば `.h` なしで CLFN 設定は可能。
+> - 構造体のパディング問題は、**仕様書のメンバ列と `long`/`short` 等のサイズから手動計算**するか、
+>   PoC で実測して確認する。
+> - サンプルが必要な場合は **DTS インサイトサポート**（`support-mvi@dts-insight.co.jp`）に依頼、
+>   または API 仕様書の「発行タイミング」節の呼び出しフローを参照する。
+
+**確認済み DLL ファイル構成**（実機から確認）：
+
+| ファイル | 役割 |
+|----------|------|
+| `RAMScopeVP_API.dll` | RAMScopeVP API 本体（CLFN から直接呼ぶ） |
+| `GT150.dll` / `GT170.dll` / `GT170USB.dll` | 機種別ハードウェア制御（`RAMScopeVP_API.dll` が内部で使用） |
+| `PGTMgrVP.dll` / `PGTMgrVP_ENG.dll` | 管理モジュール |
+| `mfc140u.dll` / `msvcp140.dll` / `vcruntime140.dll` | Visual C++ ランタイム（依存）|
+| `utillc.dll` | ユーティリティ |
+| `pgtlib\` フォルダ | ライブラリ補助ファイル |
 
 準備：
 1. **対象 PC に RAMScopeVP（API）をインストール**し、DLL のフルパスを確定。
@@ -72,15 +91,83 @@ RAMScopeVP API（DLL）を **Call Library Function Node（CLFN）** で呼び出
 
 CLFN を置く前に、外部仕様書とヘッダから次を表にまとめる（これが解読の本体）。
 
-1. **関数一覧とライフサイクル**：初期化→測定変数設定→計測開始→読み出し→停止→クローズ、
-   の順序と各関数名を把握。RAMScope は「ハンドル（デバイス ID）」を初期化で取得し、
-   以降の関数へ渡す型が多い → **ハンドルを VI 間で引き回す設計**にする（[04](./04_VIの仕組み_LabVIEW基礎.md) 4.4 リファレンスと同じ考え方）。
-2. **各関数のプロトタイプ**（`.h` から）：戻り値型・引数型・引数の入出力方向（in / out）・
+1. **関数一覧とライフサイクル**（→ 10.4.2a で確認済み分を記載）。
+2. **各関数のプロトタイプ**：戻り値型・引数型・引数の入出力方向（in / out）・
    呼び出し規約マクロ（`WINAPI`/`__stdcall` か `__cdecl` か）。
 3. **データ型の対応付け**：整数サイズ（`int`/`unsigned long`/`short` 等）、ポインタ、文字列、
    構造体、配列（RAM 値バッファ）を LabVIEW 型へどう写すか（10.4.4・10.4.5）。
 4. **定数の洗い出し**：エラーコード、動作モード値、RAM 型（符号/サイズ）等の `#define`/`enum`
    → LabVIEW 側の定数表／Enum 型定義にして可読化。
+
+#### 10.4.2a 確認済み API 仕様（仕様書スクリーンショットより）
+
+**関数プレフィックスの規則**：
+- `RAMScopeGT150*`：全機種共通（GT150/GT17x/GT12x 全てに適用）
+- `RAMScopeGT170*`：GT170 固有機能（RAM 計測条件設定・CAN 操作 等）
+
+**確認済み関数プロトタイプ：**
+
+```c
+/* 接続デバイス初期化（6.2章） */
+long RAMScopeGT150DeviceInit(
+    long  *pUnitNum,   /* [out] 接続成功台数（現仕様では常に 1） */
+    long  *kind        /* [out] 機種コード：0=GT150, 1=GT12x, 2=GT17x */
+);
+
+/* 接続デバイス終了（6.3章） */
+long RAMScopeGT150DeviceExit(
+    void
+);
+```
+
+**GT170 固有機能（機能別）：**
+
+| カテゴリ | 関数名 | 章 |
+|---------|--------|-----|
+| 測定設定 | `RAMScopeGT170SetMeasCond()` | 6.13 |
+| 測定設定 | `RAMScopeGT170SetMeasCh()` | 6.15 |
+| トリガ設定 | `RAMScopeGT170SetEventCond()` | 6.19 |
+| トリガ設定 | `RAMScopeGT170SetExternalTrigger()` | 6.23 |
+| トリガ設定 | `RAMScopeGT170SetMeasTrigger()` | 6.24 |
+| RAM 書き込み | `RAMScopeGT170ScenarioWriteStart()` | 6.36 |
+| RAM 書き込み | `RAMScopeGT170ScenarioWriteStop()` | 6.37 |
+| **CAN 送信** | **`RAMScopeGT170SendCANDataFrame()`** | 6.39 |
+| **CAN シナリオ** | **`RAMScopeGT170ScenarioSendCond()`** | 6.40 |
+| **CAN シナリオ** | **`RAMScopeGT170ScenarioSendStart()`** | 6.41 |
+| **CAN シナリオ** | **`RAMScopeGT170ScenarioSendStop()`** | 6.42 |
+| アナログ入力 | `RAMScopeGT170SetAdcRange()` | 6.44 |
+
+> **CAN 操作は RAMScopeVP API で確定**（`RAMScopeGT170SendCANDataFrame` / `ScenarioSend*`）。
+> 10.6 の「未確定事項」から除去。
+
+**DeviceInit のエラーコード（確認済み）：**
+
+| 戻り値 | 意味 |
+|--------|------|
+| `0x00000000` | 正常終了 |
+| `0x30000001` | 関数内部で例外を検出 |
+| `0x30000503` | 同一種類の RAMScope が複数台接続されている |
+| `0x30100000` | 必要な DLL ファイルが見つからない |
+| `0x30000504` | RAMScope ハードウェアとの通信に失敗 |
+| `0x30000506` | 電源・USB 接続・ドライバ・発行手順を確認 |
+
+**DeviceExit のエラーコード：**
+
+| 戻り値 | 意味 |
+|--------|------|
+| `0x00000000` | 正常終了 |
+| `0x30000001` | 関数内部で例外を検出 |
+
+**注意事項（仕様書より）：**
+- `DeviceInit` は **DLL ロード後、全ての処理に先立って最初に発行**する。
+- `DeviceInit` はオフライン状態でのみ有効（測定中・アイドル中は応答するが実処理なし）。
+- `DeviceExit` 発行時、RAMScopeVP API が保持していた**測定設定・測定データは全て破棄**される。
+- 測定状態で `DeviceExit` を発行すると**自動停止してから切断**される。
+
+**まだ未確認の共通関数**（仕様書の追加ページで確認が必要）：
+- 測定開始・停止関数（`RAMScopeGT150Meas*` 相当）
+- データ読み出し関数（RAM 値取得）
+- 呼び出し規約（`__stdcall` か `__cdecl` か）
 
 ### 10.4.3 STEP2：1 関数あたりの CLFN 設定手順
 
@@ -135,16 +222,22 @@ CLFN を置く前に、外部仕様書とヘッダから次を表にまとめる
 
 仕様の関数を、本資料の 1 イベント 1VI（[05](./05_VI設計方針と共通仕様.md)）に対応させる。
 
-| VI | ラップする API（例。仕様書で確認） | 入出力（共通仕様に準拠） |
-|----|-------------------------------------|--------------------------|
-| `RAMScope_Init.vi` | デバイス Open／初期化（ハンドル取得）、測定変数（RAM アドレス/シンボル）の登録 | in:接続情報 / out:**ハンドル**・Status・TestError |
-| `RAMScope_Log_Start.vi` | 計測開始 | in:ハンドル / out:Status・TestError |
-| `RAMScope_Read.vi` | 現在値の読み出し（ポーリング or バッファ取得） | in:ハンドル / out:**RAM 値（配列）**・Status・TestError |
-| `RAMScope_Log_Stop.vi` | 計測停止 | in:ハンドル / out:Status・TestError |
-| `RAMScope_Reset.vi` | リセット／デバイス Close（異常時最後段） | in:ハンドル / out:Status・TestError |
-| `CAN_*`（RAMScope 経由の場合） | CAM モジュールの CAN 送受信 API（**仕様書で有無を要確認**） | [09](./09_CAN通信の実装.md) の入出力に整合 |
+| VI | ラップする API（確認済み） | 入出力（共通仕様に準拠） |
+|----|----------------------------|--------------------------|
+| `RAMScope_Init.vi` | `RAMScopeGT150DeviceInit(long *pUnitNum, long *kind)` → 機種コード取得後、測定条件設定（`RAMScopeGT170SetMeasCond`/`SetMeasCh`）を続けて呼ぶ | in: なし（1台固定前提）/ out:**kind**（機種確認用）・Status・TestError |
+| `RAMScope_Set_Cond.vi` | `RAMScopeGT170SetMeasCond()` + `RAMScopeGT170SetMeasCh()` | in: 測定条件パラメータ / out: Status・TestError |
+| `RAMScope_Log_Start.vi` | 計測開始 API（**仕様書の測定開始章で確認**） | in: — / out: Status・TestError |
+| `RAMScope_Read.vi` | データ読み出し API（**仕様書のデータ取得章で確認**） | in: — / out: **RAM 値（配列）**・Status・TestError |
+| `RAMScope_Log_Stop.vi` | 計測停止 API（**仕様書の測定停止章で確認**） | in: — / out: Status・TestError |
+| `RAMScope_Reset.vi` | `RAMScopeGT150DeviceExit(void)` | in: なし / out: Status・TestError |
+| `CAN_Send.vi`（RAMScope 経由） | `RAMScopeGT170SendCANDataFrame()` | [09](./09_CAN通信の実装.md) の入出力に整合 |
+| `CAN_Scenario_Start.vi` | `RAMScopeGT170ScenarioSendCond()` + `RAMScopeGT170ScenarioSendStart()` | シナリオ CAN 送信開始 |
+| `CAN_Scenario_Stop.vi` | `RAMScopeGT170ScenarioSendStop()` | シナリオ CAN 送信停止 |
 
-> **ハンドルは VI 出力で引き回す**（VISA リファレンスと同じ運用）。Setup で Init、Cleanup で Reset/Close。
+> **ハンドルについて**：`RAMScopeGT150DeviceInit` は出力引数（`pUnitNum`/`kind`）のみで
+> **セッションハンドルを返さない**（グローバル状態で管理される模様）。
+> 後続の `RAMScopeGT170*` 関数もハンドル引数を持たない可能性がある。
+> 実際の引数構成は仕様書の各関数ページで確認し、ハンドルが不要なら VI 間引き回しは不要となる。
 
 ### 10.4.8 STEP7：エラー処理
 
@@ -169,12 +262,28 @@ CLFN を置く前に、外部仕様書とヘッダから次を表にまとめる
 - 順序：**DUT の電源を落としてから、RAMScope を落とす（リセット）**。
 - `RAMScope_Reset.vi` を Cleanup の最後段に配置する（[12](./12_異常系処理とシャットダウン設計.md)）。
 
-## 10.6 未確定事項（要決定）
+## 10.6 状況まとめと残課題
 
-- 方式1 / 方式2 のどちらを採用するか。
-- 方式2 の費用、CAN 操作対応可否。
-- ~~方式1 の DLL 仕様入手可否~~ → **入手可能（RAMScopeVP API、外部仕様書・ヘッダ・サンプル付）で確定**。
-- 方式1 の残課題：
-  - **CAN 操作 API が RAMScopeVP API に含まれるか**（CAM モジュール経由）の確認 → PoC（10.4.9）。
-  - 構造体／ポインタ／配列引数の解読・実装の難易度（PoC で見極め）。
-  - DLL の **ビット数**（10.4.6）を LabVIEW と一致させること。
+### 確定済み事項
+
+| 項目 | 状況 |
+|------|------|
+| 実装方式 | **方式1（RAMScopeVP API / CLFN）** で進める |
+| DLL 入手 | ✅ `RAMScopeVP_API.dll` / `GT170.dll` 等 入手済み |
+| API 仕様書 | ✅ 入手済み（PDF。確認中） |
+| `.h` / サンプル | ❌ 未同梱。仕様書の関数宣言表から代替可能（10.4.1） |
+| **CAN 操作 API** | ✅ **確定**：`RAMScopeGT170SendCANDataFrame()` / `ScenarioSend*()` あり |
+| 接続・切断 API | ✅ `RAMScopeGT150DeviceInit` / `DeviceExit` 確定（プロトタイプ・エラーコード済） |
+| GT170 機能一覧 | ✅ 測定設定・トリガ・RAM 書込・CAN・アナログの関数名確定 |
+
+### 残課題（仕様書の追加ページ確認）
+
+| 確認項目 | 必要な仕様書ページ |
+|----------|------------------|
+| **測定開始関数**のプロトタイプ（`Meas Start` 相当） | GT150_IF 共通関数 一覧章（6.1.1 相当） |
+| **測定停止関数**のプロトタイプ | 同上 |
+| **データ読み出し関数**のプロトタイプ・引数（バッファサイズ等） | 同上 |
+| **呼び出し規約**（`__stdcall` か `__cdecl` か） | 仕様書冒頭・ヘッダ・または任意の関数ページの宣言行 |
+| `RAMScopeGT170SendCANDataFrame` の引数詳細 | 6.39 章 |
+| `RAMScopeGT170SetMeasCond`/`SetMeasCh` の引数・構造体 | 6.13/6.15 章 |
+| DLL の **ビット数**（32 / 64bit） | `dumpbin /headers` または PE ツールで確認 |
