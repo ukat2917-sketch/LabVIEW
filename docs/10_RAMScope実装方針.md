@@ -552,6 +552,74 @@ long RAMScopeGT150GetBufferData(
 > **CAN 操作は RAMScopeVP API で確定**（`RAMScopeGT170SendCANDataFrame` / `ScenarioSend*`）。
 > 10.6 の「未確定事項」から除去。
 
+**`RAMScopeGT170SendCANDataFrame` 関数仕様（6.39章・確定）：**
+
+```c
+/* CAN データフレーム送信処理
+   CAN モジュールから測定対象の CAN バスへデータフレームを送信する。
+   発行対象モジュール：CAN */
+long RAMScopeGT170SendCANDataFrame(
+    long              UnitNo,      /* [in] 発行対象ユニット（将来拡張用。現仕様では常に 0）*/
+    long              MdlNo,       /* [in] 発行対象モジュールのモジュール番号 */
+    long              ChNo,        /* [in] データフレーム送信に使用する CAN モジュールの物理Ch番号。0=Ch1／1=Ch2 */
+    CANSEND_170_INFO  *pSendInfo   /* [in] 送信情報を格納した CANSEND_170_INFO 型変数のポインタ */
+);
+```
+
+**`CANSEND_170_INFO` / `CANSEND_170_DATA` 構造体定義（6.39.3章・表6-223、6-224）：**
+
+```c
+typedef struct CANSEND_170_INFO {
+    long              IdFormat;    /* ID フォーマット：0=標準ID／1=拡張ID */
+    long              Count;       /* 送信データフレーム数（1〜30）*/
+    CANSEND_170_DATA  *pSendData;  /* 送信データフレーム情報。
+                                       設定値を格納した CANSEND_170_DATA 型配列
+                                       （要素数 Count）の先頭ポインタを渡す */
+} CANSEND_170_INFO;
+
+typedef struct CANSEND_170_DATA {
+    unsigned long  DataLength;  /* 送信データ長。
+                                    0〜8: 0〜8Byte／12:12Byte／16:16Byte／20:20Byte／
+                                    24:24Byte／32:32Byte／48:48Byte／64:64Byte
+                                    （CAN FD の非線形DLC対応値をそのままByte数で指定）*/
+    unsigned long  CanID;       /* データフレーム送信時のメッセージ ID */
+    unsigned char  Data[64];    /* 送信データ。DataLength で設定した分のデータを
+                                    先頭から詰めて格納する */
+} CANSEND_170_DATA;
+```
+
+> **LabVIEW CLFN での `SendCANDataFrame` の扱い**：
+> - `UnitNo`/`MdlNo`/`ChNo` : I32
+> - `pSendInfo` : ネストしたポインタを持つ構造体のため、二段階で組み立てる。
+>   1. `CANSEND_170_DATA` 配列（要素数 = 送信フレーム数、1要素 = 4+4+64 = **72バイト**）を
+>      U8 配列として `Initialize Array` で確保し、`Array Data Pointer` を取得。
+>   2. `CANSEND_170_INFO` 本体（IdFormat(4)+Count(4)+pSendData(ポインタ4/8byte) = 環境依存サイズ）
+>      を別の U8 配列として確保し、`pSendData` 位置に手順1で得たポインタ値を書き込む。
+>   3. 手順2の配列の `Array Data Pointer` を `CLFN` の `pSendInfo` 引数に渡す。
+> - `pSendInfo` 自体は CLFN 上で `Pointer to Value` 相当（構造体を指すポインタ1個）として渡す。
+
+> **注意・制限事項（6.39.4節）：**
+> - アイドル中に本関数を発行する場合、事前に **`RAMScopeGT170SetMeasCond()`** 関数によりバス設定を行うこと。
+> - `DataLength=0` のデータフレームを要求した場合、本関数は該当のデータフレーム送信を実施しない
+>   （**エラーとはしない**）。
+>
+> **発行タイミング（6.39.5節）**：オフライン=×／測定中=○／アイドル=○
+>
+> **応答（6.39.6節 表6-226）：**
+> | 戻り値 | 意味 |
+> |--------|------|
+> | `0x00000000` | 正常終了 |
+> | `0x30000001` | 関数内部で例外を検出 |
+> | `0x30000005` | `MdlNo` の指定値に誤りがある |
+> | `0x30000006` | （同上・詳細未記載）|
+> | `0x30000500` | `UnitNo` の指定値に誤りがある |
+> | `0x3000050E` | オフラインの状態で関数が呼び出された |
+> | `0x30000900` | 動作指定値に誤りがある |
+> | `0x30100001` | 下位DLL内に必要な処理が見つからない（DLLバージョン確認）／GT150・GT12xに対して関数が呼び出された |
+> | `0x30000504` | RAMScopeハードウェアとの通信に失敗 |
+> | `0x3000050D` | 電源・ホストPCとの接続・USBドライバのインストール状況・API関数の発行手順などを確認 |
+> | `0x30000512`〜`0x30000515` | 上記確認後も現象が改善しない場合は弊社まで問い合わせ |
+
 **DeviceInit のエラーコード（確認済み）：**
 
 | 戻り値 | 意味 |
