@@ -331,24 +331,32 @@ long RAMScopeGT170SetMeasCond(
 );
 ```
 
-**MEASINFO_170 共用体・構造体定義（`SetMeasCond` 用、表 6-74〜6-76）：**
+**MEASINFO_170 共用体・構造体定義（`SetMeasCond` 用、表 6-74〜6-76／`.h` ヘッダで完全一致確認済み）：**
+
+> 🔴 **ヘッダファイル（`RAMScopeVP_API.h`、[docs/reference/RAMScopeVP_API.h](./reference/RAMScopeVP_API.h)）入手により、
+> 以下 2 点の誤りが判明・修正済み：**
+> 1. `MEASINFO_RAM170.MeasPeri_reserve` は単一の `long` ではなく **`long MeasPeri_reserve[2]`（配列）**。
+>    サイズは 16 バイトではなく **20 バイト**が正しい。
+> 2. `MEASINFO_CAN170.isUseFDFormat` は `char` ではなく **`long`（4バイト）**。
+>    そのため **パディングは発生しない**（旧記述の「3バイトパディング」は誤り）。
+>    union 全体のサイズは偶然にも変わらず 72 バイト（後述）。
 
 ```c
 /* 共用体：モジュール種別に応じたメンバを使う */
 typedef union MEASINFO_170 {
     MEASINFO_RAM170  RAM;   /* RAMモニタモジュール用（module_type=0x0） */
     MEASINFO_ADC170  ADC;   /* アナログ入力モジュール用（module_type=0xE 相当） */
-    MEASINFO_CAN170  CAN;   /* CAN モジュール用（module_type=0x2）（構造体定義は表6-77→未確認）*/
+    MEASINFO_CAN170  CAN;   /* CAN モジュール用（module_type=0x2） */
 } MEASINFO_170;
 
-/* RAM モニタモジュール用（表 6-75）*/
+/* RAM モニタモジュール用（表 6-75。.h では MeasPeri_reserve[2] の配列） */
 typedef struct MEASINFO_RAM170 {
-    long DummyInterval;      /* [将来拡張用] ダミーパケット生成周期(usec)。常に 100 を指定 */
-    long MeasPeri;           /* 測定周期：1〜999999 */
-    long MeasUnit;           /* 測定周期の単位：1=usec / 2=msec */
-    long MeasPeri_reserve;   /* [将来拡張用] 現版数では常に 1 を指定 */
+    long DummyInterval;         /* [将来拡張用] ダミーパケット生成周期(usec)。常に 100 を指定 */
+    long MeasPeri;              /* 測定周期：1〜999999 */
+    long MeasUnit;               /* 測定周期の単位：1=usec / 2=msec */
+    long MeasPeri_reserve[2];   /* [将来拡張用] 要素数2の配列。現版数では常に {1, 0} 等を指定（詳細仕様書要再確認）*/
 } MEASINFO_RAM170;
-/* サイズ = long×4 = 16 バイト */
+/* サイズ = long×3 + long[2] = 12 + 8 = 20 バイト（.h ヘッダで確定） */
 
 /* アナログ入力モジュール用（表 6-76）*/
 typedef struct MEASINFO_ADC170 {
@@ -358,14 +366,13 @@ typedef struct MEASINFO_ADC170 {
 } MEASINFO_ADC170;
 /* サイズ = long×3 = 12 バイト */
 
-/* CAN モジュール用（表 6-77）*/
+/* CAN モジュール用（表 6-77。.h では isUseFDFormat は long） */
 typedef struct MEASINFO_CAN170 {
     long             DummyInterval;  /* [将来拡張用] ダミーパケット生成周期(usec)。常に 100 */
-    char             isUseFDFormat;  /* パケットフォーマット：0=CAN 2.0B(GT150互換) / 1=CAN FD(推奨) */
-    /* ← char の後に 3 バイトパディングが入る（Ch の 4 バイトアライン） */
+    long             isUseFDFormat;  /* パケットフォーマット：0=CAN 2.0B(GT150互換) / 1=CAN FD(推奨) */
     MEAS_CAN_CH_170  Ch[2];          /* 物理 Ch 毎の設定（Ch[0]=Ch1, Ch[1]=Ch2）*/
 } MEASINFO_CAN170;
-/* サイズ = 4(long) + 1(char) + 3(padding) + 32×2(Ch[2]) = 72 バイト */
+/* サイズ = 4(long) + 4(long) + 32×2(Ch[2]) = 72 バイト（パディングなし・.h ヘッダで確定） */
 
 typedef struct MEAS_CAN_CH_170 {
     long Enable;        /* CAN Ch 有効無効：0=無効 / 1=有効 */
@@ -405,27 +412,28 @@ typedef struct MEAS_CAN_CH_170 {
 > - **`isUseFDFormat=0` のとき `BusMode=0` 以外は設定エラーとなる**（CAN 2.0B 時は BusMode=0 固定）
 > - CAN FD 使用時（`isUseFDFormat=1`）は `BusMode=2`（CANFD ISO）を指定すること
 
-> **MEASINFO_170 union サイズ（確定）：**
-> - MEASINFO_RAM170 = 16 バイト
+> **MEASINFO_170 union サイズ（`.h` ヘッダで確定・修正済み）：**
+> - MEASINFO_RAM170 = **20 バイト**（旧: 16バイトは誤り。`MeasPeri_reserve[2]` の配列のため）
 > - MEASINFO_ADC170 = 12 バイト
-> - MEASINFO_CAN170 = **72 バイト**（最大）
-> - **union サイズ = 72 バイト**（CLFN で確保する U8 配列のサイズ）
+> - MEASINFO_CAN170 = **72 バイト**（最大。`isUseFDFormat` は long のためパディングなし）
+> - **union サイズ = 72 バイト**（CAN が最大のまま。CLFN で確保する U8 配列のサイズ）
 
 > **使い方例：**
 > ```c
 > /* RAM モニタの測定条件設定（module_type=0x0 のモジュールに対して発行）*/
 > MEASINFO_170 info;
 > memset(&info, 0, sizeof(info));
-> info.RAM.DummyInterval    = 100;  // 固定
-> info.RAM.MeasPeri         = 1000; // 1000 usec = 1ms 周期
-> info.RAM.MeasUnit         = 1;    // 1=usec
-> info.RAM.MeasPeri_reserve = 1;    // 固定
+> info.RAM.DummyInterval       = 100;  // 固定
+> info.RAM.MeasPeri            = 1000; // 1000 usec = 1ms 周期
+> info.RAM.MeasUnit            = 1;    // 1=usec
+> info.RAM.MeasPeri_reserve[0] = 0;    // [将来拡張用] 詳細仕様は仕様書側で要再確認
+> info.RAM.MeasPeri_reserve[1] = 0;    // 同上
 > RAMScopeGT170SetMeasCond(0, mdlNo_RAM, &info);
 >
 > /* CAN モジュールの測定条件設定（module_type=0x2 のモジュールに対して発行）*/
 > memset(&info, 0, sizeof(info));
 > info.CAN.DummyInterval    = 100;       // 固定
-> info.CAN.isUseFDFormat    = 1;         // CAN FD フォーマット推奨
+> info.CAN.isUseFDFormat    = 1;         // CAN FD フォーマット推奨（long型）
 > info.CAN.Ch[0].Enable     = 1;         // Ch1 有効
 > info.CAN.Ch[0].MonitorOnly= 1;         // モニタのみ（Ack なし）
 > info.CAN.Ch[0].BaudRate   = 0x9;       // 500kbps（対象バスに合わせる）
@@ -433,18 +441,19 @@ typedef struct MEAS_CAN_CH_170 {
 > RAMScopeGT170SetMeasCond(0, mdlNo_CAN, &info);
 > ```
 
-> **CLFN での union の扱い（確定）**：
+> **CLFN での union の扱い（`.h` ヘッダで確定・修正済み）**：
 > LabVIEW では **`Initialize Array`（U8 配列、72 要素）** を確保して各フィールドを
 > バイト順に埋め（`Insert Into Array` / 直接配線）、`Array Data Pointer` で渡す。
-> フィールドのオフセット計算は下記の通り（little-endian, 32bit long 前提）：
+> フィールドのオフセット計算は下記の通り（little-endian, 32bit long 前提。**パディングなし**）：
 >
 > | フィールド | オフセット | サイズ |
 > |-----------|-----------|--------|
 > | DummyInterval（RAM/ADC/CAN 共通先頭）| 0 | 4 |
 > | RAM: MeasPeri | 4 | 4 |
 > | RAM: MeasUnit | 8 | 4 |
-> | RAM: MeasPeri_reserve | 12 | 4 |
-> | CAN: isUseFDFormat | 4 | 1 |
+> | RAM: MeasPeri_reserve[0] | 12 | 4 |
+> | RAM: MeasPeri_reserve[1] | 16 | 4 |
+> | CAN: isUseFDFormat（long, 修正済み）| 4 | 4 |
 > | CAN: Ch[0].Enable | 8 | 4 |
 > | CAN: Ch[0].Terminate | 12 | 4 |
 > | CAN: Ch[0].MonitorOnly | 16 | 4 |
@@ -455,6 +464,9 @@ typedef struct MEAS_CAN_CH_170 {
 > | CAN: Ch[0].BusMode | 36 | 4 |
 > | CAN: Ch[1].Enable | 40 | 4 |
 > | （以降 Ch[1] メンバが +8〜+68）| … | … |
+>
+> ※ CAN のオフセットは isUseFDFormat のサイズ変更後も偶然一致（char+padding=4byte 相当だったため）、
+> 　旧版からの変更なし。RAM 側のみ offset 12 以降が変わる点に注意。
 
 **SYSINFO 構造体定義（`GetSysInfo` 用）：**
 
@@ -631,20 +643,22 @@ long RAMScopeGT150GetBufferData(
 
 **GT170 固有機能（機能別）：**
 
-| カテゴリ | 関数名 | 章 |
-|---------|--------|-----|
-| 測定設定 | `RAMScopeGT170SetMeasCond()` | 6.13 |
-| 測定設定 | `RAMScopeGT170SetMeasCh()` | 6.15 |
-| トリガ設定 | `RAMScopeGT170SetEventCond()` | 6.19 |
-| トリガ設定 | `RAMScopeGT170SetExternalTrigger()` | 6.23 |
-| トリガ設定 | `RAMScopeGT170SetMeasTrigger()` | 6.24 |
-| RAM 書き込み | `RAMScopeGT170ScenarioWriteStart()` | 6.36 |
-| RAM 書き込み | `RAMScopeGT170ScenarioWriteStop()` | 6.37 |
-| **CAN 送信** | **`RAMScopeGT170SendCANDataFrame()`** | 6.39 |
-| **CAN シナリオ** | **`RAMScopeGT170ScenarioSendSet()`** | 6.40 |
-| **CAN シナリオ** | **`RAMScopeGT170ScenarioSendStart()`** | 6.41 |
-| **CAN シナリオ** | **`RAMScopeGT170ScenarioSendStop()`** | 6.42 |
-| アナログ入力 | `RAMScopeGT170SetAdcRange()` | 6.44 |
+| カテゴリ | 関数名 | 章 | プロトタイプ・構造体 |
+|---------|--------|-----|---------------------|
+| 測定設定 | `RAMScopeGT170SetMeasCond()` | 6.13 | ✅ 確定（`.h`で修正2件反映済み）|
+| 測定設定 | `RAMScopeGT170SetMeasCh()` | 6.15 | ✅ 確定（`.h`。`CHINFO_170`）|
+| トリガ設定 | `RAMScopeGT170SetEventCond()` | 6.19 | ✅ 確定（`.h`。`EVENTINFO_170`）|
+| トリガ設定 | `RAMScopeGT170SetExternalTrigger()` | 6.23 | ✅ 確定（`.h`。`EXTTRG_INFO_170`）|
+| トリガ設定 | `RAMScopeGT170SetMeasTrigger()` | 6.24 | ✅ 確定（`.h`。`MEASTRG_INFO_170`）|
+| RAM 書き込み | `RAMScopeGT170ScenarioWriteStart()` | 6.36 | ✅ 確定（`.h`。`WRITE_SCENARIO`）|
+| RAM 書き込み | `RAMScopeGT170ScenarioWriteStop()` | 6.37 | ✅ 確定（`.h`）|
+| **CAN 送信** | **`RAMScopeGT170SendCANDataFrame()`** | 6.39 | ✅ 確定（仕様書+`.h`一致）|
+| **CAN シナリオ** | **`RAMScopeGT170ScenarioSendSet()`** | 6.40 | ✅ 確定（仕様書+`.h`一致）|
+| **CAN シナリオ** | **`RAMScopeGT170ScenarioSendStart()`** | 6.41 | ✅ 確定（仕様書+`.h`一致）|
+| **CAN シナリオ** | **`RAMScopeGT170ScenarioSendStop()`** | 6.42 | ✅ 確定（仕様書+`.h`一致）|
+| アナログ入力 | `RAMScopeGT170SetAdcRange()` | 6.44 | ✅ 確定（`.h`）|
+
+> 上記全関数の完全プロトタイプ・構造体定義は 10.4.2c 参照。
 
 > **CAN 操作は RAMScopeVP API で確定**（`RAMScopeGT170SendCANDataFrame` / `ScenarioSend*`）。
 > 10.6 の「未確定事項」から除去。
@@ -990,6 +1004,284 @@ pData → [ Packet[0] | Packet[1] | ... | Packet[M-1] ]
 > - RAM モニタの `N`（測定有効チャンネル数）は `SetMeasCh()` で設定した値と一致させて
 >   パケットサイズを計算する（アプリ側で保持しておく必要あり）。
 
+### 10.4.2c ヘッダファイル入手により新規確定した関数・構造体（`.h` ヘッダより）
+
+RAMScopeVP API のヘッダファイル `RAMScopeVP_API.h`（本リポジトリ [docs/reference/RAMScopeVP_API.h](./reference/RAMScopeVP_API.h) に保存済み）が入手できたため、
+これまで仕様書 PDF の表からのみ関数名・章番号を把握していた関数群のプロトタイプ・構造体が
+全て確定した。ヘッダは関数ポインタ型（`typedef long (*XxxPtr)(...)`）として宣言されており、
+実行時に `GetProcAddress` 等で解決する設計だが、CLFN で使う分にはこの型定義から
+戻り値・引数の型と順序をそのまま読み取ればよい。
+
+> **注意**：ヘッダにも `__stdcall`／`WINAPI` 等の呼び出し規約マクロは明記されていない
+>（プレーンな関数ポインタ宣言のみ）。呼び出し規約は依然として実機・DLL側で確認が必要
+>（64bit DLL 入手待ちのため実質的には保留でよい。10.6 参照）。
+
+**`RAMScopeGT170SetMeasCh` 関数仕様 + `CHINFO_170` 構造体（6.15章）：**
+
+```c
+long RAMScopeGT170SetMeasCh(
+    long          UnitNo,   /* [in] 常に 0 */
+    long          MdlNo,    /* [in] モジュール番号 */
+    long          ChNum,    /* [in] チャンネル番号 */
+    CHINFO_170    *pChInfo  /* [in] チャンネル情報 union ポインタ */
+);
+
+typedef struct CHINFO_RAM170 {
+    DWORD enable;         /* 0=無効 / 1=有効 */
+    DWORD core;           /* 測定対象コア番号 */
+    DWORD address;        /* 測定対象アドレス */
+    DWORD size;           /* データサイズ */
+    DWORD sign;           /* 符号有無 */
+    DWORD speed;          /* 測定速度区分 */
+} CHINFO_RAM170;   /* 24 バイト（DWORD×6） */
+
+typedef struct CHINFO_ADC170 {
+    DWORD enable;         /* 0=無効 / 1=有効 */
+    DWORD magnification;  /* 倍率 */
+} CHINFO_ADC170;   /* 8 バイト（DWORD×2） */
+
+typedef union CHINFO_170 {
+    CHINFO_RAM170  RAM;
+    CHINFO_ADC170  ADC;
+} CHINFO_170;   /* union サイズ = 24 バイト（RAM が最大） */
+```
+
+**`RAMScopeGT150SetLoggingInfo` 関数仕様 + `LOGINFO` 構造体（6.16章）：**
+
+```c
+long RAMScopeGT150SetLoggingInfo(
+    long      UnitNo,    /* [in] 常に 0 */
+    LOGINFO   *pLogInfo  /* [in] ロギング容量設定情報 */
+);
+
+typedef struct LOGINFO {
+    long  logDevice;       /* ロギング先デバイス */
+    long  limitHddSize;    /* HDD使用量上限 */
+    struct {
+        long  logSize;     /* モジュール毎のロギングサイズ */
+        long  BuffSize;    /* モジュール毎の表示用バッファサイズ（GetBufferData 対象）*/
+    } mdl[16];              /* モジュール番号でインデックス（要素数16）*/
+} LOGINFO;
+/* サイズ = long×2 + (long×2)×16 = 8 + 128 = 136 バイト */
+```
+
+> `mdl[MdlNo].BuffSize` が `GetBufferData` で読み出す**表示用データバッファ**の容量に対応する
+> （10.4.2a の「注意・制限事項」で確認済みの「`SetLoggingInfo` で容量指定する表示用データバッファ」はこの構造体のこと）。
+
+**`RAMScopeGT170SetEventCond` 関数仕様 + `EVENTINFO_170` 構造体（6.19章）：**
+
+```c
+long RAMScopeGT170SetEventCond(
+    long           UnitNo,   /* [in] 常に 0 */
+    EVENTINFO_170  *pEvtInfo /* [in] イベント条件情報 */
+);
+
+typedef union EV_DATA_4 { DWORD ulData; long slData; } EV_DATA_4;      /* 4バイト */
+typedef union EV_DATA_8 { ULONGLONG ullData; LONGLONG sllData; } EV_DATA_8; /* 8バイト */
+
+typedef struct EVENTINFO_RAM170 {
+    long        ChNo;
+    EV_DATA_4   Data1;
+    EV_DATA_4   Data2;
+} EVENTINFO_RAM170;   /* 12 バイト */
+
+typedef struct EVENTINFO_CAN170 {
+    long           ChNo;
+    unsigned long  CanID;
+    long           Format;
+    long           Endian;
+    long           SigLen;
+    long           SigStartByte;
+    long           SigStartBit;
+    long           SigSigned;
+    EV_DATA_8      Data1;
+    EV_DATA_8      Data2;
+} EVENTINFO_CAN170;   /* long×8(32) + EV_DATA_8×2(16) = 48 バイト */
+
+typedef struct EVENTINFO_ADC170 {
+    long ChNo;
+    long Data1;
+    long Data2;
+} EVENTINFO_ADC170;   /* 12 バイト */
+
+typedef union MDL_EVENTINFO_170 {
+    EVENTINFO_RAM170  RAM;
+    EVENTINFO_CAN170  CAN;
+    EVENTINFO_ADC170  ADC;
+} MDL_EVENTINFO_170;   /* union サイズ = 48 バイト（CAN が最大）*/
+
+typedef struct EVENTINFO_170 {
+    long                Enable;
+    long                MdlNo;
+    long                EventType;
+    MDL_EVENTINFO_170   MdlUnq;
+} EVENTINFO_170;   /* 4+4+4+48 = 60 バイト */
+```
+
+**`RAMScopeGT170SetExternalTrigger` 関数仕様 + `EXTTRG_INFO_170` 構造体（6.23章）：**
+
+```c
+long RAMScopeGT170SetExternalTrigger(
+    long              UnitNo,      /* [in] 常に 0 */
+    long              MdlNo,       /* [in] モジュール番号 */
+    EXTTRG_INFO_170   *pExtTrgInfo /* [in] 外部トリガ設定情報 */
+);
+
+typedef struct SOFTTRG_INFO {
+    long relay;
+    struct { long ptn; long relay; } GROUP[2];
+} SOFTTRG_INFO;   /* 4 + (4+4)×2 = 20 バイト */
+
+typedef struct EXTTRG_IN_INFO {
+    long Mode;
+    long FilterTime;
+} EXTTRG_IN_INFO;   /* 8 バイト */
+
+typedef struct EXTTRG_OUT_INFO {
+    long           Mode;
+    long           Level;
+    long           Cycle;
+    SOFTTRG_INFO   Event;
+} EXTTRG_OUT_INFO;   /* 4+4+4+20 = 32 バイト */
+
+typedef struct EXTTRG_INFO_170 {
+    EXTTRG_IN_INFO   ExtIn;
+    EXTTRG_OUT_INFO  ExtOut;
+} EXTTRG_INFO_170;   /* 8 + 32 = 40 バイト */
+```
+
+**`RAMScopeGT170SetMeasTrigger` 関数仕様 + `MEASTRG_INFO_170` 構造体（6.24章）：**
+
+```c
+long RAMScopeGT170SetMeasTrigger(
+    long                UnitNo,       /* [in] 常に 0 */
+    long                Mode,         /* [in] 動作モード */
+    MEASTRG_INFO_170    *pMeasTrgInfo /* [in] 測定制御設定情報 union */
+);
+
+typedef struct MEASTRG_CANBUS_COND {
+    long MdlNo;
+    long ChNo;
+    long Mode;
+    long ID;
+    long Format;
+    long WaitTime;
+} MEASTRG_CANBUS_COND;   /* 24 バイト */
+
+typedef struct MEASTRG_CANBUS_PARAM {
+    MEASTRG_CANBUS_COND Start;
+    MEASTRG_CANBUS_COND End;
+} MEASTRG_CANBUS_PARAM;   /* 48 バイト */
+
+typedef struct MEASTRG_LEVEL_PARAM {
+    long LeaderModule;
+} MEASTRG_LEVEL_PARAM;   /* 4 バイト */
+
+typedef union MEASTRG_INFO_170 {
+    MEASTRG_LEVEL_PARAM   Level;
+    MEASTRG_CANBUS_PARAM  CanBus;
+} MEASTRG_INFO_170;   /* union サイズ = 48 バイト（CanBus が最大）*/
+```
+
+**`RAMScopeGT170ScenarioWriteStart`/`Stop` 関数仕様 + `WRITE_SCENARIO` 構造体（6.36/6.37章）：**
+
+```c
+long RAMScopeGT170ScenarioWriteStart(
+    long             UnitNo,      /* [in] 常に 0 */
+    long             MdlNo,       /* [in] モジュール番号 */
+    long             ScenarioNum, /* [in] 設定シナリオ数 */
+    WRITE_SCENARIO   *pScenario   /* [in] シナリオ情報配列の先頭ポインタ */
+);
+long RAMScopeGT170ScenarioWriteStop(
+    long  UnitNo,   /* [in] 常に 0 */
+    long  MdlNo     /* [in] モジュール番号 */
+);
+
+typedef struct WRITE_SCENARIO_STEP {
+    unsigned long  WriteValue;   /* 書き込み値 */
+    unsigned long  Count;        /* 繰り返し回数 */
+} WRITE_SCENARIO_STEP;   /* 8 バイト */
+
+typedef struct WRITE_SCENARIO {
+    long                  Mode;
+    long                  Repeat;
+    long                  StartEvNo;
+    long                  StopEvNo;
+    unsigned long         Address;    /* 書き込み対象アドレス */
+    unsigned long         Size;       /* 書き込みサイズ */
+    long                  StepNum;    /* ステップ数：1〜64 */
+    WRITE_SCENARIO_STEP   Step[64];
+} WRITE_SCENARIO;
+/* サイズ = long×7(28) + WRITE_SCENARIO_STEP[64](8×64=512) = 540 バイト */
+```
+
+> `RAMScopeGT170ScenarioSendSet`/`SEND_SCENARIO`（CAN送信シナリオ、6.40章で既出）と構造が類似するが、
+> こちらは **RAM モニタモジュールへの値書き込みシナリオ**であり別機能（CAN 用ではない）。
+
+**測定データ取得 API 全プロトタイプ（6.25〜6.31章。関数名・章番号のみだった箇所を完全確定）：**
+
+```c
+long RAMScopeGT150GetGapTime(       long UnitNo, unsigned long *pGapTime);
+long RAMScopeGT150GetMeasNum(       long UnitNo, long *pMeasNum);
+long RAMScopeGT150GetBlockNum(      long UnitNo, long MeasNo, long *pBlockNum);
+long RAMScopeGT150GetBufferDataNum( long UnitNo, long MdlNo, long *pDataNum);
+long RAMScopeGT150GetBufferData(    long UnitNo, long MdlNo, void *pData,
+                                     long *pDataNum, long *pLostDataNum);      /* 既出・完全一致確認 */
+long RAMScopeGT150GetLoggingDataNum(long UnitNo, long MdlNo, long MeasNo,
+                                     long BlockNo, long *pDataNum);
+long RAMScopeGT150GetLoggingData(   long UnitNo, long MdlNo, long MeasNo, long BlockNo,
+                                     void *pData, long *pDataNum, long *pLostDataNum);
+```
+
+> `GetLoggingData` は `GetBufferData` と異なり `MeasNo`（測定回数）・`BlockNo`（ブロック番号）を
+> 指定する点に注意。表示用バッファのリアルタイム取得（`GetBufferData`）とは別に、
+> **測定終了後にロギング済みデータをブロック単位で読み出す**用途と考えられる（詳細は仕様書要確認）。
+
+**RAM モニタ固有機能：メモリ読み書き（6.32〜6.35章）：**
+
+```c
+long RAMScopeGT150MemoryRead(
+    long UnitNo, long MdlNo, unsigned long Address,
+    long Size, long Count, char *Buffer, long Tmout
+);
+long RAMScopeGT150MemoryWrite(
+    long UnitNo, long MdlNo, unsigned long Address,
+    long Size, long Count, char *Buffer, long Tmout
+);
+long RAMScopeGT150ContinualyMemoryRead( long UnitNo, long MdlNo, long Count,
+                                         CONT_MEM_RD *Buffer, long Tmout);
+long RAMScopeGT150ContinualyMemoryWrite(long UnitNo, long MdlNo, long Count,
+                                         CONT_MEM_WR *Buffer, long Tmout);
+
+typedef struct CONT_MEM_WR {
+    unsigned long  Size;      /* 1要素あたりのサイズ */
+    unsigned long  Address;   /* 書き込み/読み込みアドレス */
+    char           Data[4];   /* データ */
+} CONT_MEM_WR;
+typedef CONT_MEM_WR CONT_MEM_RD;   /* 同一構造体を読み込み用に流用 */
+/* サイズ = 4+4+4 = 12 バイト */
+```
+
+**新規発見：`RAMScopeGT150PGT_ModifyMdlConfig`（6.8章相当。既存の 6.7 `PGT_SetMdlConfig` とは別関数）：**
+
+```c
+long RAMScopeGT150PGT_ModifyMdlConfig(
+    long  UnitNo,    /* [in]  常に 0 */
+    long  *SlotErr   /* [out] エラー情報配列（要素数16。PGT_SetMdlConfig と同じ形式）*/
+);
+```
+
+> `SetMdlConfig` は初期設定、`ModifyMdlConfig` は設定変更用と推測される
+> （章タイトル「モジュール構成編集（PGT使用）」より）。詳細な用途の違いは仕様書 6.8 章の
+> 本文で要確認。
+
+**`RAMScopeGT150/GT170SetAdcRange`（アナログ入力レンジ設定。6.43/6.44章）：**
+
+```c
+long RAMScopeGT150SetAdcRange(long UnitNo, long MdlNo, long ChNum, long *pRange);
+long RAMScopeGT170SetAdcRange(long UnitNo, long MdlNo, long ChNum, long *pRange);
+```
+
 ### 10.4.3 STEP2：1 関数あたりの CLFN 設定手順
 
 関数ごとに次を行う（雛形化して量産する）。
@@ -1096,7 +1388,7 @@ pData → [ Packet[0] | Packet[1] | ... | Packet[M-1] ]
 | 実装方式 | **方式1（RAMScopeVP API / CLFN）** で進める |
 | DLL 入手 | ✅ `RAMScopeVP_API.dll` / `GT170.dll` 等 入手済み |
 | API 仕様書 | ✅ 入手済み（PDF。確認中） |
-| `.h` / サンプル | ❌ 未同梱。仕様書の関数宣言表から代替可能（10.4.1） |
+| `.h` / サンプル | ✅ **入手済み**（`RAMScopeVP_API.h`。[docs/reference/RAMScopeVP_API.h](./reference/RAMScopeVP_API.h) に保存）。全構造体・全関数プロトタイプが確定し、仕様書からの手動転記による誤りを2件修正（10.4.2c 参照）|
 | **CAN 操作 API** | ✅ **全確定**：`SendCANDataFrame`(6.39)／`ScenarioSendSet`(6.40)／`ScenarioSendStart`(6.41)／`ScenarioSendStop`(6.42) 全プロトタイプ・構造体・エラーコード確定 |
 | 接続・切断 API | ✅ `RAMScopeGT150DeviceInit` / `DeviceExit` 確定（プロトタイプ・エラーコード済） |
 | GT170 機能一覧 | ✅ 測定設定・トリガ・RAM 書込・CAN・アナログの関数名確定 |
@@ -1120,12 +1412,27 @@ pData → [ Packet[0] | Packet[1] | ... | Packet[M-1] ]
 | **データ取得 API 一覧** | GT150_IF 表6-5 | ✅ GetBufferData(6.29)・GetLoggingData(6.31) ほか7関数確定 |
 | **測定データパケット構造（RAM・CAN）** | 7.1 章（表7-1,7-2）・7.3 章（表7-5,7-6）| ✅ パケットサイズ・フラグ情報すべて確定（RAM: `4N+12`byte／CAN: 固定84byte）|
 | 測定データパケット構造（アナログ入力）| 「7 測定データの構成」章（ADC節）| ⬜ 未確認 |
-| **`RAMScopeGT170SendCANDataFrame` 引数詳細** | 6.39 章（表6-221〜226）| ✅ プロトタイプ・`CANSEND_170_INFO/DATA`構造体・エラーコード確定 |
-| **`RAMScopeGT170ScenarioSendSet` 引数詳細** | 6.40 章（表6-227〜232）| ✅ プロトタイプ・`SEND_SCENARIO`構造体・エラーコード確定（関数名誤り修正済み）|
+| **`RAMScopeGT170SendCANDataFrame` 引数詳細** | 6.39 章（表6-221〜226）| ✅ プロトタイプ・`CANSEND_170_INFO/DATA`構造体・エラーコード確定（.h でも一致確認）|
+| **`RAMScopeGT170ScenarioSendSet` 引数詳細** | 6.40 章（表6-227〜232）| ✅ プロトタイプ・`SEND_SCENARIO`構造体・エラーコード確定（関数名誤り修正済み・.h でも一致確認）|
 | **`RAMScopeGT170ScenarioSendStart` 引数詳細** | 6.41 章（表6-233〜236）| ✅ プロトタイプ・エラーコード確定 |
 | **`RAMScopeGT170ScenarioSendStop` 引数詳細** | 6.42 章（表6-237〜240）| ✅ プロトタイプ・エラーコード確定 |
-| **呼び出し規約**（`__stdcall` か `__cdecl` か） | 仕様書冒頭・任意の関数宣言行 | ⬜ 未確認（32bit版でのみ必要。下記「重大な問題」参照）|
+| **`RAMScopeGT170SetMeasCh` + `CHINFO_170` 構造体** | 6.15 章 | ✅ `.h` ヘッダで確定（10.4.2c）|
+| **`RAMScopeGT150SetLoggingInfo` + `LOGINFO` 構造体** | 6.16 章 | ✅ `.h` ヘッダで確定（10.4.2c）|
+| **`RAMScopeGT170SetEventCond` + `EVENTINFO_170` 構造体** | 6.19 章 | ✅ `.h` ヘッダで確定（10.4.2c）|
+| **`RAMScopeGT170SetExternalTrigger` + `EXTTRG_INFO_170` 構造体** | 6.23 章 | ✅ `.h` ヘッダで確定（10.4.2c）|
+| **`RAMScopeGT170SetMeasTrigger` + `MEASTRG_INFO_170` 構造体** | 6.24 章 | ✅ `.h` ヘッダで確定（10.4.2c）|
+| **`RAMScopeGT170ScenarioWriteStart/Stop` + `WRITE_SCENARIO` 構造体** | 6.36/6.37 章 | ✅ `.h` ヘッダで確定（10.4.2c）|
+| **測定データ取得API全プロトタイプ**（GetGapTime/GetMeasNum/GetBlockNum/GetLoggingDataNum/GetLoggingData）| 6.25〜6.31 章 | ✅ `.h` ヘッダで確定（10.4.2c）|
+| **RAM モニタ メモリ読み書き**（MemoryRead/Write/ContinualyMemoryRead/Write）+ `CONT_MEM_WR/RD` | 6.32〜6.35 章 | ✅ `.h` ヘッダで確定（10.4.2c）|
+| **`RAMScopeGT150PGT_ModifyMdlConfig`**（未発見だった関数）| 6.8 章 | ✅ `.h` ヘッダで新規発見・プロトタイプ確定（用途の詳細は仕様書本文要確認）|
+| `RAMScopeGT150/GT170SetAdcRange` | 6.43/6.44 章 | ✅ `.h` ヘッダで確定（10.4.2c）|
+| **呼び出し規約**（`__stdcall` か `__cdecl` か） | 仕様書冒頭・任意の関数宣言行 | ⬜ 未確認（`.h` にもマクロ明記なし。32bit版でのみ必要。下記「重大な問題」参照）|
 | DLL の **ビット数**（32 / 64bit） | Python スクリプトで PE ヘッダの Machine フィールドを直接確認 | 🔴 **確認済み：全て32bit**（下記参照）|
+
+> 🔴 **`.h` ヘッダ入手による誤り修正（重要）**：
+> - `MEASINFO_RAM170.MeasPeri_reserve` は `long` 単体ではなく **`long[2]`（配列）** ＝ 20バイト（旧: 16バイトは誤り）
+> - `MEASINFO_CAN170.isUseFDFormat` は `char` ではなく **`long`** ＝ パディングなし（旧: 3バイトパディングは誤り）
+> - 詳細・修正版の構造体定義は 10.4.2a 内 `MEASINFO_170` セクション参照。
 
 ### 🔴 重大な問題：DLL が 32bit・LabVIEW が 64bit（アーキテクチャ不一致）
 

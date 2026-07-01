@@ -36,6 +36,7 @@ VI（バーチャルインスツルメント）の作り方、TestStand シー�
 | 12  | [docs/12_異常系処理とシャットダウン設計.md](./docs/12_異常系処理とシャットダウン設計.md) | 異常系のシャットダウン順序、データ退避 |
 | 13  | [docs/13_構築ロードマップ.md](./docs/13_構築ロードマップ.md) | 推奨する構築の進め方（段階的導入） |
 | 付録A1 | [docs/A1_付録_FG420基盤単体試験自動化.md](./docs/A1_付録_FG420基盤単体試験自動化.md) | **別案件**：FG420（ファンクションジェネレータ）による基盤単体試験の VI / TestStand 構築手順 |
+| 参考 | [docs/reference/RAMScopeVP_API.h](./docs/reference/RAMScopeVP_API.h) | RAMScopeVP API ヘッダファイル（ベンダー提供の一次情報。doc 10 の記述と突き合わせる際の正）|
 
 ---
 
