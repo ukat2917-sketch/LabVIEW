@@ -145,7 +145,7 @@ CLFN を置く前に、外部仕様書とヘッダから次を表にまとめる
   RAMScopeGT170ScenarioWriteStart()  6.36
   RAMScopeGT170ScenarioWriteStop()   6.37
   RAMScopeGT170SendCANDataFrame()    6.39
-  RAMScopeGT170ScenarioSendCond()    6.40
+  RAMScopeGT170ScenarioSendSet()     6.40
   RAMScopeGT170ScenarioSendStart()   6.41
   RAMScopeGT170ScenarioSendStop()    6.42
   RAMScopeGT170SetAdcRange()         6.44
@@ -544,7 +544,7 @@ long RAMScopeGT150GetBufferData(
 | RAM 書き込み | `RAMScopeGT170ScenarioWriteStart()` | 6.36 |
 | RAM 書き込み | `RAMScopeGT170ScenarioWriteStop()` | 6.37 |
 | **CAN 送信** | **`RAMScopeGT170SendCANDataFrame()`** | 6.39 |
-| **CAN シナリオ** | **`RAMScopeGT170ScenarioSendCond()`** | 6.40 |
+| **CAN シナリオ** | **`RAMScopeGT170ScenarioSendSet()`** | 6.40 |
 | **CAN シナリオ** | **`RAMScopeGT170ScenarioSendStart()`** | 6.41 |
 | **CAN シナリオ** | **`RAMScopeGT170ScenarioSendStop()`** | 6.42 |
 | アナログ入力 | `RAMScopeGT170SetAdcRange()` | 6.44 |
@@ -619,6 +619,80 @@ typedef struct CANSEND_170_DATA {
 > | `0x30000504` | RAMScopeハードウェアとの通信に失敗 |
 > | `0x3000050D` | 電源・ホストPCとの接続・USBドライバのインストール状況・API関数の発行手順などを確認 |
 > | `0x30000512`〜`0x30000515` | 上記確認後も現象が改善しない場合は弊社まで問い合わせ |
+
+**`RAMScopeGT170ScenarioSendSet` 関数仕様（6.40章・確定）：**
+
+```c
+/* シナリオ送信設定処理
+   CAN モジュールのシナリオ送信機能を設定する。
+   発行対象モジュール：CAN */
+long RAMScopeGT170ScenarioSendSet(
+    long            UnitNo,       /* [in] 発行対象ユニット（将来拡張用。現仕様では常に 0）*/
+    long            MdlNo,        /* [in] 発行対象モジュールのモジュール番号 */
+    long            ChNo,         /* [in] データフレームの送信に使用する CAN モジュールの物理Ch番号。0=Ch1／1=Ch2 */
+    long            ScenarioNum,  /* [in] 設定シナリオ数。0〜1 の範囲で指定 */
+    SEND_SCENARIO   *pScenario    /* [in] シナリオ送信情報。設定済み、要素数 ScenarioNum の
+                                          SEND_SCENARIO 型配列の先頭ポインタを渡す */
+);
+```
+
+**`SEND_SCENARIO` / `SEND_SCENARIO_STEP` 構造体定義（6.40.3章・表6-229、6-230）：**
+
+```c
+typedef struct SEND_SCENARIO {
+    long                 Mode;       /* シナリオの動作モード：
+                                         0=本関数の発行と連動してシナリオ開始
+                                         1=開始イベント成立でシナリオ開始 ＆ 停止イベント成立でシナリオ停止
+                                         2=開始イベントが成立でシナリオ開始、開始イベントが非成立でシナリオ停止 */
+    long                 Repeat;     /* シナリオの繰り返し指示：
+                                         0=最終ステップ終了後、シナリオ停止
+                                         1=最終ステップ終了後、最初のステップからシナリオを再開 */
+    long                 StartEvNo;  /* 開始イベント番号。Mode=1,2 の場合、動作開始のキーとするイベント番号を指定 */
+    long                 StopEvNo;   /* 停止イベント番号。Mode=1 の場合、動作停止のキーとするイベント番号を指定 */
+    long                 StepNum;    /* シナリオのステップ数。1〜64 の範囲で指定 */
+    SEND_SCENARIO_STEP   Step[64];   /* シナリオのステップ情報 */
+} SEND_SCENARIO;
+
+typedef struct SEND_SCENARIO_STEP {
+    long              IdFormat;   /* ID フォーマット：0=標準ID／1=拡張ID */
+    long              Count;      /* 該当ステップの繰り返し回数（0〜）*/
+    long              WaitTime;   /* ステップ実行間の待ち時間（msec単位）。0〜4095msec の間で指定 */
+    CANSEND_170_DATA  SendData;   /* 送信データフレーム情報（表6-223 CANSEND_170_DATA 参照・上記で確定済み）*/
+} SEND_SCENARIO_STEP;
+```
+
+> **注意・制限事項（6.40.4節）：**
+> - RAMScopeVP アプリケーションの**有償ライセンス**が適用されていない状態で本関数を発行した場合、エラーを応答する。
+> - アイドル中に本関数を発行する場合、事前に `RAMScopeGT170SetMeasCond()` 関数によりバス設定を行うこと。
+> - 本関数の発行時点では**まだ CAN データフレームのシナリオ送信を開始しない**。
+>   別途 `RAMScopeGT170ScenarioSendStart()` 関数を発行すること。
+> - シナリオ送信の実施中に本関数を発行した場合、本関数はエラーを応答する。
+> - 本関数で設定した情報は RAMScopeVP API 内部で保持し続ける。情報を破棄するには
+>   以下いずれかの関数を実行すること：`RAMScopeGT150AllInit()` ／ `RAMScopeGT150DeviceExit()` ／
+>   本関数を `ScenarioNum=0` で発行。
+>
+> **発行タイミング（6.40.5節）**：オフライン=×／測定中=○／アイドル=○
+>
+> **応答（6.40.6節 表6-232）：**
+> | 戻り値 | 意味 |
+> |--------|------|
+> | `0x00000000` | 正常終了 |
+> | `0x30000001` | 関数内部で例外を検出 |
+> | `0x30000003` | 関数の呼び出し順序に誤りがある |
+> | `0x30000005` | `MdlNo` の指定値に誤りがある |
+> | `0x30000006` | （同上・詳細未記載）|
+> | `0x30000500` | `UnitNo` の指定値に誤りがある |
+> | `0x3000050E` | オフラインの状態で関数が呼び出された |
+> | `0x30000900` | 動作指定値に誤りがある |
+> | `0x30100001` | 下位DLL内に必要な処理が見つからない（DLLバージョン確認）／GT150・GT12xに対して関数が呼び出された |
+> | `0xE0000004`／`0xE0000010` | 有効なライセンスが見つからない |
+
+> **LabVIEW CLFN での `ScenarioSendSet` の扱い**：
+> - `CANSEND_170_DATA` はすでに定義済み（4+4+64=72バイト）。
+> - `SEND_SCENARIO_STEP` = IdFormat(4)+Count(4)+WaitTime(4)+SendData(72) = **84バイト**。
+> - `SEND_SCENARIO` = Mode(4)+Repeat(4)+StartEvNo(4)+StopEvNo(4)+StepNum(4)+Step[64](84×64=5376) = **5396バイト**。
+> - `pScenario` は `ScenarioNum`（0〜1）要素の `SEND_SCENARIO` 配列。U8 配列（5396×ScenarioNum バイト）を
+>   `Initialize Array` で確保し `Array Data Pointer` で渡す。
 
 **DeviceInit のエラーコード（確認済み）：**
 
@@ -800,7 +874,7 @@ pData → [ Packet[0] | Packet[1] | ... | Packet[M-1] ]
 | `RAMScope_Release.vi` | Main（Stop直後） | **`RAMScopeGT150ReleaseBufferData()`** | out: Status・TestError |
 | `RAMScope_Close.vi` | Cleanup（最後段） | `RAMScopeGT150DeviceExit()` | out: Status・TestError |
 | `CAN_Send.vi`（RAMScope 経由） | Main | `RAMScopeGT170SendCANDataFrame()` | [09](./09_CAN通信の実装.md) の入出力に整合 |
-| `CAN_Scenario_Start.vi` | Main | `RAMScopeGT170ScenarioSendCond()` + `RAMScopeGT170ScenarioSendStart()` | in: シナリオ設定 / out: Status・TestError |
+| `CAN_Scenario_Start.vi` | Main | `RAMScopeGT170ScenarioSendSet()` ✅ + `RAMScopeGT170ScenarioSendStart()` | in: シナリオ設定（SEND_SCENARIO）/ out: Status・TestError |
 | `CAN_Scenario_Stop.vi` | Main | `RAMScopeGT170ScenarioSendStop()` | out: Status・TestError |
 
 > **ハンドルなし構造**：`DeviceInit` はセッションハンドルを返さない（グローバル状態管理）。
