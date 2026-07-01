@@ -577,9 +577,84 @@ long RAMScopeGT150GetBufferData(
 - 測定状態で `DeviceExit` を発行すると**自動停止してから切断**される。
 
 **まだ未確認の共通関数**（仕様書の追加ページで確認が必要）：
-- 測定開始・停止関数（`RAMScopeGT150Meas*` 相当）
-- データ読み出し関数（RAM 値取得）
 - 呼び出し規約（`__stdcall` か `__cdecl` か）
+
+#### 10.4.2b 測定データパケット構成（7章・確定）
+
+`GetBufferData` / `GetLoggingData` の `pData` に格納される **1パケット分のバイナリ構成**。
+モジュール種別（RAM モニタ / CAN）ごとにフォーマットが異なる。
+
+**① RAM モニタモジュール（7.1章・表7-1、表7-2）**
+
+```
+pData → [ Packet[0] | Packet[1] | ... | Packet[M-1] ]   ※M = pDataNum（取得パケット数）
+
+1パケットの内訳：
+[ Data[0] | Data[1] | ... | Data[N-1] | Flag(4byte) | Time(8byte) ]
+```
+
+| フィールド | サイズ | 説明 |
+|-----------|--------|------|
+| `Data[0..N-1]` | 4byte × N | ロギング対象チャンネルの測定値。N = `SetMeasCh()` で設定した**測定有効チャンネル数**。各チャンネルは `SetMeasCh()` で設定した順序で格納。全チャンネル共通で 4byte（データサイズは `SetMeasCh()` 指定に依存するがすべて4byte）|
+| `Flag` | 4byte | ステータスフラグ（下記フラグ情報 参照）|
+| `Time` | 8byte（64bit）| タイムスタンプ。測定開始(0)基準、20nsec周期のカウントアップ値。実時間 = 本値 × 20nsec |
+
+**1パケットサイズ = 4×N + 4 + 8 = `4N + 12` バイト**（N=測定有効チャンネル数）
+
+> **RAM モニタ フラグ情報（表7-2、32bit）：**
+>
+> | ビット位置 | ビット数 | フィールド | 説明 |
+> |-----------|---------|-----------|------|
+> | 0-7 | 8 | `status` | 測定ステータス。`0x00`=正常 / `0xFF`=バスエラー / `0xFE`=オフライン / `0xFA`=セキュリティIDエラー / `0xF9`=リンクエラー / `0xF8`=パラメータ未設定エラー（`0xF9`,`0xF8` は光RAMモニタ限定の異常ステータス。`9.2 Firmware内部エラーコード一覧` の `0x10000970`/`0x10000971` に対応）|
+> | 8 | 1 | `skip` | スキップ現象検出フラグ。0=未発生／1=発生（測定周期・チャンネル数・メモリ操作関数の処理時間兼ね合いで発生）|
+> | 10-11 | 2 | `log_trg` | ロギングトリガ実行フラグ。0=無効時／1=開始位置（トリガ待受中消失あり）／2=センター位置（トリガ成立パケットのみ）／3=終了位置 |
+> | 12 | 1 | `dummy` | ダミーフラグ。0=メッセージ受信に伴う測定データパケット／1=情報通知目的の内部生成ダミーパケット |
+> | 16-23 | 8 | `event` | イベント成立フラグ。LSBから e1,e2,...,e8。0=不成立／1=成立 |
+> | 28 | 1 | `datalost` | データ欠落検出フラグ。0=正常通信／1=本パケット以前にデータ欠落発生 |
+> | それ以外 | - | 予約 | 値不定 |
+
+**② CAN モジュール（7.3章・表7-5、表7-6）**
+
+```
+pData → [ Packet[0] | Packet[1] | ... | Packet[M-1] ]
+
+1パケットの内訳（GT17x、CAN FD 64byte最大長を考慮した固定フォーマット）：
+[ Flag(4byte) | Time(8byte) | FD_Flag(4byte) | ID(4byte) | Data[0..63](64byte固定) ]
+```
+
+| フィールド | サイズ | 説明 |
+|-----------|--------|------|
+| `Flag` | 4byte | ステータスフラグ（下記参照）|
+| `Time` | 8byte（64bit）| タイムスタンプ。20nsec周期カウント値 ×20nsec = 経過時間 |
+| `FD_Flag` | 4byte | CAN FD フォーマット関連の追加フラグ（下記参照。表7-6に統合表示）|
+| `ID` | 4byte | CAN ID（受信メッセージの識別ID）|
+| `Data[0..63]` | 64byte 固定 | CAN受信データ。DLCに関わらず常に64byte固定（未使用分は不定）|
+
+**1パケットサイズ = 4+8+4+4+64 = 固定 84 バイト**
+
+> **CAN モジュール フラグ情報（表7-6、32bit・Flag と FD_Flag を統合表示）：**
+>
+> | ビット位置 | ビット数 | フィールド | 説明 |
+> |-----------|---------|-----------|------|
+> | 0-3 | 4 | `dlc` | データ長コード。受信メッセージのDLC |
+> | 4 | 1 | `format` | 受信メッセージのIDフォーマット。0=標準ID／1=拡張ID |
+> | 5 | 1 | `port` | メッセージを受信したCANモジュールの物理Ch番号。0=Ch1／1=Ch2 |
+> | 8 | 1 | `valid` | パケットの有効性。0=無効パケット／1=有効パケット |
+> | 10-11 | 2 | `log_trg` | ロギングトリガ実行フラグ（RAM同様。1=開始位置／2=センター位置／3=終了位置）|
+> | 12 | 1 | `dummy` | ダミーフラグ。0=メッセージ受信に伴う測定データパケット／1=内部生成ダミーパケット |
+> | 16-23 | 8 | `event` | イベント成立フラグ（e1〜e8、RAMと同様）|
+> | 24 | 1 | `FD` | 受信メッセージフォーマット。0=CAN 2.0B／1=CAN FD |
+> | 28 | 1 | `datalost` | データ欠落検出フラグ。0=正常通信／1=データ欠落発生 |
+> | それ以外 | - | 予約 | 値不定 |
+
+> **LabVIEW CLFN でのパケット解析方針**：
+> - `pData` の U8 配列を `GetBufferData` から受け取った後、`Type Cast` でパケットサイズ分ずつ
+>   切り出し（RAM: `4N+12`byte／CAN: 固定84byte）、`For Loop` で `pDataNum`（取得パケット数）分ループ処理する。
+> - フラグは 32bit 値として取得後、`Boolean Array (Number To Boolean Array)` や
+>   シフト/マスク演算でビットフィールドへ分解する。
+> - タイムスタンプ（64bit, 20nsec単位）は `U64` として取り出し、`×20e-9` で秒に変換。
+> - RAM モニタの `N`（測定有効チャンネル数）は `SetMeasCh()` で設定した値と一致させて
+>   パケットサイズを計算する（アプリ側で保持しておく必要あり）。
 
 ### 10.4.3 STEP2：1 関数あたりの CLFN 設定手順
 
@@ -641,7 +716,7 @@ long RAMScopeGT150GetBufferData(
 | `RAMScope_Config.vi` | Setup ③ | `RAMScopeGT150PGT_SetMdlConfig()` | in: endian（Init.viの出力）/ out: Status・TestError |
 | `RAMScope_Set_Cond.vi` | Setup ④ | `RAMScopeGT170SetMeasCond()` + `RAMScopeGT170SetMeasCh()` + `RAMScopeGT150SetLoggingInfo()` | in: 測定条件（TestStand変数）/ out: Status・TestError |
 | `RAMScope_Log_Start.vi` | Main | **`RAMScopeGT150MeasStart()`** ✅ | out: Status・TestError |
-| `RAMScope_Read.vi` | Main（ポーリング） | データ読み出し API（**仕様書 6.25〜6.35 章で確認**） | out: **RAM 値（配列）**・Status・TestError |
+| `RAMScope_Read.vi` | Main（ポーリング） | `RAMScopeGT150GetBufferData()` ✅ + パケット解析（10.4.2b 参照）| out: 測定値配列・タイムスタンプ・フラグ・Status・TestError |
 | `RAMScope_Log_Stop.vi` | Main | **`RAMScopeGT150MeasStop()`** ✅ | out: Status・TestError |
 | `RAMScope_Release.vi` | Main（Stop直後） | **`RAMScopeGT150ReleaseBufferData()`** | out: Status・TestError |
 | `RAMScope_Close.vi` | Cleanup（最後段） | `RAMScopeGT150DeviceExit()` | out: Status・TestError |
@@ -705,11 +780,12 @@ long RAMScopeGT150GetBufferData(
 | GT170_IF 完全関数一覧 | 6.1.2 章 | ✅ 確定 |
 | **測定開始 `RAMScopeGT150MeasStart(long)`** | 6.9 章 | ✅ プロトタイプ・エラーコード確定 |
 | **測定停止 `RAMScopeGT150MeasStop(long)`** | 6.10 章 | ✅ プロトタイプ・エラーコード確定 |
-| **データ読み出し `RAMScopeGT150GetBufferData`** | 6.29 章（表 6-178〜180） | ✅ プロトタイプ・エラーコード確定（パケットサイズ定義=「7 測定データの構成」章のみ残） |
+| **データ読み出し `RAMScopeGT150GetBufferData`** | 6.29 章（表 6-178〜180） | ✅ プロトタイプ・エラーコード確定 |
 | `RAMScopeGT170SetMeasCond` 引数・`MEASINFO_170` union | 6.13 章（表 6-74〜78） | ✅ RAM/ADC/CAN 構造体確定・周期範囲・SmpCnt 制約・互換性注記すべて確定 |
 | **`PGT_SetMdlConfig` 引数** | 6.7 章（表 6-38） | ✅ プロトタイプ確定（UnitNo/SlotErr[16]）|
 | **データ取得 API 一覧** | GT150_IF 表6-5 | ✅ GetBufferData(6.29)・GetLoggingData(6.31) ほか7関数確定 |
-| 測定データパケット構造（RAM/CAN/ADC 別サイズ・フォーマット） | 「7 測定データの構成」章 | ⬜ 要確認（最優先。`pData` バッファサイズ計算に必須）|
+| **測定データパケット構造（RAM・CAN）** | 7.1 章（表7-1,7-2）・7.3 章（表7-5,7-6）| ✅ パケットサイズ・フラグ情報すべて確定（RAM: `4N+12`byte／CAN: 固定84byte）|
+| 測定データパケット構造（アナログ入力）| 「7 測定データの構成」章（ADC節）| ⬜ 未確認 |
 | `RAMScopeGT170SendCANDataFrame` 引数詳細 | 6.39 章 | ⬜ 未確認 |
 | **呼び出し規約**（`__stdcall` か `__cdecl` か） | 仕様書冒頭・任意の関数宣言行 | ⬜ 未確認 |
 | DLL の **ビット数**（32 / 64bit） | `dumpbin /headers` で確認 | ⬜ 未確認 |
