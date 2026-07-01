@@ -248,7 +248,7 @@ CLFN を置く前に、外部仕様書とヘッダから次を表にまとめる
   RAMScopeGT170SetAdcRange()         6.44
 ```
 
-**呼び出しライフサイクル（確定）：**
+**呼び出しライフサイクル（確定・ベンダー提供サンプル `samp_simple.cpp` で完全一致確認済み）：**
 
 ```
 [オフライン]
@@ -265,7 +265,7 @@ CLFN を置く前に、外部仕様書とヘッダから次を表にまとめる
     ↓ RAMScopeGT150GetBufferData(...)               ← データ読み出し（★確定）
     ↓ RAMScopeGT150MeasStop(UnitNo=0)              ← 測定停止
 [アイドル]
-    ↓ RAMScopeGT150ReleaseBufferData(...)           ← バッファ解放
+    ↓ (RAMScopeGT150GetLoggingData(...))            ← 保持済みデータの追加取得（サンプルではMeasStop後に発行）
     ↓ RAMScopeGT150DeviceExit()                    ← 接続破棄
 [オフライン]
 ```
@@ -277,6 +277,95 @@ CLFN を置く前に、外部仕様書とヘッダから次を表にまとめる
 
 > **`SetMdlConfig` の注意**：`RAMScopeGT150SetMdlConfig()` は非推奨。
 > **`RAMScopeGT150PGT_SetMdlConfig()`（PGT使用版）を使うこと**。
+
+### 10.4.2d ベンダー提供サンプルコード（`samp_simple.cpp`）による検証結果
+
+DTS インサイト提供の実サンプル（[docs/reference/samp_simple.cpp](./reference/samp_simple.cpp)、
+「Simple sample for RAMScopeVP API」、対象構成は `GT170U01+GT171M01`）を入手し、
+これまでの記述内容を検証した。**呼び出し順序・引数の与え方は 10.4.2a のライフサイクル図と完全一致**。
+以下、サンプルから新たに読み取れた実装上の重要ポイントをまとめる。
+
+**① DLL のロード方式（`GetProcAddress` 方式）：**
+```c
+HINSTANCE Inst = ::LoadLibraryEx(L".\\RAMScopeVP_API.dll", 0, 0);
+RAMScopeGT150DeviceInitPtr GT150DeviceInitFunc =
+    (RAMScopeGT150DeviceInitPtr)::GetProcAddress(Inst, "RAMScopeGT150DeviceInit");
+```
+ヘッダの関数ポインタ型定義（`typedef long (*XxxPtr)(...)`）は、この
+`LoadLibraryEx` + `GetProcAddress` パターンで使うための型であることが確定した。
+**LabVIEW の CLFN は内部で同様に「DLL パス＋エクスポート関数名」を指定して直接呼び出す**ため、
+この構造は CLFN 利用上の障害にはならない（GetProcAddress 相当の処理は CLFN が自動で行う）。
+
+**② `MdlNo` の実例：RAM モジュールは `MdlNo=1`（`0` ではない）**
+
+サンプルでは `SetMeasCond(0, 1, &GTMeasInfo)`・`SetMeasCh(0, 1, 1, GTChInfo)`・
+`GetBufferData(0, 1, ...)`・`GetLoggingData(0, 1, 0, 0, ...)` と、一貫して
+**`MdlNo=1`** を使っている。`UnitNo` は常に `0` だが、`MdlNo` は
+`GetSysInfo` で取得した `SYSINFO[].module` の実際の値（環境依存）を使う必要があり、
+本サンプルの構成（`GT170U01+GT171M01`）では RAM モニタモジュールが `module=1` だったと分かる。
+**`MdlNo` を `0` 固定にしないこと**（`UnitNo` と混同しないよう注意）。
+
+**③ `SetMeasCh` の `ChNum` 引数の意味＝チャンネル「個数」**
+```c
+CHINFO_170 GTChInfo[1];   // 要素数1の配列
+memset(GTChInfo, 0, sizeof(CHINFO_170)*1);
+GTChInfo[0].RAM.enable  = 1;
+GTChInfo[0].RAM.address = 0x1000;
+GTChInfo[0].RAM.size    = 0;
+GTChInfo[0].RAM.sign    = 0;
+GT170SetMeasChFunc(0, 1, 1, GTChInfo);   // (UnitNo, MdlNo, ChNum, pChInfo)
+```
+第3引数 `ChNum` は「配列 `pChInfo` の要素数（設定するチャンネル数）」であり、
+特定のチャンネル番号を指すインデックスではないことが確定した。
+複数チャンネル設定時は `CHINFO_170` 配列を必要数分確保し、`ChNum` にその個数を渡す。
+また `CHINFO_RAM170` の `core`・`speed` フィールドはサンプルでは未設定（0 のまま）であり、
+最低限 `enable`／`address`／`size`／`sign` の設定で動作する模様。
+
+**④ `LOGINFO.mdl[]` は使用モジュール以外も含めて全要素を初期化する**
+```c
+for (int i = 0; i < NUM_MODULE_MAX_170; i++) {
+    GTLogInfo.mdl[i].BuffSize = 1;
+    GTLogInfo.mdl[i].logSize  = 1;
+}
+```
+サンプルは使用する `MdlNo=1` だけでなく、**GT170 の最大モジュール数（`NUM_MODULE_MAX_170=10`）分すべて**
+`BuffSize`/`logSize` に `1` を設定してから `SetLoggingInfo` を呼んでいる。
+未使用モジュールも含め全スロットを最低値で初期化しておくのが安全な実装パターン。
+
+**⑤ 🔴 実装上の注意：`GetBufferData` の `pDataNum` 事前設定について（サンプルの矛盾点）**
+```c
+long GTDataNum;       // ローカル変数、初期化されていない
+long GTLostDataNum;
+...
+GT150GetBufferDataFunc(0, 1, GTPackData, &GTDataNum, &GTLostDataNum);
+```
+仕様書では `pDataNum` は **in/out**（呼び出し前に要求パケット数を書き込む）と説明されているが、
+本サンプルでは `GTGetBufferData` 呼び出し直前に `GTDataNum` を**明示的に初期化していない**
+（ローカル変数の不定値のまま渡している）。一方、後段の `GetLoggingData` 呼び出しでは
+```c
+GTDataNum = 100;   // ← こちらは明示的に設定している
+GT150GetLoggingDataFunc(0, 1, 0, 0, GTPackData, &GTDataNum, &GTLostDataNum);
+```
+と正しく初期化しており、**同一サンプル内で扱いが一貫していない**。
+`GetBufferData` 側の書き方はサンプルの単純化・省略の可能性が高く、**そのまま真似ることは推奨しない**。
+LabVIEW 実装では **必ず `pDataNum` に「バッファが受け止められる最大パケット数」を明示的に
+書き込んでから呼び出す**こと（`GTPackData` のようなバッファサイズ ÷ 1パケットサイズ で計算した
+安全な上限値を使う）。
+
+**⑥ `ReleaseBufferData` はこの簡易サンプルでは呼ばれていない**
+サンプルは `GetLoggingData` の直後に `DeviceExit()` を呼んでおり、`ReleaseBufferData()` を
+経由していない。10.4.2a のライフサイクル図で必須ステップとしていたが、少なくとも
+簡易な単発測定シーケンスでは省略可能な可能性がある（`DeviceExit` が内部で解放処理を
+兼ねている可能性）。ただし正式な用途・必須性は仕様書 6.17 章の本文で別途確認が望ましい。
+
+**⑦ 呼び出し規約について（`.h`／サンプルからは依然特定できず）**
+
+サンプルは関数ポインタを `GetProcAddress` で取得する方式のため、呼び出し規約に関する
+追加のヒントは得られなかった（`__stdcall`/`WINAPI` 等のキーワードがヘッダ・サンプルの
+どちらにも見当たらない）。ただし、この方式自体は呼び出し規約の指定が誤っていても
+コンパイル時エラーにならず**実行時にスタック破壊で不定動作になる**タイプの問題であるため、
+CLFN 設定時は **実機での動作確認（クラッシュしないか）による実証が引き続き必要**。
+64bit 版 DLL が入手できれば、この論点自体が消滅する（10.6 参照）。
 > AllInit + GetSysInfo 後、測定条件設定の前に発行する。`endian` は GetSysInfo の結果を渡す。
 
 **確認済み関数プロトタイプ：**
