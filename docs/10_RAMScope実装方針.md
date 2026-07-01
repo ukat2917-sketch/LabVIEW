@@ -217,8 +217,14 @@ long RAMScopeGT150MeasStop(
     long  UnitNo    /* [in] 常に 0 */
 );
 
-/* 測定データ読み出し（GT150_IF。GetBufferData の章は別途確認要） */
-/* 関数名: RAMScopeGT150GetBufferData() ← MeasStart の注記で確認済み。引数は要確認 */
+/* ---- 測定データ取得 API（表6-5 GT150_IF 一覧より確定）---- */
+/* RAMScopeGT150GetGapTime()        6.25章 測定開始時間取得処理  */
+/* RAMScopeGT150GetMeasNum()        6.26章 測定回数取得処理      */
+/* RAMScopeGT150GetBlockNum()       6.27章 ブロック取得処理      */
+/* RAMScopeGT150GetBufferDataNum()  6.28章 最新データ数取得処理  */
+/* RAMScopeGT150GetBufferData()     6.29章 最新データ取得処理    ← ★引数は6.29章で要確認 */
+/* RAMScopeGT150GetLoggingDataNum() 6.30章 測定データ数取得処理  */
+/* RAMScopeGT150GetLoggingData()    6.31章 測定データ取得処理    */
 
 /* 測定条件設定・GT170専用版（6.13章）：モジュール別に発行 */
 long RAMScopeGT170SetMeasCond(
@@ -279,6 +285,29 @@ typedef struct MEAS_CAN_CH_170 {
 /* サイズ = long×8 = 32 バイト */
 ```
 
+> **測定周期設定範囲（6.13.4節・確定）：**
+> | モジュール | 周期設定範囲 |
+> |-----------|-------------|
+> | RAMモニタ | 5µsec 〜 65sec（MeasPeri + MeasUnit で指定）|
+> | アナログ入力 | 1µsec 〜 65sec |
+>
+> **SmpCnt / SmpCntHigh の有効値（6.13.5節 表6-80）：**
+> BaudRateHigh によって指定できる値が異なる（BusMode=2 の CAN FD のみ適用）。
+>
+> | BaudRateHigh 指定値 | SmpCnt・SmpCntHigh に指定可能な値 |
+> |---------------------|-----------------------------------|
+> | 1（1Mbps）、2（2Mbps）、4（4Mbps）| 0(60%)、1(65%)、2(70%)、3(75%)、4(80%) |
+> | 5（5Mbps） | 3(75%) のみ |
+> | 8（8Mbps） | 0(60%)、2(70%)、4(80%) |
+>
+> ※ SmpCnt と SmpCntHigh には同じ値を指定すること。
+
+> **互換性注記（6.13.7節）：**
+> - `isUseFDFormat=1` → CAN FD フォーマット（GT170 推奨）
+> - `isUseFDFormat=0` → GT150 互換フォーマット（CAN 2.0B）
+> - **`isUseFDFormat=0` のとき `BusMode=0` 以外は設定エラーとなる**（CAN 2.0B 時は BusMode=0 固定）
+> - CAN FD 使用時（`isUseFDFormat=1`）は `BusMode=2`（CANFD ISO）を指定すること
+
 > **MEASINFO_170 union サイズ（確定）：**
 > - MEASINFO_RAM170 = 16 バイト
 > - MEASINFO_ADC170 = 12 バイト
@@ -303,7 +332,7 @@ typedef struct MEAS_CAN_CH_170 {
 > info.CAN.Ch[0].Enable     = 1;         // Ch1 有効
 > info.CAN.Ch[0].MonitorOnly= 1;         // モニタのみ（Ack なし）
 > info.CAN.Ch[0].BaudRate   = 0x9;       // 500kbps（対象バスに合わせる）
-> info.CAN.Ch[0].BusMode    = 0;         // CAN 2.0B
+> info.CAN.Ch[0].BusMode    = 0;         // CAN 2.0B（isUseFDFormat=0時は必ず0）
 > RAMScopeGT170SetMeasCond(0, mdlNo_CAN, &info);
 > ```
 
@@ -393,6 +422,27 @@ typedef struct MDLPSMCFG {
 > `SetMdlConfig` は非推奨。代わりに **`PGT_SetMdlConfig()`** を使う。
 > `PGT_SetMdlConfig()` は PGT ツールが生成する設定ファイルを読み込む方式のため、
 > プローブ固有の非公開パラメータ（`jtag_clk` / `psm` 等）を自分で調べる必要がなくなる。
+
+**`RAMScopeGT150PGT_SetMdlConfig` 関数仕様（6.7章・確定）：**
+
+```c
+/* モジュール構成設定処理（PGT使用）
+   RAMモニタモジュール用のプローブ固有設定情報を RAMScope HW へ通知する。
+   発行対象モジュール：RAMモニタ（API関数内自動定義）
+   発行タイミング：AllInit・GetSysInfo の後、SetMeasCond の前 */
+long RAMScopeGT150PGT_SetMdlConfig(
+    long   UnitNo,    /* [in]  発行対象ユニット（将来拡張用。現仕様では常に 0）*/
+    long   *SlotErr   /* [out] パラメータ通知時のエラー情報。モジュールごとに返す。
+                               要素数 16 の配列を用意して先頭アドレスを渡す。
+                               SlotErr[MdlNo] = 該当モジュールのエラー情報。
+                               例）MdlNo=1 のエラーは SlotErr[1] に格納 */
+);
+```
+
+> **LabVIEW CLFN での `PGT_SetMdlConfig` の扱い**：
+> - `UnitNo` : I32（値 0）
+> - `SlotErr` : `Initialize Array`（I32、16 要素）を確保 → `Array Data Pointer` で渡す
+> - 各スロットの戻り値は `SlotErr[MdlNo]` の値で確認する（0 = 正常）
 
 **MeasStart エラーコード（確認済み）：**
 
@@ -603,10 +653,11 @@ typedef struct MDLPSMCFG {
 | GT170_IF 完全関数一覧 | 6.1.2 章 | ✅ 確定 |
 | **測定開始 `RAMScopeGT150MeasStart(long)`** | 6.9 章 | ✅ プロトタイプ・エラーコード確定 |
 | **測定停止 `RAMScopeGT150MeasStop(long)`** | 6.10 章 | ✅ プロトタイプ・エラーコード確定 |
-| **データ読み出し `RAMScopeGT150GetBufferData`** | GT150_IF（MeasStart注記で確認） | ✅ 関数名確定（引数は要確認） |
-| `RAMScopeGT170SetMeasCond` 引数・`MEASINFO_170` union | 6.13 章（表 6-74〜76） | ✅ RAM/ADC 構造体確定（CAN は表 6-77→未確認） |
-| `PGT_SetMdlConfig` 引数・PGT ファイル仕様 | 6.7 章 | ⬜ 未確認 |
-| `GetBufferData` 引数詳細・バッファ構造 | GT150_IF 当該章 | ⬜ 未確認 |
+| **データ読み出し `RAMScopeGT150GetBufferData`** | GT150_IF 表6-5・6.29章 | ✅ 関数名確定（引数は6.29章で要確認）|
+| `RAMScopeGT170SetMeasCond` 引数・`MEASINFO_170` union | 6.13 章（表 6-74〜78） | ✅ RAM/ADC/CAN 構造体確定・周期範囲・SmpCnt 制約・互換性注記すべて確定 |
+| **`PGT_SetMdlConfig` 引数** | 6.7 章（表 6-38） | ✅ プロトタイプ確定（UnitNo/SlotErr[16]）|
+| **データ取得 API 一覧** | GT150_IF 表6-5 | ✅ GetBufferData(6.29)・GetLoggingData(6.31) ほか7関数確定 |
+| `GetBufferData` 引数詳細・バッファ構造 | 6.29 章 | ⬜ 要確認（最優先）|
 | `RAMScopeGT170SendCANDataFrame` 引数詳細 | 6.39 章 | ⬜ 未確認 |
 | **呼び出し規約**（`__stdcall` か `__cdecl` か） | 仕様書冒頭・任意の関数宣言行 | ⬜ 未確認 |
 | DLL の **ビット数**（32 / 64bit） | `dumpbin /headers` で確認 | ⬜ 未確認 |
