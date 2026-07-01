@@ -139,7 +139,7 @@ CLFN を置く前に、外部仕様書とヘッダから次を表にまとめる
   RAMScopeGT170SetExternalTrigger()  6.23 外部トリガ設定（GT170専用版）
   RAMScopeGT170SetMeasTrigger()      6.24 測定トリガ設定（GT170専用）
 
-  [6.25〜6.35 GT170_IF その他]       データ読み出し関数はこの範囲にある可能性あり→要確認
+  RAMScopeGT150GetBufferData()       GT150_IF データ読み出し★確定（MeasStart注記より）
 
 ■RAM書き込み/CAN（GT170専用）
   RAMScopeGT170ScenarioWriteStart()  6.36
@@ -151,25 +151,25 @@ CLFN を置く前に、外部仕様書とヘッダから次を表にまとめる
   RAMScopeGT170SetAdcRange()         6.44
 ```
 
-**呼び出しライフサイクル（大幅更新・確定）：**
+**呼び出しライフサイクル（確定）：**
 
 ```
 [オフライン]
-    ↓ RAMScopeGT150DeviceInit()         ← USB接続・ハードウェア検出
+    ↓ RAMScopeGT150DeviceInit()                     ← USB接続・ハードウェア検出
 [アイドル]
-    ↓ RAMScopeGT150AllInit(0)           ← API+ハードウェア初期化（設定全クリア）
-    ↓ RAMScopeGT150GetSysInfo(0, [...]) ← モジュール構成・endian値の取得
-    ↓ RAMScopeGT150PGT_SetMdlConfig()   ← プローブ接続情報設定（必須！）
-    ↓ RAMScopeGT170SetMeasCond()        ← 測定条件設定（GT170専用版）
-    ↓ RAMScopeGT170SetMeasCh()          ← チャネル設定（GT170専用版）
-    ↓ RAMScopeGT150SetLoggingInfo()     ← ロギング設定
-    ↓ RAMScopeGT150MeasStart()          ← 測定開始
+    ↓ RAMScopeGT150AllInit(UnitNo=0)                ← API+HW初期化（設定全クリア）
+    ↓ RAMScopeGT150GetSysInfo(UnitNo=0, buf[16])    ← モジュール構成・endian取得
+    ↓ RAMScopeGT150PGT_SetMdlConfig(...)            ← プローブ接続情報設定（必須！）
+    ↓ RAMScopeGT170SetMeasCond(0, MdlNo, *MEASINFO) ← 測定条件（モジュール毎に発行）
+    ↓ RAMScopeGT170SetMeasCh(...)                   ← チャネル設定
+    ↓ RAMScopeGT150SetLoggingInfo(...)              ← ロギング設定（必須！MeasStart前に）
+    ↓ RAMScopeGT150MeasStart(UnitNo=0)             ← 測定開始
 [測定中]
-    ↓ [データ読み出し]                  ← 関数未確認（6.25〜6.35に存在する可能性）
-    ↓ RAMScopeGT150MeasStop()           ← 測定停止
+    ↓ RAMScopeGT150GetBufferData(...)               ← データ読み出し（★確定）
+    ↓ RAMScopeGT150MeasStop(UnitNo=0)              ← 測定停止
 [アイドル]
-    ↓ RAMScopeGT150ReleaseBufferData()  ← バッファ解放（読み出し後）
-    ↓ RAMScopeGT150DeviceExit()         ← 接続破棄
+    ↓ RAMScopeGT150ReleaseBufferData(...)           ← バッファ解放
+    ↓ RAMScopeGT150DeviceExit()                    ← 接続破棄
 [オフライン]
 ```
 
@@ -206,7 +206,35 @@ long RAMScopeGT150GetSysInfo(
 long RAMScopeGT150DeviceExit(
     void
 );
+
+/* 測定開始処理（6.9章）：アイドル→測定中。SetLoggingInfo完了後に発行 */
+long RAMScopeGT150MeasStart(
+    long  UnitNo    /* [in] 常に 0 */
+);
+
+/* 測定停止処理（6.10章）：測定中→アイドル。MeasStop でシナリオ書き込み/送信も同時停止 */
+long RAMScopeGT150MeasStop(
+    long  UnitNo    /* [in] 常に 0 */
+);
+
+/* 測定データ読み出し（GT150_IF。GetBufferData の章は別途確認要） */
+/* 関数名: RAMScopeGT150GetBufferData() ← MeasStart の注記で確認済み。引数は要確認 */
+
+/* 測定条件設定・GT170専用版（6.13章）：モジュール別に発行 */
+long RAMScopeGT170SetMeasCond(
+    long           UnitNo,       /* [in] 常に 0 */
+    long           MdlNo,        /* [in] 発行対象モジュール番号（SYSINFO.module の値） */
+    MEASINFO_170   *pMeasInfo    /* [in] 測定条件構造体ポインタ（表 6-74 参照。引数要確認）*/
+);
 ```
+
+> **`RAMScopeGT150GetBufferData` について**：MeasStart の注記「本関数の発行以降、
+> `RAMScopeGT150GetBufferData()` による測定データの取得が可能になります」で確認済み。
+> 引数の詳細（バッファ構造・サイズ等）は仕様書の当該章で確認する。
+
+> **`RAMScopeGT170SetMeasCond` の `MdlNo`**：`GetSysInfo` で取得した `SYSINFO.module` の値を
+> 指定する。RAMモニタ・CAN・アナログ入力の各モジュール番号を `module_type` で判別して渡す。
+> `MEASINFO_170` 構造体の定義は仕様書表 6-74（未確認）。
 
 **SYSINFO 構造体定義（`GetSysInfo` 用）：**
 
@@ -271,6 +299,31 @@ typedef struct MDLPSMCFG {
 > `SetMdlConfig` は非推奨。代わりに **`PGT_SetMdlConfig()`** を使う。
 > `PGT_SetMdlConfig()` は PGT ツールが生成する設定ファイルを読み込む方式のため、
 > プローブ固有の非公開パラメータ（`jtag_clk` / `psm` 等）を自分で調べる必要がなくなる。
+
+**MeasStart エラーコード（確認済み）：**
+
+| 戻り値 | 意味 |
+|--------|------|
+| `0x00000000` | 正常終了 |
+| `0x30000001` | 関数内部で例外を検出 |
+| `0x30000004` | 測定動作状態で呼び出された |
+| `0x30000109` | **ロギング情報が未設定**（`SetLoggingInfo` を先に呼ぶ） |
+| `0x30000500` | UnitNo の指定値に誤り |
+| `0x3000050E` | オフライン状態で呼び出された |
+
+**MeasStop エラーコード（確認済み）：**
+
+| 戻り値 | 意味 |
+|--------|------|
+| `0x00000000` | 正常終了 |
+| `0x30000001` | 関数内部で例外を検出 |
+| `0x30000105` | 測定処理スレッドの停止に失敗（DLL インスタンス破棄 + HW 電源 OFF） |
+| `0x30000500` | UnitNo の指定値に誤り |
+| `0x3000050E` | オフライン状態で呼び出された |
+
+> **MeasStop でエラー（特に `0x30000105`）が出た場合**は、アプリの DLL インスタンスを
+> 破棄して RAMScope ハードウェアの電源を OFF にすること（仕様書の指示）。
+> TestStand の Cleanup ではこのエラーコードを別途ハンドリングする。
 
 **AllInit エラーコード（確認済み）：**
 
@@ -454,11 +507,12 @@ typedef struct MDLPSMCFG {
 | `SetMdlConfig` MDLCFG/MDLPSMCFG 構造体 | 6.6 章 | ✅ 確定（非推奨→PGT版使用）|
 | GT150_IF 完全関数一覧 | 6.1.1 章 | ✅ 確定 |
 | GT170_IF 完全関数一覧 | 6.1.2 章 | ✅ 確定 |
-| **測定開始 `RAMScopeGT150MeasStart`** | 6.9 章 | ✅ 関数名確定（引数は要確認） |
-| **測定停止 `RAMScopeGT150MeasStop`** | 6.10 章 | ✅ 関数名確定（引数は要確認） |
-| **データ読み出し関数**（引数・バッファ構造） | 6.25〜6.35 章（GT170_IF） | ⬜ 未確認 |
+| **測定開始 `RAMScopeGT150MeasStart(long)`** | 6.9 章 | ✅ プロトタイプ・エラーコード確定 |
+| **測定停止 `RAMScopeGT150MeasStop(long)`** | 6.10 章 | ✅ プロトタイプ・エラーコード確定 |
+| **データ読み出し `RAMScopeGT150GetBufferData`** | GT150_IF（MeasStart注記で確認） | ✅ 関数名確定（引数は要確認） |
+| `RAMScopeGT170SetMeasCond` 引数・`MEASINFO_170`構造体 | 6.13 章（表 6-74） | ⬜ 未確認 |
 | `PGT_SetMdlConfig` 引数・PGT ファイル仕様 | 6.7 章 | ⬜ 未確認 |
-| `RAMScopeGT170SetMeasCond` 引数・構造体 | 6.13 章 | ⬜ 未確認 |
+| `GetBufferData` 引数詳細・バッファ構造 | GT150_IF 当該章 | ⬜ 未確認 |
 | `RAMScopeGT170SendCANDataFrame` 引数詳細 | 6.39 章 | ⬜ 未確認 |
 | **呼び出し規約**（`__stdcall` か `__cdecl` か） | 仕様書冒頭・任意の関数宣言行 | ⬜ 未確認 |
 | DLL の **ビット数**（32 / 64bit） | `dumpbin /headers` で確認 | ⬜ 未確認 |
