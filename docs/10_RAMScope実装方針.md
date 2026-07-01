@@ -105,13 +105,48 @@ CLFN を置く前に、外部仕様書とヘッダから次を表にまとめる
 - `RAMScopeGT150*`：全機種共通（GT150/GT17x/GT12x 全てに適用）
 - `RAMScopeGT170*`：GT170 固有機能（RAM 計測条件設定・CAN 操作 等）
 
+**呼び出しライフサイクル（確定）：**
+
+```
+[オフライン]
+    ↓ RAMScopeGT150DeviceInit()    ← USB 接続・ハードウェア検出
+[アイドル]
+    ↓ RAMScopeGT150AllInit()       ← API + ハードウェア初期化（設定を全クリア）
+[アイドル]                            ※ DeviceInit 後に必ず呼ぶ。呼ぶたびに設定リセット
+    ↓ RAMScopeGT150GetSysInfo()    ← モジュール構成確認（任意。アイドルのみ可）
+    ↓ RAMScopeGT170SetMeasCond()   ← 測定条件設定（GT170 固有）
+    ↓ RAMScopeGT170SetMeasCh()     ← チャネル設定（GT170 固有）
+    ↓ [計測開始]                   ← 未確認（仕様書の続きページで確認）
+[測定中]
+    ↓ [データ読み出し]             ← 未確認
+    ↓ [計測停止]                   ← 未確認
+[アイドル]
+    ↓ RAMScopeGT150DeviceExit()    ← 接続を破棄
+[オフライン]
+```
+
+> GT150_IF 共通関数（`DeviceInit` / `AllInit` / `GetSysInfo` / `DeviceExit`）は
+> **GT170 でも必須**。これらはライフサイクル管理であり、GT170 固有の測定関数は
+> `AllInit` 完了後（アイドル状態）でないと呼べない。
+
 **確認済み関数プロトタイプ：**
 
 ```c
-/* 接続デバイス初期化（6.2章） */
+/* 接続デバイス初期化（6.2章）：オフライン→アイドル */
 long RAMScopeGT150DeviceInit(
     long  *pUnitNum,   /* [out] 接続成功台数（現仕様では常に 1） */
     long  *kind        /* [out] 機種コード：0=GT150, 1=GT12x, 2=GT17x */
+);
+
+/* 初期化処理（6.4章）：アイドル/測定中→アイドル。設定を全クリア */
+long RAMScopeGT150AllInit(
+    long  UnitNo       /* [in]  発行対象ユニット（現仕様では常に 0） */
+);
+
+/* システム情報取得（6.5章）：アイドルのみ可 */
+long RAMScopeGT150GetSysInfo(
+    long     UnitNo,      /* [in]  発行対象ユニット（現仕様では常に 0） */
+    SYSINFO  *pSysInfo    /* [out] SYSINFO 型、要素数 16 の配列先頭ポインタ */
 );
 
 /* 接続デバイス終了（6.3章） */
@@ -119,6 +154,43 @@ long RAMScopeGT150DeviceExit(
     void
 );
 ```
+
+**SYSINFO 構造体定義（`GetSysInfo` 用）：**
+
+```c
+typedef struct SYSINFO {
+    long module;            /* モジュール番号 */
+    long module_type;       /* モジュールタイプ: 0x0=RAMモニタ/光RAMモニタ, 0x2=CAN,
+                               0xE=電源通信, 0xF=非接続 */
+    long probe_id;          /* 接続プローブID（RAMモニタのみ） */
+    long interface_id;      /* 将来拡張用（値は不定） */
+    long version;           /* FPGAバージョン番号 */
+    long addinfo;           /* Firmwareバージョン番号 */
+    long endian;            /* エンディアン：0=Big / 1=Little */
+    long probe_version;     /* 接続プローブFPGAバージョン番号 */
+    long security_id_req;   /* セキュリティID有無（0/1）*/
+    long security_id_size;  /* セキュリティIDサイズ（security_id_req=1のみ有効）*/
+    long flash_enable;      /* 将来拡張用（値は不定） */
+    char name[16];          /* モジュール識別名称（RAMモニタ: プローブ識別名）*/
+} SYSINFO;
+/* サイズ = long×11 + char×16 = 44 + 16 = 60 バイト（アライン次第で確認要） */
+/* GetSysInfo には要素数 16 の配列（= 16×60 = 960 バイト）を渡す */
+```
+
+> **CLFN での `GetSysInfo` の扱い**：`pSysInfo` は要素 16 の配列ポインタ。
+> LabVIEW では **`Initialize Array`（サイズ 960 の U8 配列）** を先に確保して
+> `Array Data Pointer` で渡し、後段で `Type Cast` / `Unflatten` して各フィールドを取り出す。
+
+**AllInit エラーコード（確認済み）：**
+
+| 戻り値 | 意味 |
+|--------|------|
+| `0x00000000` | 正常終了 |
+| `0x30000001` | 関数内部で例外を検出 |
+| `0x30000518` | （GT17x）対応不可なモジュール構成を検出 |
+| `0x30100001` | 下位 DLL に必要な処理が見つからない（DLL バージョン確認） |
+| `0x30000504` | ハードウェアとの通信に失敗 |
+| `0x30000506` | 電源・USB 接続・ドライバ・発行手順を確認 |
 
 **GT170 固有機能（機能別）：**
 
@@ -222,22 +294,24 @@ long RAMScopeGT150DeviceExit(
 
 仕様の関数を、本資料の 1 イベント 1VI（[05](./05_VI設計方針と共通仕様.md)）に対応させる。
 
-| VI | ラップする API（確認済み） | 入出力（共通仕様に準拠） |
-|----|----------------------------|--------------------------|
-| `RAMScope_Init.vi` | `RAMScopeGT150DeviceInit(long *pUnitNum, long *kind)` → 機種コード取得後、測定条件設定（`RAMScopeGT170SetMeasCond`/`SetMeasCh`）を続けて呼ぶ | in: なし（1台固定前提）/ out:**kind**（機種確認用）・Status・TestError |
-| `RAMScope_Set_Cond.vi` | `RAMScopeGT170SetMeasCond()` + `RAMScopeGT170SetMeasCh()` | in: 測定条件パラメータ / out: Status・TestError |
-| `RAMScope_Log_Start.vi` | 計測開始 API（**仕様書の測定開始章で確認**） | in: — / out: Status・TestError |
-| `RAMScope_Read.vi` | データ読み出し API（**仕様書のデータ取得章で確認**） | in: — / out: **RAM 値（配列）**・Status・TestError |
-| `RAMScope_Log_Stop.vi` | 計測停止 API（**仕様書の測定停止章で確認**） | in: — / out: Status・TestError |
-| `RAMScope_Reset.vi` | `RAMScopeGT150DeviceExit(void)` | in: なし / out: Status・TestError |
-| `CAN_Send.vi`（RAMScope 経由） | `RAMScopeGT170SendCANDataFrame()` | [09](./09_CAN通信の実装.md) の入出力に整合 |
-| `CAN_Scenario_Start.vi` | `RAMScopeGT170ScenarioSendCond()` + `RAMScopeGT170ScenarioSendStart()` | シナリオ CAN 送信開始 |
-| `CAN_Scenario_Stop.vi` | `RAMScopeGT170ScenarioSendStop()` | シナリオ CAN 送信停止 |
+| VI | TestStand の配置 | ラップする API | 入出力 |
+|----|-----------------|----------------|--------|
+| `RAMScope_Connect.vi` | Setup (1回) | `RAMScopeGT150DeviceInit()` | out: kind（機種確認用）・Status・TestError |
+| `RAMScope_Init.vi` | Setup (Connect直後) | `RAMScopeGT150AllInit(UnitNo=0)` + `RAMScopeGT150GetSysInfo(UnitNo=0, pSysInfo[16])` | out: SYSINFO配列（モジュール構成確認）・Status・TestError |
+| `RAMScope_Set_Cond.vi` | Setup (条件設定) | `RAMScopeGT170SetMeasCond()` + `RAMScopeGT170SetMeasCh()` | in: 測定条件パラメータ（TestStand変数）/ out: Status・TestError |
+| `RAMScope_Log_Start.vi` | Main | 計測開始 API（**仕様書続きページで確認**） | out: Status・TestError |
+| `RAMScope_Read.vi` | Main（ポーリング） | データ読み出し API（**仕様書続きページで確認**） | out: **RAM 値（配列）**・Status・TestError |
+| `RAMScope_Log_Stop.vi` | Main | 計測停止 API（**仕様書続きページで確認**） | out: Status・TestError |
+| `RAMScope_Close.vi` | Cleanup（最後段） | `RAMScopeGT150DeviceExit()` | out: Status・TestError |
+| `CAN_Send.vi`（RAMScope 経由） | Main | `RAMScopeGT170SendCANDataFrame()` | [09](./09_CAN通信の実装.md) の入出力に整合 |
+| `CAN_Scenario_Start.vi` | Main | `RAMScopeGT170ScenarioSendCond()` + `RAMScopeGT170ScenarioSendStart()` | in: シナリオ設定 / out: Status・TestError |
+| `CAN_Scenario_Stop.vi` | Main | `RAMScopeGT170ScenarioSendStop()` | out: Status・TestError |
 
-> **ハンドルについて**：`RAMScopeGT150DeviceInit` は出力引数（`pUnitNum`/`kind`）のみで
-> **セッションハンドルを返さない**（グローバル状態で管理される模様）。
-> 後続の `RAMScopeGT170*` 関数もハンドル引数を持たない可能性がある。
-> 実際の引数構成は仕様書の各関数ページで確認し、ハンドルが不要なら VI 間引き回しは不要となる。
+> **ハンドルなし構造**：`DeviceInit` はセッションハンドルを返さない（グローバル状態管理）。
+> VISA のようなリファレンス引き回しは不要。VI 間でつなぐのはエラークラスタのみ。
+>
+> **AllInit の注意**：呼ぶたびに全測定設定がクリアされる。再試験で条件を変えたい場合は
+> `AllInit` → `SetMeasCond/Ch` を再度実行すること。
 
 ### 10.4.8 STEP7：エラー処理
 
@@ -278,12 +352,18 @@ long RAMScopeGT150DeviceExit(
 
 ### 残課題（仕様書の追加ページ確認）
 
-| 確認項目 | 必要な仕様書ページ |
-|----------|------------------|
-| **測定開始関数**のプロトタイプ（`Meas Start` 相当） | GT150_IF 共通関数 一覧章（6.1.1 相当） |
-| **測定停止関数**のプロトタイプ | 同上 |
-| **データ読み出し関数**のプロトタイプ・引数（バッファサイズ等） | 同上 |
-| **呼び出し規約**（`__stdcall` か `__cdecl` か） | 仕様書冒頭・ヘッダ・または任意の関数ページの宣言行 |
-| `RAMScopeGT170SendCANDataFrame` の引数詳細 | 6.39 章 |
-| `RAMScopeGT170SetMeasCond`/`SetMeasCh` の引数・構造体 | 6.13/6.15 章 |
-| DLL の **ビット数**（32 / 64bit） | `dumpbin /headers` または PE ツールで確認 |
+| 確認項目 | 仕様書の場所 | 状況 |
+|----------|-------------|------|
+| `DeviceInit` プロトタイプ・エラーコード | 6.2 章 | ✅ 確定 |
+| `DeviceExit` プロトタイプ・エラーコード | 6.3 章 | ✅ 確定 |
+| `AllInit` プロトタイプ・エラーコード・タイミング | 6.4 章 | ✅ 確定 |
+| `GetSysInfo` プロトタイプ・SYSINFO 構造体定義 | 6.5 章 | ✅ 確定 |
+| GT170 固有関数一覧（測定設定・トリガ・CAN 等） | 6.1.2 章 | ✅ 確定 |
+| **測定開始関数**のプロトタイプ | 仕様書の測定開始章 | ⬜ 未確認 |
+| **測定停止関数**のプロトタイプ | 仕様書の測定停止章 | ⬜ 未確認 |
+| **データ読み出し関数**（バッファ構造含む） | 仕様書の読み出し章 | ⬜ 未確認 |
+| `RAMScopeGT170SetMeasCond` の引数・構造体 | 6.13 章 | ⬜ 未確認 |
+| `RAMScopeGT170SetMeasCh` の引数 | 6.15 章 | ⬜ 未確認 |
+| `RAMScopeGT170SendCANDataFrame` の引数詳細 | 6.39 章 | ⬜ 未確認 |
+| **呼び出し規約**（`__stdcall` か `__cdecl` か） | 仕様書冒頭・任意の関数宣言行 | ⬜ 未確認 |
+| DLL の **ビット数**（32 / 64bit） | `dumpbin /headers` で確認 | ⬜ 未確認 |
