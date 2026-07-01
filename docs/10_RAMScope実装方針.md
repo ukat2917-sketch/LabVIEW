@@ -1147,29 +1147,32 @@ pData → [ Packet[0] | Packet[1] | ... | Packet[M-1] ]
 2. 32bit DLL 専用の**仲介プロセス（サロゲート EXE）** を作成し、64bit LabVIEW とは
    named pipe / TCP 等の IPC で通信する方式（実装コストが高いため優先度低）。
 
-### 🔴 未確認の懸念：RAMScope の接続方式が USB 前提の可能性（LAN 接続の計画と矛盾）
+### 🔴 確定：RAMScope（GT170U01）は RAMScopeVP API 用に USB3.0 接続が必須（LAN 接続不可）
 
-試験系全体を **PC・各操作機器の接続をすべてイーサネットで構築**する方針（システム構成図）が
-あり、RAMScope も LAN 接続で構築することを検討中。しかし、これまで確認した
-RAMScopeVP API 仕様書の内容から、**現行の API 層は USB 接続を前提にしている可能性が高い**。
+製品ページ（電源通信モジュール `GT170U01` のスペック表）にて **PC-I/F の仕様が確定**した。
 
-**根拠：**
-- 入手済み DLL に `GT170USB.dll` という **USB 専用と思われるファイル名**が存在する一方、
-  LAN/Ethernet 対応を示すファイル（例：`GT170LAN.dll` 等）は確認できていない。
-- `DeviceInit` / `ScenarioSendStart` 等、複数関数のエラーコード説明に
-  **「USB ドライバのインストール状況を確認」**という文言が繰り返し登場する。
-- これまで確認した GT150_IF / GT170_IF の全関数一覧の中に、
-  **IP アドレス設定・ポート指定・LAN 接続確立に相当する関数が一切ない**。
+| インターフェース | 用途 |
+|-----------------|------|
+| **Ethernet（GbEthernet）** | **XCP on Ethernet 用**（RAMScopeVP API とは別プロトコル） |
+| **USB3.0** | **RAMScopeVP 用**、Ethernet メンテ用 |
 
-**要確認事項：**
-- GT170 の**ハードウェア設置マニュアル**（API 仕様書とは別物）に LAN ポートの記載があるか。
-- もし RAMScope 本体がネイティブに LAN 接続をサポートする場合、API 仕様書のどこかに
-  見落としている接続設定関数（LAN 版の `DeviceInit` 相当）があるはずなので、目次を再確認する。
+つまり、**RAMScopeVP API（本ドキュメントで解読している一連の関数群）を使う場合、
+GT170U01 との接続は USB3.0 一択であり、Ethernet では代替できない**ことが確定した。
+GT170U01 の Ethernet ポートは XCP（Universal Measurement and Calibration Protocol）という
+**別のプロトコル・別の実装が必要な通信方式**専用であり、今回実装している
+RAMScopeGT150/GT170 系 API とは互換性がない。
 
-**RAMScope が USB 接続専用だった場合の代替案：**
+**結論として、システム構成図の「全機器イーサネット化」方針からは RAMScope のみ除外し、
+USB3.0 接続を前提に設計する必要がある。** 上記 10.6 の代替案のうち：
 
-| 案 | 内容 | 課題 |
-|----|------|------|
-| A. RAMScope だけ PC1 に USB 直結 | 他の LAN 対応計測器（オシロ・ロガー・電源）はハブ経由、RAMScope だけ USB ケーブルで PC1 に直結 | システム構成図の「全機器イーサネット化」方針から RAMScope だけ逸脱する |
-| B. USB-Ethernet 変換機器（USB device server）を挟む | RAMScope を USB→LAN 変換アダプタに接続し、PC1 からは仮想 USB デバイスとして認識させる | 追加ハードウェア費用・ドライバ導入が必要。`GetBufferData` のポーリングはリアルタイム性が要求されるため、変換によるレイテンシ増加でデータ欠落（`datalost`フラグ）が増える懸念 |
-| C. RAMScope 専用の仲介 PC＋自作 TCP サーバ | RAMScope に USB 直結した別 PC に RAMScopeVP API 呼び出しをラップする簡易サーバを立て、PC1 の LabVIEW からネットワーク経由でリモート制御 | 実装コスト大。ただし他機器と同様に「PC1 からはネットワーク経由」という構成に統一できる |
+- **案A（RAMScope だけ PC1 に USB3.0 直結）を第一候補として推奨**する。
+  他機器（オシロ・ロガー・電源）は LAN 対応済みのためハブ経由、RAMScope のみ
+  PC1 に USB3.0 ケーブルで直結する構成となる。物理的に RAMScope を PC1 の近くに
+  設置できるかがレイアウト上の制約になる。
+- 案B（USB-Ethernet 変換機器）・案C（仲介PC+TCPサーバ）は、PC1 と RAMScope を
+  物理的に離す必要がある場合のみ検討（レイテンシ・実装コストの観点で優先度は低い）。
+
+> **XCP on Ethernet について（参考）**：もし将来的に ECU 側のキャリブレーション・
+> 測定を XCP プロトコルで行いたい要件が出てきた場合は、本ドキュメントの
+> RAMScopeVP API とは全く別の実装（XCP クライアントライブラリ、または
+> 対応 ASAM XCP ドライバ）が必要になる。現時点のスコープ外。
