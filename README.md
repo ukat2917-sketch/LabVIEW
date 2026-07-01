@@ -39,6 +39,7 @@ VI（バーチャルインスツルメント）の作り方、TestStand シー�
 | 参考 | [docs/reference/RAMScopeVP.h](./docs/reference/RAMScopeVP.h) | RAMScopeVP API ヘッダファイル（ベンダー提供の一次情報。doc 10 の記述と突き合わせる際の正）|
 | 参考 | [docs/reference/GTHard.h](./docs/reference/GTHard.h) | RAMScope ハードウェア定数定義（機種判定・module_type・モジュール/チャンネル数上限）|
 | 参考 | [docs/reference/samp_simple.cpp](./docs/reference/samp_simple.cpp) | ベンダー提供の実装サンプル（RAM モニタ測定の一連の呼び出し順序の実例）|
+| 参考 | [docs/reference/samp_simple.vcxproj](./docs/reference/samp_simple.vcxproj) | サンプルのビルド設定（Win32 専用・呼び出し規約推定の根拠）|
 
 ---
 
