@@ -1163,14 +1163,27 @@ GT170U01 の Ethernet ポートは XCP（Universal Measurement and Calibration P
 RAMScopeGT150/GT170 系 API とは互換性がない。
 
 **結論として、システム構成図の「全機器イーサネット化」方針からは RAMScope のみ除外し、
-USB3.0 接続を前提に設計する必要がある。** 上記 10.6 の代替案のうち：
+USB3.0 接続を前提に設計する。** 上記 10.6 の代替案のうち **案A（RAMScope のみ PC1 に
+USB3.0 直結）で構成確定**。
 
-- **案A（RAMScope だけ PC1 に USB3.0 直結）を第一候補として推奨**する。
-  他機器（オシロ・ロガー・電源）は LAN 対応済みのためハブ経由、RAMScope のみ
-  PC1 に USB3.0 ケーブルで直結する構成となる。物理的に RAMScope を PC1 の近くに
-  設置できるかがレイアウト上の制約になる。
-- 案B（USB-Ethernet 変換機器）・案C（仲介PC+TCPサーバ）は、PC1 と RAMScope を
-  物理的に離す必要がある場合のみ検討（レイテンシ・実装コストの観点で優先度は低い）。
+**最終システム構成（確定）：**
+
+```
+オシロ(DLM5058)/ロガー(MX100)/BTS×4/制御電源(PPX36-3)/IGS電源(PPX36-3)
+        │ Ethernet                                          │ Ethernet
+        └──────────────► ネットワークハブ ◄──────────────────┘
+                              │ Ethernet
+                              ▼
+                            PC1 ◄──────USB3.0──────  RAMScope(GT170)
+                                                            │
+                                                      FCAN×2 (RAM/CANモニタ用プローブ)
+                                                            ▼
+                                                      供試体 Assy（恒温槽内）
+```
+
+- **RAMScope のみ PC1 に USB3.0 直結**。他機器はすべて Ethernet 経由でネットワークハブに接続。
+- RAMScope から供試体へは **FCAN×2**（RAMモニタ用プローブ／CANモニタ用プローブ）で接続。
+- 案B（USB-Ethernet 変換機器）・案C（仲介PC+TCPサーバ）は不採用（USB3.0 直結で決着）。
 
 > **XCP on Ethernet について（参考）**：もし将来的に ECU 側のキャリブレーション・
 > 測定を XCP プロトコルで行いたい要件が出てきた場合は、本ドキュメントの
