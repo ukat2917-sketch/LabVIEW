@@ -223,18 +223,55 @@ long RAMScopeGT150MeasStop(
 /* 測定条件設定・GT170専用版（6.13章）：モジュール別に発行 */
 long RAMScopeGT170SetMeasCond(
     long           UnitNo,       /* [in] 常に 0 */
-    long           MdlNo,        /* [in] 発行対象モジュール番号（SYSINFO.module の値） */
-    MEASINFO_170   *pMeasInfo    /* [in] 測定条件構造体ポインタ（表 6-74 参照。引数要確認）*/
+    long           MdlNo,        /* [in] SYSINFO.module の値（モジュール番号）*/
+    MEASINFO_170   *pMeasInfo    /* [in] 測定条件 union ポインタ（下記 MEASINFO_170 参照）*/
 );
 ```
 
-> **`RAMScopeGT150GetBufferData` について**：MeasStart の注記「本関数の発行以降、
-> `RAMScopeGT150GetBufferData()` による測定データの取得が可能になります」で確認済み。
-> 引数の詳細（バッファ構造・サイズ等）は仕様書の当該章で確認する。
+**MEASINFO_170 共用体・構造体定義（`SetMeasCond` 用、表 6-74〜6-76）：**
 
-> **`RAMScopeGT170SetMeasCond` の `MdlNo`**：`GetSysInfo` で取得した `SYSINFO.module` の値を
-> 指定する。RAMモニタ・CAN・アナログ入力の各モジュール番号を `module_type` で判別して渡す。
-> `MEASINFO_170` 構造体の定義は仕様書表 6-74（未確認）。
+```c
+/* 共用体：モジュール種別に応じたメンバを使う */
+typedef union MEASINFO_170 {
+    MEASINFO_RAM170  RAM;   /* RAMモニタモジュール用（module_type=0x0） */
+    MEASINFO_ADC170  ADC;   /* アナログ入力モジュール用（module_type=0xE 相当） */
+    MEASINFO_CAN170  CAN;   /* CAN モジュール用（module_type=0x2）（構造体定義は表6-77→未確認）*/
+} MEASINFO_170;
+
+/* RAM モニタモジュール用（表 6-75）*/
+typedef struct MEASINFO_RAM170 {
+    long DummyInterval;      /* [将来拡張用] ダミーパケット生成周期(usec)。常に 100 を指定 */
+    long MeasPeri;           /* 測定周期：1〜999999 */
+    long MeasUnit;           /* 測定周期の単位：1=usec / 2=msec */
+    long MeasPeri_reserve;   /* [将来拡張用] 現版数では常に 1 を指定 */
+} MEASINFO_RAM170;
+/* サイズ = long×4 = 16 バイト */
+
+/* アナログ入力モジュール用（表 6-76）*/
+typedef struct MEASINFO_ADC170 {
+    long DummyInterval;      /* ダミーパケット生成周期(usec)。常に 100 を指定 */
+    long MeasPeri;           /* 測定周期：1〜999999 */
+    long MeasUnit;           /* 測定周期の単位：1=usec / 2=msec */
+} MEASINFO_ADC170;
+/* サイズ = long×3 = 12 バイト */
+
+/* CAN モジュール用（表 6-77）：未確認。構造体定義は仕様書続きページで確認 */
+/* typedef struct MEASINFO_CAN170 { ... } MEASINFO_CAN170; */
+```
+
+> **使い方（RAM モニタの例）**：
+> ```c
+> MEASINFO_170 info;
+> info.RAM.DummyInterval   = 100;   // 固定
+> info.RAM.MeasPeri        = 1000;  // 1000 usec = 1ms 周期
+> info.RAM.MeasUnit        = 1;     // 1=usec
+> info.RAM.MeasPeri_reserve = 1;    // 固定
+> RAMScopeGT170SetMeasCond(0, mdlNo_RAM, &info);
+> ```
+
+> **CLFN での union の扱い**：union のサイズは最大メンバのサイズ（`MEASINFO_CAN170` 確認後に確定）。
+> LabVIEW では **`Initialize Array`（U8 配列、union サイズ分）** を確保して各フィールドを
+> バイト順に埋め、`Array Data Pointer` で渡す。RAM モニタ用なら最低 16 バイト。
 
 **SYSINFO 構造体定義（`GetSysInfo` 用）：**
 
@@ -510,7 +547,7 @@ typedef struct MDLPSMCFG {
 | **測定開始 `RAMScopeGT150MeasStart(long)`** | 6.9 章 | ✅ プロトタイプ・エラーコード確定 |
 | **測定停止 `RAMScopeGT150MeasStop(long)`** | 6.10 章 | ✅ プロトタイプ・エラーコード確定 |
 | **データ読み出し `RAMScopeGT150GetBufferData`** | GT150_IF（MeasStart注記で確認） | ✅ 関数名確定（引数は要確認） |
-| `RAMScopeGT170SetMeasCond` 引数・`MEASINFO_170`構造体 | 6.13 章（表 6-74） | ⬜ 未確認 |
+| `RAMScopeGT170SetMeasCond` 引数・`MEASINFO_170` union | 6.13 章（表 6-74〜76） | ✅ RAM/ADC 構造体確定（CAN は表 6-77→未確認） |
 | `PGT_SetMdlConfig` 引数・PGT ファイル仕様 | 6.7 章 | ⬜ 未確認 |
 | `GetBufferData` 引数詳細・バッファ構造 | GT150_IF 当該章 | ⬜ 未確認 |
 | `RAMScopeGT170SendCANDataFrame` 引数詳細 | 6.39 章 | ⬜ 未確認 |
