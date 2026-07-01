@@ -694,6 +694,90 @@ typedef struct SEND_SCENARIO_STEP {
 > - `pScenario` は `ScenarioNum`（0〜1）要素の `SEND_SCENARIO` 配列。U8 配列（5396×ScenarioNum バイト）を
 >   `Initialize Array` で確保し `Array Data Pointer` で渡す。
 
+**`RAMScopeGT170ScenarioSendStart` 関数仕様（6.41章・確定）：**
+
+```c
+/* シナリオ送信開始処理
+   CAN モジュールへシナリオ送信機能の起動を指示する。
+   発行対象モジュール：CAN */
+long RAMScopeGT170ScenarioSendStart(
+    long  UnitNo,   /* [in] 発行対象ユニット（将来拡張用。現仕様では常に 0）*/
+    long  MdlNo     /* [in] 発行対象モジュールのモジュール番号 */
+);
+```
+
+> **注意・制限事項（6.41.3節）：**
+> - RAMScopeVP アプリケーションの**有償ライセンス**が適用されていない状態で本関数を発行した場合、エラーを応答する。
+> - 本関数を発行する場合、事前に `RAMScopeGT170ScenarioSendSet()` 関数を発行し、送信シナリオを定義しておくこと。
+> - 既にシナリオ送信が機能している CAN モジュールに対して本関数を発行した場合、エラーとする。
+> - シナリオ送信は**測定動作中にのみ機能**する。**アイドル中に本関数を発行した場合、
+>   実際の動作は次回の測定状態への遷移後に起動する。**
+>
+> **発行タイミング（6.41.4節）**：オフライン=×／測定中=○／アイドル=○
+>
+> **応答（6.41.5節 表6-236）：**
+> | 戻り値 | 意味 |
+> |--------|------|
+> | `0x00000000` | 正常終了 |
+> | `0x30000001` | 関数内部で例外を検出 |
+> | `0x30000003` | 関数の呼び出し順序に誤りがある |
+> | `0x30000005` | `MdlNo` の指定値に誤りがある |
+> | `0x30000006` | （同上・詳細未記載）|
+> | `0x30000500` | `UnitNo` の指定値に誤りがある |
+> | `0x3000050E` | オフラインの状態で関数が呼び出された |
+> | `0x30100001` | 下位DLL内に必要な処理が見つからない（DLLバージョン確認）／GT150・GT12xに対して関数が呼び出された |
+> | `0x30000504` | RAMScopeハードウェアとの通信に失敗 |
+> | `0x30000506` | RAMScopeハードウェアの電源、ホストPCとの接続、USBドライバのインストール状況、API関数の発行手順などを確認 |
+> | `0x30000512`〜`0x30000515` | 上記確認後も現象が改善しない場合は弊社まで問い合わせ |
+> | `0xE0000004`／`0xE0000010` | 有効なライセンスが見つからない |
+
+**`RAMScopeGT170ScenarioSendStop` 関数仕様（6.42章・確定）：**
+
+```c
+/* シナリオ送信停止処理
+   CAN モジュールへシナリオ送信機能の停止を指示する。
+   発行対象モジュール：CAN */
+long RAMScopeGT170ScenarioSendStop(
+    long  UnitNo,   /* [in] 発行対象ユニット（将来拡張用。現仕様では常に 0）*/
+    long  MdlNo     /* [in] 発行対象モジュールのモジュール番号 */
+);
+```
+
+> **注意・制限事項（6.42.3節）：**
+> - シナリオ送信機能が起動していない CAN モジュールに対して本関数を発行した場合、エラーとはしない。
+> - シナリオ送信は測定動作中にのみ機能する。本関数を発行しなかった場合でも、以下の関数の発行により
+>   RAMScopeVP API はシナリオ送信を停止する：
+>   - `RAMScopeGT150DeviceExit()`
+>   - `RAMScopeGT150AllInit()`
+>   - `RAMScopeGT170MeasStop()`
+>
+> **発行タイミング（6.42.4節）**：オフライン=×／測定中=○／アイドル=○
+>
+> **応答（6.42.5節 表6-240）：**
+> | 戻り値 | 意味 |
+> |--------|------|
+> | `0x00000000` | 正常終了 |
+> | `0x30000001` | 関数内部で例外を検出 |
+> | `0x30000005` | `MdlNo` の指定値に誤りがある |
+> | `0x30000006` | （同上・詳細未記載）|
+> | `0x30000007` | アイドル状態で関数が呼び出された |
+> | `0x30000500` | `UnitNo` の指定値に誤りがある |
+> | `0x3000050E` | オフラインの状態で関数が呼び出された |
+> | `0x30100001` | 下位DLL内に必要な処理が見つからない（DLLバージョン確認）／GT150・GT12xに対して関数が呼び出された |
+> | `0x30000504` | RAMScopeハードウェアとの通信に失敗 |
+> | `0x30000506` | RAMScopeハードウェアの電源、ホストPCとの接続、USBドライバのインストール状況、API関数の発行手順などを確認 |
+> | `0x30000512`〜`0x30000515` | 上記確認後も現象が改善しない場合は弊社まで問い合わせ |
+
+> **CAN シナリオ送信の全体フロー（確定）：**
+> ```
+> ① RAMScopeGT170ScenarioSendSet(0, MdlNo, ChNo, ScenarioNum, &scenario)   ← シナリオ定義（アイドル/測定中どちらでも可）
+> ② RAMScopeGT170ScenarioSendStart(0, MdlNo)                              ← 送信起動指示
+>      ※ アイドル中に発行した場合、実際の起動は測定開始後になる
+> ③ [測定中：シナリオに従って自動送信]
+> ④ RAMScopeGT170ScenarioSendStop(0, MdlNo)                               ← 送信停止指示
+>      ※ MeasStop / AllInit / DeviceExit でも自動停止する
+> ```
+
 **DeviceInit のエラーコード（確認済み）：**
 
 | 戻り値 | 意味 |
@@ -874,8 +958,8 @@ pData → [ Packet[0] | Packet[1] | ... | Packet[M-1] ]
 | `RAMScope_Release.vi` | Main（Stop直後） | **`RAMScopeGT150ReleaseBufferData()`** | out: Status・TestError |
 | `RAMScope_Close.vi` | Cleanup（最後段） | `RAMScopeGT150DeviceExit()` | out: Status・TestError |
 | `CAN_Send.vi`（RAMScope 経由） | Main | `RAMScopeGT170SendCANDataFrame()` | [09](./09_CAN通信の実装.md) の入出力に整合 |
-| `CAN_Scenario_Start.vi` | Main | `RAMScopeGT170ScenarioSendSet()` ✅ + `RAMScopeGT170ScenarioSendStart()` | in: シナリオ設定（SEND_SCENARIO）/ out: Status・TestError |
-| `CAN_Scenario_Stop.vi` | Main | `RAMScopeGT170ScenarioSendStop()` | out: Status・TestError |
+| `CAN_Scenario_Start.vi` | Main | `RAMScopeGT170ScenarioSendSet()` ✅ + `RAMScopeGT170ScenarioSendStart()` ✅ | in: シナリオ設定（SEND_SCENARIO）/ out: Status・TestError |
+| `CAN_Scenario_Stop.vi` | Main | `RAMScopeGT170ScenarioSendStop()` ✅ | out: Status・TestError |
 
 > **ハンドルなし構造**：`DeviceInit` はセッションハンドルを返さない（グローバル状態管理）。
 > VISA のようなリファレンス引き回しは不要。VI 間でつなぐのはエラークラスタのみ。
@@ -916,7 +1000,7 @@ pData → [ Packet[0] | Packet[1] | ... | Packet[M-1] ]
 | DLL 入手 | ✅ `RAMScopeVP_API.dll` / `GT170.dll` 等 入手済み |
 | API 仕様書 | ✅ 入手済み（PDF。確認中） |
 | `.h` / サンプル | ❌ 未同梱。仕様書の関数宣言表から代替可能（10.4.1） |
-| **CAN 操作 API** | ✅ **確定**：`RAMScopeGT170SendCANDataFrame()` / `ScenarioSend*()` あり |
+| **CAN 操作 API** | ✅ **全確定**：`SendCANDataFrame`(6.39)／`ScenarioSendSet`(6.40)／`ScenarioSendStart`(6.41)／`ScenarioSendStop`(6.42) 全プロトタイプ・構造体・エラーコード確定 |
 | 接続・切断 API | ✅ `RAMScopeGT150DeviceInit` / `DeviceExit` 確定（プロトタイプ・エラーコード済） |
 | GT170 機能一覧 | ✅ 測定設定・トリガ・RAM 書込・CAN・アナログの関数名確定 |
 
@@ -939,6 +1023,9 @@ pData → [ Packet[0] | Packet[1] | ... | Packet[M-1] ]
 | **データ取得 API 一覧** | GT150_IF 表6-5 | ✅ GetBufferData(6.29)・GetLoggingData(6.31) ほか7関数確定 |
 | **測定データパケット構造（RAM・CAN）** | 7.1 章（表7-1,7-2）・7.3 章（表7-5,7-6）| ✅ パケットサイズ・フラグ情報すべて確定（RAM: `4N+12`byte／CAN: 固定84byte）|
 | 測定データパケット構造（アナログ入力）| 「7 測定データの構成」章（ADC節）| ⬜ 未確認 |
-| `RAMScopeGT170SendCANDataFrame` 引数詳細 | 6.39 章 | ⬜ 未確認 |
+| **`RAMScopeGT170SendCANDataFrame` 引数詳細** | 6.39 章（表6-221〜226）| ✅ プロトタイプ・`CANSEND_170_INFO/DATA`構造体・エラーコード確定 |
+| **`RAMScopeGT170ScenarioSendSet` 引数詳細** | 6.40 章（表6-227〜232）| ✅ プロトタイプ・`SEND_SCENARIO`構造体・エラーコード確定（関数名誤り修正済み）|
+| **`RAMScopeGT170ScenarioSendStart` 引数詳細** | 6.41 章（表6-233〜236）| ✅ プロトタイプ・エラーコード確定 |
+| **`RAMScopeGT170ScenarioSendStop` 引数詳細** | 6.42 章（表6-237〜240）| ✅ プロトタイプ・エラーコード確定 |
 | **呼び出し規約**（`__stdcall` か `__cdecl` か） | 仕様書冒頭・任意の関数宣言行 | ⬜ 未確認 |
 | DLL の **ビット数**（32 / 64bit） | `dumpbin /headers` で確認 | ⬜ 未確認 |
