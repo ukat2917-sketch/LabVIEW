@@ -1509,6 +1509,275 @@ long RAMScopeGT170SetAdcRange(long UnitNo, long MdlNo, long ChNum, long *pRange)
 > 解読・実装で詰まった場合は、**RAMScopeVP API の有償サポート**（`support-mvi@dts-insight.co.jp`）の
 > 利用を検討する（DLL 使用自体は無償だがサポートは有償）。
 
+## 10.4.10 段階的なVI構築手順（RAM計測のみ。CAN送受信は別途）
+
+付録A1（FG420）の A1.6.1 と同じ「段階的に作る」考え方を、RAMScope（CLFN方式）向けに具体化する。
+**FG420 はベンダー製ドライバ VI を呼ぶだけだったが、RAMScope は関数プロトタイプ・構造体を
+手動で CLFN 設定する必要があるため、作り方が根本的に異なる**。CAN 送受信（アライブカウンタ等、
+[09](./09_CAN通信の実装.md) 9.9）はいったん対象外とし、**RAM 計測のみ**に絞って進める。
+
+### STEP 0：プロジェクトの準備（FG420 とは異なり「本編メインプロジェクト」内で作業）
+
+RAMScope は FG420（別案件・別プロジェクト）と異なり、**本編メインプロジェクトの一部**
+（[03](./03_LabVIEW環境構築.md) 3.5 の `30_RAMScope` フォルダ）に組み込む。
+
+1. メインプロジェクトの `30_RAMScope` フォルダ（無ければ本編 3.5.1〜3.5.3 の要領で作成）を開く。
+2. **共通サブVI（`Status.ctl`／`TestError.ctl`／`Error_To_TestStatus.vi`）が
+   メインプロジェクトの `00_Common` に無ければ、FG420 プロジェクトからコピーする**
+   （別プロジェクトで作ったものなので実ファイルごとコピーが必要。中身は同じものでよい）。
+3. RAMScopeVP API の **64bit DLL**（入手済み）を配置し、CLFN のライブラリパスから
+   到達できる場所に置く（絶対パス、または `.lvproj` からの相対パスで解決できる場所）。
+   64bit 版のため、**呼び出し規約（stdcall/cdecl）は事実上問わない**（10.0 ⑤・10.6 参照。
+   x64 ABI には規約の区別が無いため、CLFN の Calling Convention 設定は "C" のままで良い）。
+
+### STEP 1：CLFN 疎通確認（実機・VI 抜きで最初に確認すること）
+
+FG420 の `*IDN?`（VISA Test Panel）に相当する事前確認は無いため、
+**最初の CLFN 呼び出し自体を疎通試験とする**。
+
+1. 空の VI を1つ作り、`RAMScopeGT150DeviceInit` の CLFN を1個だけ配置して設定（10.4.3 STEP2）。
+2. 実行し、**LabVIEW がクラッシュしないこと**を確認する（呼び出し規約や引数の型を間違えると
+   ここで LabVIEW ごと落ちることがある。64bit DLL 入手によりこのリスクは大幅に下がっている）。
+3. 実機が繋がっていなくても、`DeviceInit` は「オフライン→アイドル」の遷移を試みるだけなので、
+   エラーコードが返る（またはハングする）だけで済むはず。**実機が無い場合はここで得られる
+   戻り値がエラーコードになることを確認するだけでよい**（FG420 の「天然のエラー注入」と同じ考え方）。
+
+### STEP 2：共通の土台を先に作る（全RAMScope系VIで使い回す）
+
+#### `RAMScope_Code_To_Error.vi`（`30_RAMScope` に新規作成）
+
+RAMScope の CLFN 呼び出しは **戻り値が生の I32 エラーコード**であり、
+FG420 のドライバ VI のような標準 error cluster では返ってこない。そのため
+`Error_To_TestStatus.vi`（FG420 用に作った共通サブVI、06 6.1.2）にそのまま渡せない。
+**まず I32 エラーコード → 標準 error cluster に変換するアダプタ**を挟む。
+
+| 端子 | 型 | 説明 |
+|------|----|------|
+| `エラーコード` | I32（入力）| CLFN の戻り値をそのまま渡す |
+| `関数名` | String（入力）| `"DeviceInit"` 等、どの関数の戻り値かを示す文字列 |
+| `error out` | error cluster（標準・出力）| `status = (エラーコード ≠ 0)`／`code = エラーコード`／`source = "RAMScope " + 関数名 + " エラー"` |
+
+呼び出し側では、この`error out`をさらに`Error_To_TestStatus.vi`（`機器名="RAMScope"`）に渡す
+**2段変換**にする：
+
+```
+CLFN戻り値(I32) ──▶ RAMScope_Code_To_Error.vi(関数名="DeviceInit")
+                              │
+                              ▼ error out（標準クラスタ）
+                    Error_To_TestStatus.vi(機器名="RAMScope")
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+      実行結果ステータス   エラー情報      error out
+```
+
+> `0x30000001`のような16進エラーコードもI32としてそのまま扱える
+> （`TestError.ctl`の`コード`をU32にした場合はさらに正確。doc06 6.1.1参照）。
+
+#### CLFN 設定の共通テンプレート
+
+各関数のCLFN設定で毎回変わるのは「関数名」「引数」「戻り値の型」だけ。
+10.4.3 STEP2の手順（Library name／Function name／Calling convention="C"固定でよい／
+Parameters／Return type=Long）をそのままコピーして量産する。
+
+### STEP 3：VI ごとの構築（10.4.7 の対応表を1つずつ具体化）
+
+以下、確定済みの関数プロトタイプ（10.4.2a〜10.4.2c）に基づく CLFN 設定の要点のみ記載
+（構造体の完全な定義・バイトオフセットは各参照先を見る）。
+
+#### STEP 3.1：`RAMScope_Connect.vi`（`RAMScopeGT150DeviceInit`）
+
+```c
+long RAMScopeGT150DeviceInit(long *pUnitNum, long *kind);
+```
+
+| CLFN パラメータ | 設定 |
+|----------------|------|
+| `pUnitNum` | Numeric, Long, **Pointer to Value**（出力：`UnitNum`）|
+| `kind` | Numeric, Long, **Pointer to Value**（出力：`機種コード`。`0`=GT150/`1`=GT12x/`2`=GT17x）|
+| 戻り値 | Numeric, Long（`エラーコード`）|
+
+`エラーコード` → `RAMScope_Code_To_Error.vi`（関数名`"DeviceInit"`）→ `Error_To_TestStatus.vi`
+（機器名`"RAMScope"`）→ 3出力。`UnitNum`／`機種コード`はログ用に出力しておく程度でよい
+（10.4.7 の「ハンドルなし構造」注記のとおり、後続 VI へリファレンスとして引き回す必要は無い）。
+
+#### STEP 3.2：`RAMScope_Init.vi`（`AllInit` + `GetSysInfo`）＋ **MdlNo の自動判定**
+
+```c
+long RAMScopeGT150AllInit(long UnitNo);                        // UnitNo=0
+long RAMScopeGT150GetSysInfo(long UnitNo, SYSINFO *pSysInfo);   // SYSINFO[16]
+```
+
+1. `AllInit(0)` を CLFN で呼ぶ（引数は `UnitNo` 定数 `0` のみ）。戻り値をエラー変換。
+2. `GetSysInfo(0, buf[16])` を CLFN で呼ぶ。
+   - `pSysInfo`：**`Initialize Array`（U8、960要素）**を先に確保 → **Array Data Pointer** で渡す
+     （SYSINFO 1個=60バイト×16 = 960バイト。10.4.2a 参照）。
+3. 受け取った960バイトの配列を **For Loop（16回）** で60バイトずつ切り出し
+   （`Array Subset`）、各60バイトを `Type Cast` で `SYSINFO` クラスタに変換
+   （クラスタは 10.4.2a の定義どおり作っておく：`module`/`module_type`/`probe_id`/…/`name[16]`）。
+4. ループ内で **`module_type = 0x00`（RAM モニタ）のスロットを探し、その `module` の値を
+   `MdlNo_RAM` として出力**する（サンプルコードでは `MdlNo=1` だったが、これは環境依存の実測値。
+   **ハードコードせず、必ずこの実行時判定で取得する**こと。10.4.2d ②の教訓）。
+   同様に `module_type = 0x02`（CAN）のスロットも見つけておけば、後日 CAN 実装時にそのまま使える。
+
+出力：`MdlNo_RAM`（I32。後続の `Set_Cond`／`Set_Ch`／`Read` 等 RAM 系全 VI で使う）、
+`実行結果ステータス`、`エラー情報`、`error out`。
+
+> 🔴 **10.4.7 の対応表の訂正**：同表は「`RAMScope_Config.vi` の入力に endian（Init.viの出力）」と
+> 記載していたが、`.h` ヘッダで確定した `PGT_SetMdlConfig` の実際のシグネチャは
+> `(UnitNo, SlotErr*)` のみで **endian を直接引数に取らない**（10.4.2c）。
+> この記載は `.h` 入手前の古い想定のため、`RAMScope_Config.vi` は endian 入力無しで設計する。
+
+#### STEP 3.3：`RAMScope_Config.vi`（`PGT_SetMdlConfig`）
+
+```c
+long RAMScopeGT150PGT_SetMdlConfig(long UnitNo, long *SlotErr);  // SlotErr[16]
+```
+
+| CLFN パラメータ | 設定 |
+|----------------|------|
+| `UnitNo` | Numeric, Long, Pass: Value（定数 `0`）|
+| `SlotErr` | Array, I32[16]、**Array Data Pointer**（`Initialize Array` で16要素確保）|
+
+戻り値をエラー変換。`SlotErr[MdlNo_RAM]`（STEP3.2で得た値をインデックスに使用）が `0` であることを
+確認すると、RAM モジュールのプローブ接続設定が正しく通ったかピンポイントで分かる（10.4.2a）。
+
+#### STEP 3.4：`RAMScope_Set_Cond.vi`（`SetMeasCond` + `SetMeasCh` + `SetLoggingInfo`）— 最も複雑
+
+3つの CLFN 呼び出しを1つの VI にまとめる（10.4.7 の設計どおり）。
+
+**① `RAMScopeGT170SetMeasCond(0, MdlNo_RAM, pMeasInfo)`**
+
+`pMeasInfo` は72バイトの `MEASINFO_170` union（10.4.2a）。RAM モニタ用途では先頭の
+`MEASINFO_RAM170`（20バイト。`MeasPeri_reserve[2]` の配列サイズ修正済み、10.4.2a）だけ埋める。
+
+構築手順：
+1. `Initialize Array`（U8、72要素、初期値0）で72バイトのゼロ埋め配列を用意。
+2. `DummyInterval`（固定100）を I32→U8配列変換（`Type Cast`）し、オフセット`0`に`Replace Array Subset`。
+3. `MeasPeri`（試験条件。周期）をオフセット`4`に同様に埋め込む。
+4. `MeasUnit`（`1`=usec/`2`=msec）をオフセット`8`に埋め込む。
+5. `MeasPeri_reserve[0]`／`[1]`はオフセット`12`／`16`に`0`を埋める（詳細仕様は要再確認、10.4.2a参照）。
+6. この72バイト配列を `Array Data Pointer` で `pMeasInfo` に渡す。
+
+入力：`測定周期`（DBL or I32、`MeasPeri`）、`周期単位`（Enum: usec/msec、`MeasUnit`）。
+
+**② `RAMScopeGT170SetMeasCh(0, MdlNo_RAM, ChNum, pChInfo)`**
+
+`pChInfo` は `CHINFO_170` の配列（1要素24バイト、RAM用途は `CHINFO_RAM170`：
+`enable`/`core`/`address`/`size`/`sign`/`speed` の6×DWORD、10.4.2c）。
+
+> 🔴 **`ChNum` はチャンネル「個数」**（配列要素数）であり、チャンネル番号のインデックスではない
+> （10.4.2d③で実サンプルから確定済み）。
+
+構築手順：
+1. 測定したい RAM チャンネルの一覧（アドレス等）を試験条件（配列）として受け取る。
+2. チャンネル数 `N` 分の24バイトブロックを連結した `N×24` バイトの配列を組み立てる。
+   各ブロックは `enable=1`、`address`＝該当アドレス、`size`／`core`／`sign`／`speed`＝
+   サンプルコードでは `0`（10.4.2d③。最低限 `enable`/`address`/`size`/`sign` の設定で動作する模様）。
+3. `ChNum` にはこの `N` を渡す（配列の要素数と必ず一致させる）。
+
+入力：`RAMチャンネル一覧`（アドレス配列などの試験条件）。
+
+**③ `RAMScopeGT150SetLoggingInfo(0, pLogInfo)`**
+
+`pLogInfo` は136バイトの `LOGINFO` 構造体（`logDevice`/`limitHddSize`/`mdl[16]`、
+各16要素は`logSize`/`BuffSize`の2×I32＝8バイト、10.4.2c）。
+
+構築手順：
+1. `logDevice=0`、`limitHddSize=0` を埋める。
+2. **`mdl[]` は使用モジュールだけでなく全16スロットに最低値（`logSize=1`,`BuffSize=1`）を
+   埋めるのが安全なパターン**（10.4.2d④、サンプルコードでの実装に準拠。
+   `NUM_MODULE_MAX_170=10` 分だけでなく、`mdl[]` の要素数自体は16固定なので16スロット全て埋める）。
+3. `BuffSize` は次の `RAMScope_Read.vi` が読み出す表示用バッファの容量に対応するため、
+   試験のポーリング頻度・パケットサイズから逆算した値を試験条件で渡せるようにしてもよい
+   （まずは全て`1`で動作確認し、後から調整する方針でよい）。
+
+出力（①②③共通）：`実行結果ステータス`、`エラー情報`、`error out`（3つのCLFN呼び出しをこの順で
+連結し、途中でエラーが出たら以降をスキップする Case Structure にする。doc05 5.5 と同じ考え方）。
+
+#### STEP 3.5：`RAMScope_Log_Start.vi`（`RAMScopeGT150MeasStart(0)`）
+
+単純な1引数CLFN（`UnitNo`のみ）。`RAMScope_Connect.vi`と同じ粒度。
+
+#### STEP 3.6：`RAMScope_Read.vi`（`GetBufferData` + パケット解析）— データ処理が主体
+
+```c
+long RAMScopeGT150GetBufferData(long UnitNo, long MdlNo, void *pData,
+                                 long *pDataNum, long *pLostDataNum);
+```
+
+| CLFN パラメータ | 設定 |
+|----------------|------|
+| `pData` | Array, U8[]、**Array Data Pointer**。事前に十分なサイズを確保（下記）|
+| `pDataNum` | Numeric, Long, **Pointer to Value**（in/out）。**呼び出し前に必ず「バッファが
+  受け止められる最大パケット数」を明示的に書き込む**（10.4.2d⑤。ベンダーサンプルの
+  「未初期化のまま呼ぶ」実装は不具合の可能性がありそのまま真似ないこと）|
+| `pLostDataNum` | Numeric, Long, Pointer to Value（出力）|
+
+**バッファ確保**：RAM パケット1個 = `4×N + 12` バイト（`N`=STEP3.4②で設定したチャンネル数、
+10.4.2a）。例えば1000パケット分を受け止めたいなら `Initialize Array`（U8、`(4N+12)×1000`要素）を
+確保し、`pDataNum` にはあらかじめ `1000` を書き込んでから呼ぶ。
+
+**パケット解析（呼び出し後）**：
+1. 戻ってきた `pDataNum`（実際の取得パケット数）分、`For Loop` を回す。
+2. ループ内で `pData` から `(4N+12)` バイトずつ `Array Subset` で切り出す。
+3. 各パケットを：`Data[0..N-1]`（I32×N、チャンネル値）＋`Flag`（I32）＋`Time`（U64）に分解
+   （`Type Cast` または `Unflatten From String`。10.4.2b参照）。
+4. `Flag` は32bitのビットフィールド（`status`/`skip`/`log_trg`/`dummy`/`event`/`datalost`。
+   10.4.2b の RAM フラグ表）。`論理積`（AND）とシフト演算でビット単位に分解する。
+5. `Time` は20nsec単位のカウント値。`×20e-9` で秒に変換。
+
+出力：チャンネル値の2次元配列（パケット数×チャンネル数）、タイムスタンプ配列、
+フラグ配列（または`datalost`等の代表フラグのみ）、`実行結果ステータス`、`エラー情報`、`error out`。
+
+> **Watchdog的な使い方**：`pLostDataNum > 0` は表示用バッファが溢れたことを意味する
+> （10.4.2a）。この VI をポーリングする周期・`SetLoggingInfo` の `BuffSize` を見直す指標にする。
+
+#### STEP 3.7：`RAMScope_Log_Stop.vi`（`RAMScopeGT150MeasStop(0)`）
+
+単純な1引数CLFN。`RAMScope_Log_Start.vi`と同じ粒度。
+
+#### STEP 3.8：`RAMScope_Release.vi`（`RAMScopeGT150ReleaseBufferData(0)`）
+
+単純な1引数CLFN。ただし **ベンダーサンプル（`samp_simple.cpp`）ではこの関数を呼んでいない**
+（10.4.2d⑥）。作成はしておくが、STEP4のフローVIで実際に必要か・省略可能かを検証する。
+
+#### STEP 3.9：`RAMScope_Close.vi`（`RAMScopeGT150DeviceExit()`）
+
+引数無しのCLFN（戻り値のみ）。`FG420_Close.vi`同様、Cleanupの最後に1回だけ呼ぶ。
+
+### STEP 4：`RAMScope_Flow_Test.vi`（TestStand 無しで通しフロー確認）
+
+`30_RAMScope` に新規作成し、STEP3のVIを以下の順で呼ぶ。**FG420のSTEP4（A1.6.1）と同じ考え方**で、
+まずTestStandを使わず単体で一連の流れが通ることを確認する。
+
+```
+RAMScope_Connect
+  → RAMScope_Init（MdlNo_RAM を取得。以降のVIへ渡す）
+  → RAMScope_Config
+  → RAMScope_Set_Cond（測定周期・チャンネル一覧を試験条件として入力）
+  → RAMScope_Log_Start
+  → Wait
+  → RAMScope_Read（ループでポーリング。取得値をログ表示）
+  → RAMScope_Log_Stop
+  → （RAMScope_Release：STEP3.8の検証結果次第で要否判断）
+  → RAMScope_Close
+```
+
+- **実機無しでの検証**：`RAMScope_Connect`（`DeviceInit`）の時点でエラーコードが返る
+  （オフライン扱い）ため、以降の VI がそのエラーを引き継いで `Close` まで安全に抜けるかを
+  FG420 と同じ「天然のエラー注入テスト」で確認できる。
+- **実機ありでの検証**：`RAMScope_Init` で得た `MdlNo_RAM` が実際の構成と一致するか
+  （`GetSysInfo` の `module_type=0x00` のスロットが本当に1個だけか等）を必ず確認する。
+- フロントパネルの制御器（測定周期・チャンネル一覧・待ち時間等）が、
+  そのまま TestStand 変数化の対象リストになる。
+
+### STEP 5：TestStand への移行
+
+STEP4で問題なければ、10.4.7 の対応表どおり Setup/Main/Cleanup にVIを配置する
+（[11](./11_TestStandシーケンス構築手順.md)）。CAN 送受信（`CAN_Send.vi`等）はこの後、
+[09](./09_CAN通信の実装.md) 9.9 のアライブカウンタ・チェックサム仕様が確定してから着手する。
+
 ## 10.5 異常系での扱い（重要）
 
 - RAMScope はエラー発生時、**一番最後にリセット**する。
