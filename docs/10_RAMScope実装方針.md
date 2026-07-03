@@ -1790,8 +1790,139 @@ RAMScope_Connect
 ### STEP 5：TestStand への移行
 
 STEP4で問題なければ、10.4.7 の対応表どおり Setup/Main/Cleanup にVIを配置する
-（[11](./11_TestStandシーケンス構築手順.md)）。CAN 送受信（`CAN_Send.vi`等）はこの後、
-[09](./09_CAN通信の実装.md) 9.9 のアライブカウンタ・チェックサム仕様が確定してから着手する。
+（[11](./11_TestStandシーケンス構築手順.md)）。CAN 送受信（`CAN_Send.vi`等）は
+以下 10.4.11 で扱う。
+
+## 10.4.11 段階的なVI構築手順（CAN送信。RAMScopeのCANモジュールから送る）
+
+RAM計測用VI（10.4.10）と同じ `30_RAMScope` プロジェクトに追加する。`DeviceInit`／`AllInit`／
+`GetSysInfo`（`RAMScope_Connect.vi`／`RAMScope_Init.vi`）は**RAM計測と共用**でよい
+（同じRAMScope本体に対し、RAM用モジュールとCAN用モジュールが別の`MdlNo`として同時に存在する
+だけなので、接続・初期化は1回で済む）。チェックサム／アライブカウンタのアルゴリズムは
+[09](./09_CAN通信の実装.md) 9.9.2 で確定済み。
+
+> 🔴 **着手前に必ず確認**：`RAMScopeGT170ScenarioSendSet`／`ScenarioSendStart` は
+> **RAMScopeVPアプリケーションの有償ライセンスが無いとエラー応答になる**（6.40.4節/6.41.3節）。
+> ライセンスが無い場合はシナリオ送信が使えないため、後述の代替（単発送信 + LabVIEWタイムドループ、
+> doc09 9.9 方式B相当）に切り替える必要がある。**まずライセンス状況を確認すること。**
+
+### STEP 0：前提（新規プロジェクト作業は無し）
+
+- 10.4.10 STEP0（プロジェクトは本編メインプロジェクトの `30_RAMScope` に一本化。
+  基盤試験側からは参照のみ）がそのまま適用される。
+- 10.4.10 STEP3.2 の `RAMScope_Init.vi`（`MdlNo` 自動判定）を**そのまま流用**し、
+  `module_type=0x02`（CANモジュール）の `MdlNo` も同時に取得できるよう、
+  戻り値に `MdlNo_CAN` を追加する（`MdlNo_RAM` と並べて出力するだけでよい）。
+
+### STEP 1：`RAMScope_CAN_Set_Cond.vi`（`SetMeasCond`。CANモジュール用）
+
+10.4.10 STEP3.3（`RAMScope_Config.vi`）と同じ`SetMeasCond`のCLFNを、
+`MEASINFO_CAN170`（10.4.2c確定）を使って呼ぶ。
+
+| 端子 | 型 | 内容 |
+|------|----|----|
+| `MdlNo_CAN` | I32（入力）| STEP0で取得したCANモジュール番号 |
+| `isUseFDFormat?` | Bool（入力）| True＝CAN FD、False＝CAN 2.0B互換 |
+| `Ch1有効?`／`Ch2有効?` | Bool（入力）| 使用する物理チャンネル |
+| `BaudRate`（Ch1/Ch2）| I32（入力、Enum推奨）| ボーレート設定値（仕様書表の設定値番号）|
+| `BusMode`（Ch1/Ch2）| I32（入力）| `isUseFDFormat=False`なら**必ず0固定**（6.4.10で確認済みの制約）|
+
+`isUseFDFormat=0`のとき`BusMode`を0以外にするとエラー、という制約をVI内部でガード
+（`Case Structure`で`isUseFDFormat=False`なら`BusMode`を強制的に0にする）しておくと安全。
+
+### STEP 2：`CAN_Alive_Checksum_Calc.vi`（RAMScopeのCLFNと無関係に先行実装可能）
+
+[09](./09_CAN通信の実装.md) 9.9.2 で確定したアルゴリズムをそのまま実装する。
+
+| 端子 | 型 | 内容 |
+|------|----|------|
+| `CAN ID` | U32（入力）| 標準/拡張の判定も内部で行う（`id_check`相当）|
+| `拡張ID?` | Bool（入力）| 標準ID／拡張IDの判定（`0x800`境界で自動判定も可）|
+| `ペイロード（チェックサム・カウンタ確定後、チェックサムバイトは0）` | U8配列（入力）| 組み立て済みバイト列 |
+| `アライブカウンタ値` | U8（入力、0〜3）| |
+| `ペイロード（チェックサム反映後）` | U8配列（出力）| |
+
+内部処理：①IDに標準/拡張マーカーをOR→ニブル和　②ペイロード各バイトをニブル和した総和
+③②と①とカウンタ値を加算　④`256 - 総和` の下位1バイトをチェックサムとしてペイロードに書き戻す。
+RAMScope本体のCLFNとは無関係な純粋計算VIなので、**dbc未確定でも今すぐ作れる**
+（ペイロードのどこにカウンタ/チェックサムを書き込むかは呼び出し側で解決する設計にする）。
+
+### STEP 3：`RAMScope_CAN_Send_Frame.vi`（単発送信。`SendCANDataFrame`）
+
+まずシナリオ無しの単発送信から動作確認する（10.4.2b確定の構造体を使用）。
+
+| 端子 | 型 | 内容 |
+|------|----|------|
+| `MdlNo_CAN`／`ChNo`（0=Ch1/1=Ch2）| I32（入力）| |
+| `IdFormat`（0=標準/1=拡張）| I32（入力）| |
+| `CAN ID` | U32（入力）| |
+| `送信データ`（DataLength込み）| U8配列＋長さ（入力）| `CANSEND_170_DATA`1件分 |
+
+CLFN配線は10.4.2b「LabVIEW CLFNでのSendCANDataFrameの扱い」の2段階組み立て
+（`CANSEND_170_DATA`配列→`CANSEND_170_INFO`本体へポインタ書き込み）に従う。
+**この単発送信で、まずCANバスモニタ（CANalyzer等）に意図通りのフレームが出ることを確認**
+してから、シナリオ送信（STEP4以降）に進む。
+
+### STEP 4：シナリオ配列の組み立て（`CAN_Build_Alive_Scenario.vi`）
+
+1メッセージ分の**アライブカウンタが2bit（0〜3）で巡回する**ことを利用し、
+`For i = 0 to 3` で `CAN_Alive_Checksum_Calc.vi`（STEP2）を呼んで
+`SEND_SCENARIO_STEP`配列（4要素）を組み立てる。
+
+| 端子 | 型 | 内容 |
+|------|----|------|
+| `CAN ID`／`固定ペイロード（カウンタ・チェックサム以外）` | 入力 | |
+| `WaitTime`（該当メッセージの周期。doc09 9.9.2のCAPLで確認した周期をms単位で）| I32（入力）| |
+| `SEND_SCENARIO_STEP[4]` | 出力 | `StepNum=4`として`RAMScope_CAN_Scenario_Set.vi`へ渡す |
+
+> **複数のCAN IDを同時に周期送信したい場合**：`SEND_SCENARIO`は`ScenarioNum`が0〜1、
+> つまり**1回のCLFN発行で有効にできるシナリオは1系統のみ**だが、その中の`Step[64]`には
+> **異なるCAN IDを混在させられる**ため、複数メッセージを1本のシナリオに時分割で
+> 織り込むことは可能（例：10ms周期のIDを複数、100ms周期のIDを1つ、といった構成を
+> `WaitTime`の積み上げで再現）。ただし周期が異なるメッセージを1本のシナリオに
+> 正しく織り込むにはステップの並び・`WaitTime`を手計算する必要があり、64ステップの
+> 制約と合わせて設計が複雑になる。**試験で実際に周期送信が必要なCAN IDが何個あるか
+> によって設計方針が変わる**ため、次回までに対象IDを整理してもらえると具体化しやすい。
+
+### STEP 5：`RAMScope_CAN_Scenario_Set.vi`（`ScenarioSendSet`）
+
+10.4.2b「LabVIEW CLFNでのScenarioSendSetの扱い」の構造体サイズ
+（`SEND_SCENARIO`=5396バイト）に従ってCLFN設定。`StepNum`・`Mode=0`・`Repeat=1`
+（最終ステップ後は先頭へループ＝周期送信を継続）を基本とする。
+
+- **アイドル中に発行しても即座には送信開始しない**（測定中に遷移して初めて動く）ため、
+  STEP7のフロー確認では呼び出し順序に注意する。
+- シナリオ送信中に本関数を再発行するとエラーになる（6.40.4節）。条件を変えて送り直す場合は
+  先に`RAMScope_CAN_Scenario_Stop.vi`を呼ぶ。
+
+### STEP 6：`RAMScope_CAN_Scenario_Start.vi` / `RAMScope_CAN_Scenario_Stop.vi`
+
+`ScenarioSendStart`／`ScenarioSendStop`（10.4.2b確定）をそれぞれ薄くラップするだけ。
+`Start`は**測定中でないと実際には動作しない**（アイドル中に発行すると次回測定開始まで
+待機）ことを呼び出し側のコメントに明記しておく。
+
+### STEP 7：`RAMScope_CAN_Flow_Test.vi`（フロー確認）
+
+```
+RAMScope_Connect → RAMScope_Init（MdlNo_RAM・MdlNo_CAN 取得）
+  → RAMScope_Config（RAM）→ RAMScope_CAN_Set_Cond（CAN）
+  → RAMScope_Set_Cond（RAM測定条件）→ RAMScope_Log_Start（＝測定中に遷移）
+  → RAMScope_CAN_Scenario_Set → RAMScope_CAN_Scenario_Start
+  → Wait（試験時間）
+  → RAMScope_CAN_Scenario_Stop
+  → RAMScope_Log_Stop → RAMScope_Close
+```
+
+**`RAMScopeGT170MeasStart`（測定開始）を挟んでから`ScenarioSendStart`を呼ぶ**のが要点
+（シナリオ送信は測定動作中にのみ機能するため）。CANバスモニタ側で、
+①アライブカウンタが0→1→2→3→0…と巡回、②チェックサムが受信側で不正判定されないこと、
+の2点を確認する。
+
+### STEP 8：TestStand への移行
+
+STEP7で確認できたら、10.4.7の対応表と同様にSetup/Main/Cleanupへ配置する。
+`Scenario_Stop`はCleanupで**条件によらず必ず通す**（FG420の`Output(OFF)`と同じ考え方、
+[06](./06_VIの作り方_手順.md) 6.4.1／A1.6.1 STEP4）。
 
 ## 10.5 異常系での扱い（重要）
 
