@@ -267,7 +267,9 @@ Run-Time Engine のみで動く）ため、台数が増えても展開しやす�
 1. **LabVIEW Run-Time Engine**（無償）：**ビルドに使った LabVIEW と同じバージョン・同じ bit 数**を
    インストール（例：LabVIEW 2026 でビルドしたなら 2026 用 Run-Time Engine）。バージョン不一致だと
    起動時にエラーになる。
+   ダウンロード：https://www.ni.com/en/support/downloads/software-products/download.labview-runtime.html
 2. **NI-VISA**（開発 PC と同じ bit 数）をインストール。
+   ダウンロード：https://www.ni.com/en/support/downloads/drivers/download.ni-visa.html
 3. **機器の接続インターフェースに応じたドライバ**を追加インストール（開発 PC の構成に合わせる）。
    - USB-TMC 接続 → NI-VISA に同梱の USB クラスドライバで通常追加不要
      （**FG420 はこれに該当**。追加ドライバ導入は不要で、Run-Time Engine＋NI-VISA のみでよい）。
