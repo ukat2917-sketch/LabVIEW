@@ -79,14 +79,28 @@ CANalyzer 無しで CAN 通信を行う手順（検討結果）：
 ## 9.8 CANalyzer COM（ActiveX）API での操作方式
 
 TEXIO/DTS インサイトのような公式 LabVIEW ドライバとは異なり、CANalyzer には
-COM（ActiveX）経由でのみ外部から操作する手段がある。ベンダー提供の Python 仕様書
-（System Variable の Tx/Rx 自動化スクリプト、Excel 3+1 列構造）を確認したところ、
+COM（ActiveX）経由でのみ外部から操作する手段がある。顧客から提供された実際の
+Python 参考実装（`CAN_Tx.txt`／`CAN_Rx.txt`）を確認したところ、
 **同じ COM API を LabVIEW の ActiveX パレットから直接呼び出すことも可能**と判断できる。
 
-**COM 接続の仕様（Python 仕様書より）：**
-- 必須アクセス形式：`app.System.Namespaces("Namespace").Variables.Item("Variable").Value`
-- 既存プロセスへの接続が前提（新規起動は保証外。複数起動時は動作保証外）
-- COM 接続失敗時は即終了（リトライ機構なし）
+**COM 接続の仕様（提供されたPython参考実装より確定）：**
+
+```python
+canalyzer = win32com.client.Dispatch("CANalyzer.Application")   # ProgID確定。CANoeは明示的に禁止と明記
+...
+# 書き込み（Tx）
+canalyzer.System.Namespaces(namespace).Variables.Item(variable_name).Value = value_to_send
+# 読み取り（Rx）
+value = canalyzer.System.Namespaces(namespace).Variables.Item(variable_name).Value
+```
+
+- **ProgID は `"CANalyzer.Application"` で確定**（`"CANoe.Application"`ではない。
+  Pythonソースのコメントに「CANoeは禁止」と明記されている）。
+- 既存プロセスへの接続が前提（新規起動は保証外。複数起動時は動作保証外）。
+- Tx/Rxとも**Excelから読み込んだ表（列：`ID`＝Namespace名、`Name`＝変数名、
+  Txのみ`deta`＝送信する値）を1行ずつループし、行ごとに`try/except`で
+  エラーを握りつぶして次の行へ進む**（1行の失敗で全体を止めない設計）。
+- COM接続自体の失敗時（`Dispatch`失敗）は即終了・リトライ無し。
 
 ### 9.8.1 利点
 
@@ -120,6 +134,75 @@ CANalyzer 統合（COM）と RAMScope への CAN 統合は、**機能ごとに�
 |------|-----------|------|
 | 残バスシミュレーション・複雑なノード模擬・E2E 保護付き周期フレーム送信 | **CANalyzer（COM/CAPL）** | CAPL のタイマ・組込み関数が最も堅牢。9.9 のアライブカウンタ＋チェックサムもここが本来得意な領域 |
 | 単純なモード送信・CAN モニタ（RAM 値との同時取得）| **RAMScope 直叩き** | doc 10 で API が確定済み。ライセンス不要、LabVIEW/TestStand と同一プロセスで完結 |
+
+> 🔴 **重要な整理（Python参考実装の内容から判明）**：9.9.2 で読み解いた `.can`
+> （CAPLソース）は、**まさにこのCANalyzerプロセスの中で常時動いているノードシミュレーション**
+> であり、`CORE_SVS_OPE_MODE_COM`等の「送りたい値」を`@sysvar::...`のSystem Variableに
+> COM経由で書き込みさえすれば、**アライブカウンタのインクリメントとチェックサム計算は
+> CAPL側が自動で行い、そのままバスへ送信してくれる**。つまり **CANalyzer統合を使う場合、
+> LabVIEW側で9.9.2/9.9.3のチェックサムを再実装する必要は無い**（COMで論理値を書き込むだけでよい）。
+> 9.9（RAMScope直叩き）でチェックサム計算をLabVIEW側に持たせているのは、
+> **CANalyzerを使わずRAMScopeのCANモジュール単体で送る場合の実装**であり、
+> 両方を同時に使う設計ではない。
+>
+> **要確認**：この試験システムでCANalyzer（CAPLノードシミュレーション）を常時稼働させる
+> 前提であれば、9.9・10.4.11のRAMScope CAN送信は「CANalyzerが無い環境での代替手段」
+> という位置づけになる。**同一のCAN IDをCANalyzerとRAMScopeの両方から同時に送信すると
+> バス上で二重送信・衝突になる**ため、実際の試験構成でCANalyzerを常時使うのか、
+> RAMScope単体で完結させたいのかを確認してから、9.9系の実装に注力するか判断したい。
+
+### 9.8.4 LabVIEW ActiveX 実装（Python参考実装の翻訳）
+
+`CAN_Tx.txt`／`CAN_Rx.txt`（提供された参考実装）をそのままLabVIEW ActiveXへ翻訳する。
+
+#### `CAN_COM_Connect.vi`
+
+- **Automation Open**（関数パレット→通信→ActiveX）で ProgID `"CANalyzer.Application"` を開く。
+- 出力：Application の ActiveX 参照（後続VIへ引き回す。VISA参照と同じ考え方、[05](./05_VI設計方針と共通仕様.md) 5.6）。
+- **既存プロセスへの接続が前提**（CANalyzerを事前に人手で起動・測定開始しておく）。
+  接続失敗時はリトライせずエラーを返す（Python参考実装と同じ設計）。
+
+#### `CAN_COM_Write_SysVar.vi`（Tx。1行分）
+
+| 端子 | 型 | 内容 |
+|------|----|----|
+| `Application参照`（in/out）| ActiveX参照 | `CAN_COM_Connect.vi`の出力を引き回す |
+| `Namespace`（Python版の`ID`列）| String（入力）| 例：`"ID03AD5D62"` |
+| `変数名`（Python版の`Name`列）| String（入力）| 例：`"CORE_SVS_OPE_MODE_COM"` |
+| `値`（Python版の`deta`列）| Variant/倍精度（入力）| 書き込む値 |
+
+配線：プロパティノード `Application.System` → 呼び出しノード `Namespaces(Namespace)` →
+プロパティノード `.Variables` → 呼び出しノード `Item(変数名)` →
+プロパティノード `.Value`（**書き込み＝Set**）に`値`を配線。
+
+#### `CAN_COM_Read_SysVar.vi`（Rx。1行分）
+
+`CAN_COM_Write_SysVar.vi`と同じ配線で、最後の `.Value` プロパティノードを
+**読み取り＝Get**にする（`変数名`までの入力は同じ、出力に`値`が追加される）。
+
+#### `CAN_COM_Close.vi`
+
+**Close Reference** で ActiveX 参照を解放する。**CANalyzerプロセス自体は終了させない**
+（Python参考実装と同じく「既存プロセスへ接続」しているだけなので、こちらから終了させる
+筋合いではない）。
+
+#### 複数行の一括Tx/Rx（Excel表 → CSV/クラスタ配列への置き換え）
+
+Python参考実装は`pandas`でExcelを読むが、LabVIEW側は[05](./05_VI設計方針と共通仕様.md)の方針
+（試験条件はCSV/プロパティファイルで管理）に合わせ、**CSVまたはクラスタ配列**
+（`{Namespace:String, 変数名:String, 値:Double}`の配列）で置き換える。
+
+```
+CSV/配列読み込み → For Loop（各行）
+  → CAN_COM_Write_SysVar.vi（Tx）または CAN_COM_Read_SysVar.vi（Rx）
+  → エラーが出てもログに残して次の行へ進む（Python版のtry/except/continueに合わせる）
+```
+
+> ⚠️ **標準のエラー伝播（[05](./05_VI設計方針と共通仕様.md) 5.5）からの意図的な逸脱**：
+> 通常は`error in`にエラーがあれば後続処理をスキップするが、この一括Tx/Rxループは
+> **1行の失敗で他の行を止めない**という参考実装の設計をそのまま踏襲する。
+> `For Loop`内でエラークラスタを毎回リセットし、エラー内容は行番号付きでログ配列に
+> 追記する（ループを止めるための`error in`配線はしない）。
 
 ## 9.9 アライブカウンタ・チェックサム付きフレームの実装（RAMScope 直叩き版）
 
