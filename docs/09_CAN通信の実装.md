@@ -151,58 +151,130 @@ value = canalyzer.System.Namespaces(namespace).Variables.Item(variable_name).Val
 どちらを最終的に採用するか、あるいは試験フェーズによって使い分けるかは未確定。
 現時点では両案とも並行して具体化中（9.8.4＝方式1のVI設計、9.9・10.4.11＝方式2のVI設計）。
 
-### 9.8.4 LabVIEW ActiveX 実装（Python参考実装の翻訳）
+### 9.8.4 LabVIEW ActiveX 実装
 
-`CAN_Tx.txt`／`CAN_Rx.txt`（提供された参考実装）をそのままLabVIEW ActiveXへ翻訳する。
+`CAN_Tx.txt`／`CAN_Rx.txt`（提供された参考実装）をベースに、追加でChatGPTによる
+詳細実装案（`CANalyzer_LabVIEW_ActiveX_Implementation.md`）も検討した。後者には
+Python参考実装に無い**重要な指摘（Measurement起動確認）**が含まれる一方、
+**本プロジェクトの設計方針（doc05・06）とは異なるアーキテクチャ**
+（内部ステートマシンVI＋Excel＋独自ログ体系）を提案しているため、
+**良い点だけ取り込み、アーキテクチャは本プロジェクトの流儀に合わせる**。
 
-#### `CAN_COM_Connect.vi`
+#### 9.8.4.1 ChatGPT草案との比較・採否
+
+| 項目 | ChatGPT草案の提案 | 採否 | 理由 |
+|---|---|---|---|
+| **Measurement起動確認・自動開始** | `Measurement.Running`確認→未起動なら`Start`→`Running=True`までポーリング（100ms周期、10sタイムアウト） | ✅ **採用**（重要な訂正） | CAPLの`on timer`ハンドラは**測定中のみ実行される**。測定停止中にSystem Variableへ書き込んでもCAPL側が反応せず送信されない。Python参考実装はここを「事前に人手で測定開始しておく」前提にしていたが、**LabVIEW側で確認・自動開始する方が自動試験に向く**ため採用 |
+| **LabVIEWが起動した場合のみ停止**（`MeasurementStartedByLabVIEW`）| Close時、自分が起動した場合のみ`Measurement.Stop`| ✅ **採用** | 他プロセス（人・別試験）が使用中の測定を意図せず止める事故を防げる、妥当な設計 |
+| **Direction列（Tx/Rx統合）／DataType列（型指定）** | 1つの表でTx/Rxを混在させ、型も明示 | ✅ **採用**（簡略化として） | Tx用・Rx用で表を分けなくてよくなり、型の暗黙変換ミスも防げる |
+| **Wait列（行ごとの待ち時間）** | 行実行後に指定秒数待機。不正値はログ＋スキップ、上限あり | 🟡 **一部採用** | 待ち時間の概念自体は有用。ただし本プロジェクトでは「待ち時間はTestStand側で明示する」方針（doc05 5.2）のため、**LabVIEW VI内蔵ではなくTestStand側のWaitステップに任せる**のが本来の流儀。バッチ処理VIとして一括実行する場合に限り、VI内部にWait列を持たせてよい |
+| **行エラー／システムエラーの2階層** | 行エラー＝ログして継続、システムエラー（COM接続失敗等）＝終了 | ✅ **採用**（考え方のみ）| 妥当な分類。ただし独自の`CAN_State`/ログCSVではなく、**本プロジェクト標準の`Status.ctl`/`TestError.ctl`/`Error_To_TestStatus.vi`（doc06 6.1.2）で表現**する |
+| **内部ステートマシンVI（`CAN_State.ctl`で13状態）＋`CAN_Auto_Main.vi`が全体を統括** | 1本の大きなVIがExcel読込〜ログ出力まで全部内包 | ❌ **不採用** | 本プロジェクトは「1イベント1VI、TestStandが順序を制御する」設計（doc05 5.1）。ステートマシンをLabVIEW側に作ると**TestStandと役割が重複**し、他機器群（FG420・RAMScope）と設計思想が食い違う。各状態はそのまま薄いVI（`CAN_COM_Connect.vi`等）またはTestStandのステップ・ループに対応させれば同じことができる |
+| **Excel（`pandas`相当）を直接読む** | `.xlsx`をそのまま読み込み | ❌ **不採用（CSVに統一）**| doc05の既定方針（試験条件はCSV/プロパティファイルで管理）に合わせる。LabVIEWのレポート生成ツールキット無しでExcel読込は依存が増える |
+| **独自ログCSV形式（Timestamp,Level,RowIndex,...）** | 専用の`Log_Write.vi` | 🟡 **一部採用**| ログに残すこと自体はよいが、**実行結果ステータス／エラー情報は`Status.ctl`/`TestError.ctl`のままTestStandへ返す**（doc05 5.3/5.4）。追加のCSVログは任意の補助出力として残す分には問題ない |
+| **cfg一致確認**（開いている設定ファイルパスの検証）| 期待するcfgと現在のcfgを比較 | ✅ **採用（任意機能として）**| 誤ったCANalyzer設定を開いたまま試験してしまう事故を防げる、安価で有効な保険 |
+| **bit数一致（32/64bit）・複数起動不可の明記** | 運用上の注意点 | ✅ **採用（運用注意として記載）**| 妥当な注意点。9.8.4.4に記載 |
+| **Rxの値をExcelへ書き戻さない（ログのみ）** | 元Python仕様の踏襲 | ❌ **不採用（本プロジェクトでは戻り値として返す）**| 9.8.2で既述のとおり、**LabVIEWから直接読めばTestStandの判定にRx値を渡せる**のが本プロジェクトの狙い。ログのみに留める理由が無い |
+
+#### 9.8.4.2 VI構成（確定）
+
+```
+CAN_COM_Connect.vi              … Automation Open（ProgID "CANalyzer.Application"）
+CAN_COM_Check_Measurement.vi    … Measurement.Running を読むだけ（NEW）
+CAN_COM_Start_Measurement.vi    … 未測定なら Start → Running=True までポーリング（NEW）
+CAN_COM_Write_SysVar.vi         … Tx（1行分）
+CAN_COM_Read_SysVar.vi          … Rx（1行分）
+CAN_COM_Close.vi                … Measurementは「自分が起動した場合のみ」Stop、参照はClose
+```
+
+`CAN_COM_Connect.vi`：
 
 - **Automation Open**（関数パレット→通信→ActiveX）で ProgID `"CANalyzer.Application"` を開く。
 - 出力：Application の ActiveX 参照（後続VIへ引き回す。VISA参照と同じ考え方、[05](./05_VI設計方針と共通仕様.md) 5.6）。
-- **既存プロセスへの接続が前提**（CANalyzerを事前に人手で起動・測定開始しておく）。
+- **既存プロセスへの接続が前提**（CANalyzerを事前に人手で起動しておく）。
   接続失敗時はリトライせずエラーを返す（Python参考実装と同じ設計）。
 
-#### `CAN_COM_Write_SysVar.vi`（Tx。1行分）
+`CAN_COM_Check_Measurement.vi`／`CAN_COM_Start_Measurement.vi`：
+
+- `Application参照`→プロパティノード`.Measurement`→`MeasurementRef`取得。
+- `MeasurementRef`のプロパティノード`.Running`（Bool）を読む。
+- `False`の場合、呼び出しノード`.Start`をInvokeし、`Running=True`になるまで
+  **100ms周期でポーリング、10秒でタイムアウト**（タイムアウトは`実行結果ステータス=Timeout`、
+  [05](./05_VI設計方針と共通仕様.md) 5.3）。
+- 出力に`起動済みフラグ`（このVIが起動させたか、元々測定中だったか）を持たせ、
+  `CAN_COM_Close.vi`まで引き回す。
+
+`CAN_COM_Write_SysVar.vi`（Tx。1行分）：
 
 | 端子 | 型 | 内容 |
 |------|----|----|
-| `Application参照`（in/out）| ActiveX参照 | `CAN_COM_Connect.vi`の出力を引き回す |
-| `Namespace`（Python版の`ID`列）| String（入力）| 例：`"ID03AD5D62"` |
-| `変数名`（Python版の`Name`列）| String（入力）| 例：`"CORE_SVS_OPE_MODE_COM"` |
-| `値`（Python版の`deta`列）| Variant/倍精度（入力）| 書き込む値 |
+| `Application参照`（in/out）| ActiveX参照 | |
+| `Namespace` | String（入力）| 例：`"ID03AD5D62"` |
+| `変数名` | String（入力）| 例：`"CORE_SVS_OPE_MODE_COM"` |
+| `値` | Variant（入力）| 書き込む値。呼び出し側でI32/DBL/Boolean/String等、System Variableの実際の型に合わせて渡す |
 
 配線：プロパティノード `Application.System` → 呼び出しノード `Namespaces(Namespace)` →
 プロパティノード `.Variables` → 呼び出しノード `Item(変数名)` →
 プロパティノード `.Value`（**書き込み＝Set**）に`値`を配線。
 
-#### `CAN_COM_Read_SysVar.vi`（Rx。1行分）
+`CAN_COM_Read_SysVar.vi`（Rx。1行分）：
 
 `CAN_COM_Write_SysVar.vi`と同じ配線で、最後の `.Value` プロパティノードを
-**読み取り＝Get**にする（`変数名`までの入力は同じ、出力に`値`が追加される）。
+**読み取り＝Get**にする。**読み取った値は出力として返し、TestStandの判定にそのまま渡せる**
+（9.8.2で確認済みの改善点。Python参考実装のようにログ出力のみに留めない）。
 
-#### `CAN_COM_Close.vi`
+`CAN_COM_Close.vi`：
 
-**Close Reference** で ActiveX 参照を解放する。**CANalyzerプロセス自体は終了させない**
-（Python参考実装と同じく「既存プロセスへ接続」しているだけなので、こちらから終了させる
-筋合いではない）。
+**Close Reference** で ActiveX 参照を解放する。**CANalyzerプロセス自体は終了させない**。
+Measurementは`CAN_COM_Start_Measurement.vi`が返した`起動済みフラグ`が`True`の場合のみ
+`.Stop`をInvokeする（元々測定中だった場合や、他プロセスが起動した場合は止めない）。
 
-#### 複数行の一括Tx/Rx（Excel表 → CSV/クラスタ配列への置き換え）
+#### 9.8.4.3 型定義（`00_Common`または`60_CAN`に配置）
 
-Python参考実装は`pandas`でExcelを読むが、LabVIEW側は[05](./05_VI設計方針と共通仕様.md)の方針
-（試験条件はCSV/プロパティファイルで管理）に合わせ、**CSVまたはクラスタ配列**
-（`{Namespace:String, 変数名:String, 値:Double}`の配列）で置き換える。
+ChatGPT草案の型定義群は妥当なので、本プロジェクトの命名・配置方針に合わせて採用する。
+
+| 型定義 | 内容 |
+|---|---|
+| `CAN_SysVar_Direction.ctl`（Enum）| `Tx` / `Rx` |
+| `CAN_SysVar_DataType.ctl`（Enum）| `Auto` / `I32` / `DBL` / `Boolean` / `String` |
+| `CAN_SysVar_Command.ctl`（Cluster）| `Namespace`(String) / `変数名`(String) / `値`(Variant) / `DataType`(上記Enum) / `Direction`(上記Enum) / `Wait_s`(DBL) / `Enable`(Bool) |
+
+`Status.ctl`／`TestError.ctl`は使い回す（doc06 6.1〜6.1.2）。CANalyzer固有の追加型定義は
+この3つのみで足りる。
+
+#### 9.8.4.4 複数行の一括Tx/Rx
+
+CSV（`CAN_SysVar_Command.ctl`配列に変換）を読み込み、`For Loop`で1行ずつ
+`Direction`に応じて`CAN_COM_Write_SysVar.vi`または`CAN_COM_Read_SysVar.vi`を呼ぶ。
+待ち時間は**原則TestStand側のWaitステップで明示**する（doc05 5.2）が、1つのバッチを
+1ステップとして扱いたい場合はVI内の`For Loop`に`Wait_s`を組み込んでもよい
+（その場合、doc06 6.4.1同様フラットシーケンス等でタイミングを保証すること、A1.6.1 STEP4参照）。
 
 ```
-CSV/配列読み込み → For Loop（各行）
-  → CAN_COM_Write_SysVar.vi（Tx）または CAN_COM_Read_SysVar.vi（Rx）
-  → エラーが出てもログに残して次の行へ進む（Python版のtry/except/continueに合わせる）
+CSV読込 → CAN_SysVar_Command.ctl配列
+  → For Loop（各行）
+      Enable=False の行はスキップ
+      Direction=Tx → CAN_COM_Write_SysVar.vi
+      Direction=Rx → CAN_COM_Read_SysVar.vi（結果を配列で持ち帰りTestStandへ）
+      → 行エラーは Status.ctl=Warning 相当としてログ配列に追記、次の行へ進む
 ```
 
 > ⚠️ **標準のエラー伝播（[05](./05_VI設計方針と共通仕様.md) 5.5）からの意図的な逸脱**：
 > 通常は`error in`にエラーがあれば後続処理をスキップするが、この一括Tx/Rxループは
-> **1行の失敗で他の行を止めない**という参考実装の設計をそのまま踏襲する。
-> `For Loop`内でエラークラスタを毎回リセットし、エラー内容は行番号付きでログ配列に
+> **1行の失敗で他の行を止めない**（参考実装・ChatGPT草案とも共通の設計判断）。
+> `For Loop`内でエラークラスタを毎回リセットし、`TestError.ctl`配列に行番号付きで
 > 追記する（ループを止めるための`error in`配線はしない）。
+> **COM接続失敗・Measurement起動失敗などのシステムエラーはこの限りでなく、
+> 通常どおりerror inで後続をスキップし試験を中断する**（ChatGPT草案の
+> 「行エラー／システムエラー」の2階層区分をそのまま採用）。
+
+#### 9.8.4.5 運用上の注意点（ChatGPT草案より採用）
+
+- **32bit/64bit を LabVIEW と CANalyzer で揃える**（不一致だとActiveX接続で問題が出うる）。
+- **CANalyzerは1プロセスのみ起動**（複数起動時の動作は保証外）。
+- 任意機能として、`CAN_COM_Connect.vi`実行後に**現在開いているcfgファイルパス**
+  （`Application.Configuration.FullName`等）を取得し、期待するパスと一致するか確認する
+  チェックを追加してもよい（誤った設定ファイルのまま試験してしまう事故を防止）。
 
 ## 9.9 アライブカウンタ・チェックサム付きフレームの実装（RAMScope 直叩き版）
 
