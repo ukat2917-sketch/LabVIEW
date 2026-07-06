@@ -276,6 +276,34 @@ CSV読込 → CAN_SysVar_Command.ctl配列
   （`Application.Configuration.FullName`等）を取得し、期待するパスと一致するか確認する
   チェックを追加してもよい（誤った設定ファイルのまま試験してしまう事故を防止）。
 
+#### 9.8.4.6 TestStand導入前の単体デバッグ手順（ステートマシンを使うのはここだけ）
+
+FG420（A1.6.1 STEP4）・RAMScope（10.4.10 STEP4）と同じ「まずTestStand無しで単体確認」の
+段階を、CAN COMでも踏む。ただし他と違い、**ActiveX配線が正しいかを1操作ずつ対話的に
+確認したい**という理由から、この段階に限り9.8.4.1で見た`CAN_State.ctl`型の
+ステートマシンを使う価値がある（Connect→Measurement確認→1行Write→1行Read→Closeを
+ボタン操作で1つずつ進め、その都度CANalyzer側の反応を目で確認できるため）。
+
+1. **`CAN_COM_Debug_Test.vi`（一時的なデバッグ専用VI。TestStand導入後は使わない）**を作成。
+   While Loop＋Case Structure＋`CAN_Debug_State.ctl`（Enum：`Connect`／`CheckMeasurement`／
+   `StartMeasurement`／`WriteOne`／`ReadOne`／`Close`／`Idle`）のシフトレジスタで、
+   フロントパネルのボタンで次の状態へ進める作りにする。
+2. 各Caseの中身は9.8.4.2の薄いVI（`CAN_COM_Connect.vi`等）をそのまま1個ずつ呼ぶだけ。
+   ステートマシン自体に新しいロジックを持たせない（あくまで「薄いVIを対話的に呼ぶ順番」を
+   人間が制御するための器）。
+3. これで実際のCANalyzer（人が起動・cfgを開いた状態）に対し、
+   - `Connect`でエラーなくApplication参照が取れるか
+   - `CheckMeasurement`→（未測定なら）`StartMeasurement`で`Running`が`True`になるか
+   - `WriteOne`で指定したNamespace/変数名に値を書き込むと、CANalyzer側（Data Window等）で
+     実際に値が変化するか
+   - `ReadOne`で読み取った値がCANalyzer側の表示と一致するか
+   - `Close`で参照が解放され、かつMeasurementが（自分が起動した場合のみ）止まるか
+   を1つずつ目視確認する。
+4. **確認が取れたら`CAN_COM_Debug_Test.vi`の役目は終わり**。本番の自動化では
+   9.8.4.4のとおり、個々の薄いVIをTestStandのステップとして配置し、
+   状態遷移（順序・ループ・分岐）はTestStandに任せる（このデバッグVIのステートマシンを
+   本番に流用しない。9.8.4.1で「内部ステートマシンは不採用」とした結論はそのまま）。
+
 ## 9.9 アライブカウンタ・チェックサム付きフレームの実装（RAMScope 直叩き版）
 
 RAMScope の CAN 送信関数（`RAMScopeGT170SendCANDataFrame` / `ScenarioSendSet`、doc 10）は
