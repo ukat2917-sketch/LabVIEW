@@ -179,9 +179,8 @@ RAMScopeVP API（DLL）を **Call Library Function Node（CLFN）** で呼び出
 準備：
 1. **対象 PC に RAMScopeVP（API）をインストール**し、DLL のフルパスを確定。
 2. DLL の **ビット数（32bit / 64bit）を確認**（後述 10.4.6。最重要）。
-   → 🔴 **確認済み：入手済み DLL（`RAMScopeVP_API.dll`/`GT170.dll`/`GT170USB.dll`）は全て 32bit**。
-   　 開発環境の LabVIEW は 64bit のため **アーキテクチャ不一致**。詳細・対応方針は 10.6 章参照。
-   　 現在 DTS インサイトへ 64bit ネイティブライブラリの提供を問い合わせ中。
+   → ✅ **解決済み**：当初入手した DLL は32bitで64bit LabVIEWとアーキテクチャ不一致だったが、
+   　 その後 **64bit版DLLを入手済み**（10.4.10 STEP0参照）。以降はこの64bit DLLを前提に進める。
 3. 依存 DLL・必要ランタイムの有無を確認（仕様書／`Dependencies` 等のツール）。
 
 ### 10.4.2 STEP1：仕様の読み解き（実装前の机上作業）
@@ -1509,12 +1508,107 @@ long RAMScopeGT170SetAdcRange(long UnitNo, long MdlNo, long ChNum, long *pRange)
 > 解読・実装で詰まった場合は、**RAMScopeVP API の有償サポート**（`support-mvi@dts-insight.co.jp`）の
 > 利用を検討する（DLL 使用自体は無償だがサポートは有償）。
 
-## 10.4.10 段階的なVI構築手順（RAM計測のみ。CAN送受信は別途）
+## 10.4.9a RAM計測システムの設計まとめ（全体像）
 
 付録A1（FG420）の A1.6.1 と同じ「段階的に作る」考え方を、RAMScope（CLFN方式）向けに具体化する。
 **FG420 はベンダー製ドライバ VI を呼ぶだけだったが、RAMScope は関数プロトタイプ・構造体を
 手動で CLFN 設定する必要があるため、作り方が根本的に異なる**。CAN 送受信（アライブカウンタ等、
-[09](./09_CAN通信の実装.md) 9.9）はいったん対象外とし、**RAM 計測のみ**に絞って進める。
+[09](./09_CAN通信の実装.md) 9.9、10.4.11）はいったん対象外とし、**RAM 計測のみ**に絞って進める。
+
+### (1) 必要な機能とVIの一覧
+
+初期化・設定・測定条件設定・ロギング開始／停止・クローズの6系統＋共通土台1本、計9本のVIで足りる。
+
+| # | 機能 | VI | 対応するCLFN |
+|---|------|----|--------------|
+| 0 | エラー変換（共通土台）| `RAMScope_Code_To_Error.vi` | なし（生のI32エラーコード→標準errorクラスタへの変換のみ）|
+| 1 | 接続（機種検出）| `RAMScope_Connect.vi` | `RAMScopeGT150DeviceInit` |
+| 2 | 初期化＋モジュール番号自動判定 | `RAMScope_Init.vi` | `RAMScopeGT150AllInit` + `GetSysInfo` |
+| 3 | プローブ接続設定 | `RAMScope_Config.vi` | `RAMScopeGT150PGT_SetMdlConfig` |
+| 4 | 測定条件・チャンネル・ロギング設定 | `RAMScope_Set_Cond.vi` | `SetMeasCond` + `SetMeasCh` + `SetLoggingInfo` |
+| 5 | 計測開始 | `RAMScope_Log_Start.vi` | `RAMScopeGT170MeasStart` |
+| 6 | データ取得（ポーリング）| `RAMScope_Read.vi` | `RAMScopeGT150GetBufferData` |
+| 7 | 計測停止 | `RAMScope_Log_Stop.vi` | `RAMScopeGT170MeasStop` |
+| 8 | バッファ解放（要否は現時点未検証）| `RAMScope_Release.vi` | `RAMScopeGT150ReleaseBufferData` |
+| 9 | クローズ | `RAMScope_Close.vi` | `RAMScopeGT150DeviceExit` |
+
+**質問：現在のRAMScopeのコンフィグファイルから設定を抽出・流用できるか？** → 機能によって答えが違う。
+
+- **③プローブ接続設定（`PGT_SetMdlConfig`）は、既存の設定をそのまま流用できる**。
+  この関数は**引数にファイルパスを取らず**（`UnitNo`とエラー配列のみ）、
+  ベンダー提供の **PGTツール（`PGTMgrVP.dll`等）が事前に保存した設定を暗黙に読みに行く**方式
+  （10.4.2c）。つまり、**今までRAMScope純正アプリで動作確認済みの環境であれば、
+  そのPC上でPGTツールの設定はすでに存在しており、LabVIEWからは`PGT_SetMdlConfig`を
+  呼ぶだけで同じ設定が適用される**。プローブ固有の非公開パラメータ（セキュリティID・
+  クロック設定等）をLabVIEW側で調べ直す必要はない。
+- **④測定条件・チャンネル一覧・ロギング設定（`SetMeasCond`/`SetMeasCh`/`SetLoggingInfo`）は、
+  試験ごとに変わる「試験条件」なので流用ではなく、TestStand側の試験条件（CSV等、
+  [05](./05_VI設計方針と共通仕様.md)の方針）として都度指定する**設計にする。
+  ただし、もし既存のRAMScope純正アプリ側で「この基板ではこのRAMアドレス一覧を測定する」
+  という**チャンネルリストを保存したファイル**が既にあるなら、その内容（アドレス一覧）を
+  試験条件CSVの初期値として転記するのは有効。そのようなファイルが手元にあれば、
+  フォーマットを教えてもらえれば変換方法を検討できる。
+
+### (2) VI対応表（入力・出力・機能）
+
+| VI | 入力 | 出力 | 機能 |
+|---|---|---|---|
+| `RAMScope_Code_To_Error.vi` | `エラーコード`(I32)／`関数名`(String) | `error out`（標準クラスタ）| 生のI32エラーコードを標準errorクラスタに変換する共通アダプタ |
+| `RAMScope_Connect.vi` | `error in` | `UnitNum`(I32)／`機種コード`(I32)／`実行結果ステータス`／`エラー情報`／`error out` | RAMScope本体の検出・機種判定 |
+| `RAMScope_Init.vi` | `error in` | `MdlNo_RAM`(I32)／`MdlNo_CAN`(I32)／`実行結果ステータス`／`エラー情報`／`error out` | 全体初期化とモジュール構成の取得。RAM/CANのモジュール番号を実行時に自動判定 |
+| `RAMScope_Config.vi` | `MdlNo_RAM`／`error in` | `実行結果ステータス`／`エラー情報`／`error out` | プローブ接続情報の設定（PGTツールの既存設定を適用）|
+| `RAMScope_Set_Cond.vi` | `MdlNo_RAM`／`測定周期`(DBL)／`周期単位`(Enum)／`RAMチャンネル一覧`(配列)／`error in` | `実行結果ステータス`／`エラー情報`／`error out` | 測定条件・チャンネル・ロギングバッファの設定（3つのCLFNをまとめて実行）|
+| `RAMScope_Log_Start.vi` | `MdlNo_RAM`／`error in` | `実行結果ステータス`／`エラー情報`／`error out` | 計測開始 |
+| `RAMScope_Read.vi` | `MdlNo_RAM`／`error in` | `測定値`(配列)／`実行結果ステータス`／`エラー情報`／`error out` | 表示用バッファから最新データをポーリング取得しパケット解析 |
+| `RAMScope_Log_Stop.vi` | `MdlNo_RAM`／`error in` | `実行結果ステータス`／`エラー情報`／`error out` | 計測停止 |
+| `RAMScope_Release.vi` | `error in` | `実行結果ステータス`／`エラー情報`／`error out` | バッファ解放（STEP4のフローテストで要否を検証）|
+| `RAMScope_Close.vi` | `error in` | `実行結果ステータス`／`エラー情報`／`error out` | 切断・終了 |
+
+### (3) 各VIの作成手順
+
+以下の STEP 0〜3 で詳細化する。特に④`RAMScope_Set_Cond.vi`（測定条件・チャンネル・
+ロギング設定）は3つのCLFNをまとめる必要があり構成が複雑なため、STEP 3.4で
+バイト単位の組み立て手順まで具体的に記載している。
+
+### (4) フローテスト用VI
+
+STEP 4（`RAMScope_Flow_Test.vi`）で、TestStand無しの単体確認を行う。
+
+### (5) EXEファイルの作成
+
+FG420と同じ手順（[03](./03_LabVIEW環境構築.md) 3.6）でよいが、**1点重要な違いがある**。
+FG420のドライバはVISA/SCPIベースの計装ドライバVIだったため依存VIの自動埋め込みだけで
+完結したが、**RAMScopeはCLFNで生のDLL（`RAMScopeVP_API.dll`等）を直接パス指定で
+呼んでいる**ため、**そのDLLファイル自体はApplication Builderが自動的にEXEへ
+埋め込んでくれない**。ビルド仕様の「ソースファイル」設定で、DLL一式
+（`RAMScopeVP_API.dll`/`GT150.dll`/`GT170.dll`/`GT170USB.dll`/`PGTMgrVP.dll`/
+`PGTMgrVP_ENG.dll`/`mfc140u.dll`/`msvcp140.dll`/`vcruntime140.dll`/`utillc.dll`/
+`pgtlib\`フォルダ、10.4.1確認済み一覧）を**「常にインクルード」に追加し、
+CLFNのライブラリパスが試験用PC上でも解決できる相対配置**にしておく必要がある。
+
+### (6) 試験用PC側の追加インストール
+
+FG420（[03](./03_LabVIEW環境構築.md) 3.6.2）のLabVIEW Run-Time EngineとNI-VISAに加えて、
+RAMScopeでは以下が追加で必要。
+
+| # | 項目 | 内容 |
+|---|------|------|
+| 1 | **RAMScopeVP（API）本体のインストール** | 10.4.1確認済みのDLL一式・USBドライバ・PGTツールを含む純正インストーラを試験用PCでも実行する（DLLだけコピーするのではなく、正規のインストーラを使うのが確実。USBドライバとPGT設定はインストーラ経由でないと入らない）|
+| 2 | **PGTツールでのプローブ設定** | ③`RAMScope_Config.vi`が暗黙に読みに行く設定（(1)参照）は、**試験用PCでもPGTツールで一度設定しておく必要がある**（開発PCの設定は自動的には移行されない。設定内容自体はプローブ・ターゲット基板が同じなら同じ値でよい）|
+| 3 | **USB3.0ポート** | RAMScopeVP APIでの接続はUSB3.0必須（Ethernet不可。10.6確定事項）。試験用PCにUSB3.0ポートがあることを確認 |
+| 4 | **Visual C++ ランタイム** | `mfc140u.dll`等はVC++再頒布可能パッケージに含まれる。RAMScopeVPインストーラが導入するはずだが、EXE単体配布の場合は別途確認 |
+| 5 | **DLLのbit数** | 64bit版DLL（入手済み）と、LabVIEW Run-Time Engineのbit数を揃える（32/64bit不一致は不可）|
+
+### (7) 試験用PCでの操作手順（フロントパネルの説明）
+
+`RAMScope_Flow_Test.vi`のフロントパネル構成が固まり次第、FG420で作成した
+1枚の操作説明シートと同じ形式で作成する（本編ではまだVI未完成のため、フロントパネルの
+確定後に着手する）。想定される操作項目は、`測定周期`／`周期単位`／`RAMチャンネル一覧`／
+`待ち時間`／`実行結果ステータス`／`エラー情報`（STEP4のフロー構成より）。
+
+---
+
+## 10.4.10 段階的なVI構築手順（RAM計測のみ。CAN送受信は別途）
 
 ### STEP 0：プロジェクトの準備（実体は本編メインプロジェクトに1つだけ。基盤試験プロジェクトからは参照）
 
@@ -2002,25 +2096,16 @@ STEP7で確認できたら、10.4.7の対応表と同様にSetup/Main/Cleanupへ
 >   旧記述の「`0xE` 相当」は誤りで、`0x0E` は実際には**電源通信(CTRL_USB)モジュール**の値だった。
 > - 詳細・修正版の構造体定義は 10.4.2a 内 `MEASINFO_170`／`SYSINFO` セクション参照。
 
-### 🔴 重大な問題：DLL が 32bit・LabVIEW が 64bit（アーキテクチャ不一致）
+### ✅ 解決済み：DLL が 32bit・LabVIEW が 64bit（アーキテクチャ不一致）だった問題
 
-入手済みの DLL（`RAMScopeVP_API.dll` / `GT170.dll` / `GT170USB.dll`）を PE ヘッダの
-`Machine` フィールドで確認したところ、**全て `0x014c`（x86 / 32bit）** であることが確認された。
-一方、開発環境の LabVIEW は **64bit 版**であるため、このままでは CLFN が DLL を
-ロードできない（**ビット数不一致でロードエラーになる**）。
+当初入手した DLL（`RAMScopeVP_API.dll` / `GT170.dll` / `GT170USB.dll`）を PE ヘッダの
+`Machine` フィールドで確認したところ、**全て `0x014c`（x86 / 32bit）** であることが確認され、
+64bit版LabVIEWとのアーキテクチャ不一致が問題となっていた。
 
-**現状の対応：**
-- ユーザーが **DTS インサイトへ問い合わせ、64bit ネイティブライブラリの提供を依頼済み**
-  （DTS インサイト公式サイトに「64bit ネイティブライブラリは問い合わせにより入手可能」との記載あり）。
-- 回答待ちのステータス。64bit 版 DLL が入手できれば、本問題は解消し、
-  かつ **呼び出し規約の論点も消滅する**（x64 ABI には `__stdcall`/`__cdecl` の区別がないため）。
-
-**回答が得られない・64bit版が提供されない場合の代替案：**
-1. **32bit 版 LabVIEW を別途インストール**し、RAMScope 制御用 VI 群だけ 32bit LabVIEW で
-   作成・実行する（TestStand からは 32bit 版シーケンスエディタ／別プロセス経由で呼び出す）。
-   計測器ドライバが 32bit 専用というケースは珍しくなく、最も確実な方法。
-2. 32bit DLL 専用の**仲介プロセス（サロゲート EXE）** を作成し、64bit LabVIEW とは
-   named pipe / TCP 等の IPC で通信する方式（実装コストが高いため優先度低）。
+**その後、DTSインサイトから64bit版DLLを入手し、この問題は解消済み**（10.4.10 STEP0参照）。
+64bit版のため、呼び出し規約（`__stdcall`/`__cdecl`）の論点も消滅している
+（x64 ABIには区別が無いため）。以降の実装はすべてこの64bit DLLを前提とする。
+32bit版LabVIEWの併用やサロゲートEXE経由の代替案は不要になった。
 
 ### 🔴 確定：RAMScope（GT170U01）は RAMScopeVP API 用に USB3.0 接続が必須（LAN 接続不可）
 
