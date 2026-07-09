@@ -1517,7 +1517,8 @@ long RAMScopeGT170SetAdcRange(long UnitNo, long MdlNo, long ChNum, long *pRange)
 
 ### (1) 必要な機能とVIの一覧
 
-初期化・設定・測定条件設定・ロギング開始／停止・クローズの6系統＋共通土台1本、計9本のVIで足りる。
+初期化・設定・測定条件設定・ロギング開始／停止・クローズの6系統＋共通土台1本＋
+パケット解析1本、計10本のVIで足りる。
 
 | # | 機能 | VI | 対応するCLFN |
 |---|------|----|--------------|
@@ -1527,10 +1528,18 @@ long RAMScopeGT170SetAdcRange(long UnitNo, long MdlNo, long ChNum, long *pRange)
 | 3 | プローブ接続設定 | `RAMScope_Config.vi` | `RAMScopeGT150PGT_SetMdlConfig` |
 | 4 | 測定条件・チャンネル・ロギング設定 | `RAMScope_Set_Cond.vi` | `SetMeasCond` + `SetMeasCh` + `SetLoggingInfo` |
 | 5 | 計測開始 | `RAMScope_Log_Start.vi` | `RAMScopeGT170MeasStart` |
-| 6 | データ取得（ポーリング）| `RAMScope_Read.vi` | `RAMScopeGT150GetBufferData` |
+| 6 | データ取得（ポーリング。CLFN呼び出しのみ）| `RAMScope_Read.vi` | `RAMScopeGT150GetBufferData` |
+| 6a | パケット解析（`Read.vi`から分離。実機無しでも単体テスト可能）| `RAMScope_Parse_Buffer.vi` | なし（純粋な計算処理）|
 | 7 | 計測停止 | `RAMScope_Log_Stop.vi` | `RAMScopeGT170MeasStop` |
 | 8 | バッファ解放（要否は現時点未検証）| `RAMScope_Release.vi` | `RAMScopeGT150ReleaseBufferData` |
 | 9 | クローズ | `RAMScope_Close.vi` | `RAMScopeGT150DeviceExit` |
+
+> 🔴 **DLLアクセスの排他制御**：RAMScopeVP APIのDLLがスレッドセーフかどうかは未確認のため、
+> **RAM計測のポーリング（`RAMScope_Read.vi`）とCAN送信（10.4.11のシナリオ送信）を
+> 同じRAMScopeデバイスに対して同時に別ループから呼び出さない**こと。TestStandのステップとして
+> 順番に呼ぶだけなら問題ないが、将来どちらかを並列ループ（例：RAM計測を継続ポーリングする
+> 専用ループ）にする場合は、**DLL呼び出しは常に1つのループ（Device Accessループ）に
+> 集約し、他のループはメッセージ（キュー等）でその1ループに処理を依頼する**設計にする。
 
 **質問：現在のRAMScopeのコンフィグファイルから設定を抽出・流用できるか？** → 機能によって答えが違う。
 
@@ -1559,7 +1568,8 @@ long RAMScopeGT170SetAdcRange(long UnitNo, long MdlNo, long ChNum, long *pRange)
 | `RAMScope_Config.vi` | `MdlNo_RAM`／`error in` | `実行結果ステータス`／`エラー情報`／`error out` | プローブ接続情報の設定（PGTツールの既存設定を適用）|
 | `RAMScope_Set_Cond.vi` | `MdlNo_RAM`／`測定周期`(DBL)／`周期単位`(Enum)／`RAMチャンネル一覧`(配列)／`error in` | `実行結果ステータス`／`エラー情報`／`error out` | 測定条件・チャンネル・ロギングバッファの設定（3つのCLFNをまとめて実行）|
 | `RAMScope_Log_Start.vi` | `MdlNo_RAM`／`error in` | `実行結果ステータス`／`エラー情報`／`error out` | 計測開始 |
-| `RAMScope_Read.vi` | `MdlNo_RAM`／`error in` | `測定値`(配列)／`実行結果ステータス`／`エラー情報`／`error out` | 表示用バッファから最新データをポーリング取得しパケット解析 |
+| `RAMScope_Read.vi` | `MdlNo_RAM`／`error in` | `raw bytes`(U8配列)／`取得パケット数`／`lostDataNum`／`実行結果ステータス`／`エラー情報`／`error out` | 表示用バッファから最新データをポーリング取得（CLFN呼び出しのみ）|
+| `RAMScope_Parse_Buffer.vi` | `raw bytes`(U8配列)／`取得パケット数`／`チャンネル数N`／`error in` | `測定値`(2次元配列)／`タイムスタンプ配列`／`フラグ配列`／`実行結果ステータス`／`エラー情報`／`error out` | 生バイト列をチャンネル値・タイムスタンプ・フラグに解析（`Read.vi`から分離。実機無しでもテスト可能）|
 | `RAMScope_Log_Stop.vi` | `MdlNo_RAM`／`error in` | `実行結果ステータス`／`エラー情報`／`error out` | 計測停止 |
 | `RAMScope_Release.vi` | `error in` | `実行結果ステータス`／`エラー情報`／`error out` | バッファ解放（STEP4のフローテストで要否を検証）|
 | `RAMScope_Close.vi` | `error in` | `実行結果ステータス`／`エラー情報`／`error out` | 切断・終了 |
@@ -1802,7 +1812,7 @@ long RAMScopeGT150PGT_SetMdlConfig(long UnitNo, long *SlotErr);  // SlotErr[16]
 
 単純な1引数CLFN（`UnitNo`のみ）。`RAMScope_Connect.vi`と同じ粒度。
 
-#### STEP 3.6：`RAMScope_Read.vi`（`GetBufferData` + パケット解析）— データ処理が主体
+#### STEP 3.6：`RAMScope_Read.vi`（`GetBufferData` のCLFN呼び出しのみ）
 
 ```c
 long RAMScopeGT150GetBufferData(long UnitNo, long MdlNo, void *pData,
@@ -1821,20 +1831,45 @@ long RAMScopeGT150GetBufferData(long UnitNo, long MdlNo, void *pData,
 10.4.2a）。例えば1000パケット分を受け止めたいなら `Initialize Array`（U8、`(4N+12)×1000`要素）を
 確保し、`pDataNum` にはあらかじめ `1000` を書き込んでから呼ぶ。
 
-**パケット解析（呼び出し後）**：
-1. 戻ってきた `pDataNum`（実際の取得パケット数）分、`For Loop` を回す。
-2. ループ内で `pData` から `(4N+12)` バイトずつ `Array Subset` で切り出す。
+このVIの責務は**CLFN呼び出しと生バイト列の取得まで**とし、パケット解析は
+STEP3.6a（`RAMScope_Parse_Buffer.vi`）に分離する（理由は3.6aの冒頭を参照）。
+
+出力：`raw bytes`（U8配列。生のまま）、`取得パケット数`（`pDataNum`の戻り値）、
+`lostDataNum`、`実行結果ステータス`、`エラー情報`、`error out`。
+
+> **Watchdog的な使い方**：`pLostDataNum > 0` は表示用バッファが溢れたことを意味する
+> （10.4.2a）。この VI をポーリングする周期・`SetLoggingInfo` の `BuffSize` を見直す指標にする。
+
+> 🔧 **PoC段階のデバッグ推奨**：フロントパネルに一時的に
+> `buffer size`（確保したバイト数）／`dataNum returned`（戻ってきた値）／`lostDataNum`／
+> `raw bytesの先頭32byte`を表示器として出しておくと、`pDataNum`が実際に
+> 「パケット数」を返しているのか等の解釈をログを見ながら実測で確認できる
+> （仕様書の記載どおりのはずだが、**実測で必ず裏取りする**）。動作確認が取れたら
+> 本番のVIからはこれらの一時的な表示器を外してよい。
+
+#### STEP 3.6a：`RAMScope_Parse_Buffer.vi`（パケット解析。`RAMScope_Read.vi`から分離）
+
+**RAMScope_Read.vi に埋め込まず、独立したVIにする**。理由：パケット解析（バイト列の
+切り出し・`Type Cast`・ビットフィールド分解）は間違えやすく複雑な処理なので、
+**実機・DLLが無い状態でもダミーのバイト配列を入力して単体テストできるようにしておくと
+デバッグが大幅に楽になる**（実機接続時にしか動作確認できない設計にしない）。
+
+入力：`raw bytes`（U8配列）、`取得パケット数`、`チャンネル数N`、`error in`
+出力：`測定値`（チャンネル数×パケット数の2次元配列）、`タイムスタンプ配列`、
+`フラグ配列`、`実行結果ステータス`、`エラー情報`、`error out`
+
+内部処理：
+1. `取得パケット数`分、`For Loop` を回す。
+2. ループ内で `raw bytes` から `(4N+12)` バイトずつ `Array Subset` で切り出す。
 3. 各パケットを：`Data[0..N-1]`（I32×N、チャンネル値）＋`Flag`（I32）＋`Time`（U64）に分解
    （`Type Cast` または `Unflatten From String`。10.4.2b参照）。
 4. `Flag` は32bitのビットフィールド（`status`/`skip`/`log_trg`/`dummy`/`event`/`datalost`。
    10.4.2b の RAM フラグ表）。`論理積`（AND）とシフト演算でビット単位に分解する。
 5. `Time` は20nsec単位のカウント値。`×20e-9` で秒に変換。
 
-出力：チャンネル値の2次元配列（パケット数×チャンネル数）、タイムスタンプ配列、
-フラグ配列（または`datalost`等の代表フラグのみ）、`実行結果ステータス`、`エラー情報`、`error out`。
-
-> **Watchdog的な使い方**：`pLostDataNum > 0` は表示用バッファが溢れたことを意味する
-> （10.4.2a）。この VI をポーリングする周期・`SetLoggingInfo` の `BuffSize` を見直す指標にする。
+> **エンディアン注意**：`Type Cast`はプラットフォームのバイト順に依存する。
+> Windowsは通常リトルエンディアンだが、`GetSysInfo`が返す`endian`フィールド
+> （10.4.2a）と矛盾しないか、実測データで必ず確認すること。
 
 #### STEP 3.7：`RAMScope_Log_Stop.vi`（`RAMScopeGT150MeasStop(0)`）
 
@@ -1965,6 +2000,14 @@ CLFN配線は10.4.2b「LabVIEW CLFNでのSendCANDataFrameの扱い」の2段階�
 （`CANSEND_170_DATA`配列→`CANSEND_170_INFO`本体へポインタ書き込み）に従う。
 **この単発送信で、まずCANバスモニタ（CANalyzer等）に意図通りのフレームが出ることを確認**
 してから、シナリオ送信（STEP4以降）に進む。
+
+> 🔧 **送信前バリデーション（推奨）**：CLFNへ渡す前に、次の範囲チェックを入れておくと
+> 誤ったCAN IDやデータ長による意図しない送信・エラーを早期に検出できる。
+> - 標準ID：`0〜0x7FF`の範囲か
+> - 拡張ID：`0〜0x1FFFFFFF`の範囲か
+> - `DataLength`と実際のデータ配列長が一致しているか
+> - CAN 2.0B（Classic）は`DataLength`が0〜8byteの範囲内か
+> 範囲外の場合はCLFNを呼ばずに`Status.ctl=Error`を返す（doc06 6.1.2の設計と同じ考え方）。
 
 ### STEP 4：シナリオ配列の組み立て（メッセージごとに専用の `CAN_Build_<ID>_Scenario.vi`）
 
