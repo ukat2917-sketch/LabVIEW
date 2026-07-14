@@ -1,8 +1,10 @@
-# 10A. RAMScope 実装手順：環境準備・DLL疎通・Connect PoC
+# 10A. RAMScope 実装手順：環境準備・DLL疎通・DeviceInitラッパPoC
 
-> **本章の役割**：RAMScope VIを量産する前に、64bit DLLを正しくロードし、`RAMScopeGT150DeviceInit`をLabVIEWから呼べる状態まで確認する。
+> **本章の役割**：RAMScope VIを量産する前に、64bit DLLを正しくロードし、
+> `RAMScopeGT150DeviceInit`をLabVIEWから呼べる状態まで確認する。
 >
-> 本章完了後は [10B](./10B_RAMScope_VI作成手順_STEP3_STEP4詳細.md) へ進む。
+> 本章で作るVIは公開APIではなく、最初の薄いDLLラッパ`RS_DLL_GT150DeviceInit.vi`とする。
+> 本章完了後は [10B](./10B_RAMScope_VI作成手順_STEP3_STEP4詳細.md) で、他のDLLラッパ、公開API、最小PoCを作成する。
 > API関数・構造体の確認は [10](./10_RAMScope実装方針.md) を参照する。
 
 **最終整理日：2026-07-14**
@@ -42,7 +44,8 @@ GT170でも接続・初期化・終了の共通処理には`RAMScopeGT150*`関�
 - PGTツール
 - Visual C++ 2013 Redistributable x64
 
-Visual C++ 2015-2022 Redistributable x64は、別コンポーネントが要求する場合に導入する。ただし、Visual C++ 2013の代替ではない。
+Visual C++ 2015-2022 Redistributable x64は、別コンポーネントが要求する場合に導入する。
+ただし、Visual C++ 2013の代替ではない。
 
 ## 10A.3 確認済みパス
 
@@ -87,7 +90,8 @@ RAMScopeVP_API(64bit)\
 
 ## 10A.5 Visual C++ 2013 Redistributable x64の役割
 
-Visual C++ RedistributableはRAMScopeのUSBドライバではない。RAMScopeのDLLが内部で使用するMicrosoft C/C++共通ライブラリをWindowsへ提供する。
+Visual C++ RedistributableはRAMScopeのUSBドライバではない。
+RAMScopeのDLLが内部で使用するMicrosoft C/C++共通ライブラリをWindowsへ提供する。
 
 ```text
 LabVIEW 64bit
@@ -182,8 +186,6 @@ New-Item -ItemType Directory -Path $backup -Force | Out-Null
 
 ### 移動してはいけないファイル
 
-次はベンダー指定の配置を維持する。
-
 ```text
 PGTMgrVP.dll
 PGTMgrVP_ENG.dll
@@ -191,7 +193,8 @@ utillc.dll
 pgtlib\*.dll
 ```
 
-これらは32bitヘルパープロセスやPGT構成で使用される可能性がある。x86と表示されたことだけを理由に隔離しない。
+これらは32bitヘルパープロセスやPGT構成で使用される可能性がある。
+x86と表示されたことだけを理由に隔離しない。
 
 ---
 
@@ -238,7 +241,7 @@ Address           : 名前と序数で一致
 
 ---
 
-# STEP 2：最小`RAMScope_Connect.vi`を作る
+# STEP 2：最小`RS_DLL_GT150DeviceInit.vi`を作る
 
 ## 10A.8 ヘッダ定義
 
@@ -284,7 +287,7 @@ error in ───────────────────────�
 I32 0 → pUnitNum ─────────────────────────── CLFN ─→ UnitNum
 I32 0 → kind ──────────────────────────────────┤  └→ kind
                                                └────→ API ReturnCode
-error out ◀─────────────────────────────────────────
+error out ◀────────────────────────────────────────
 ```
 
 - `pUnitNum`と`kind`の入力側へI32の0を接続する。
@@ -294,13 +297,14 @@ error out ◀──────────────────────�
 
 ### VI名
 
-最初に作成したDeviceInitの最小VIは、次の名称で保存する。
+最小疎通で作成したCLFNは、次の薄いDLLラッパとして保存する。
 
 ```text
-RAMScope_Connect.vi
+RS_DLL_GT150DeviceInit.vi
 ```
 
-`RAMScope_Init.vi`は別VIで、`AllInit`と`GetSysInfo`を担当する。
+公開APIの`RAMScope_Connect.vi`は [10B](./10B_RAMScope_VI作成手順_STEP3_STEP4詳細.md) で作成し、
+このラッパを内部から呼び出す。
 
 ## 10A.11 実機未接続PoC
 
@@ -322,7 +326,8 @@ Device kind : 0
 - 関数の実呼び出し成功
 - 接続デバイス数は0
 
-`0x30100001`の正式定義は未確認である。実機未接続時の観測コードとして記録し、意味を断定しない。
+`0x30100001`の正式定義は未確認である。
+実機未接続時の観測コードとして記録し、意味を断定しない。
 
 ---
 
@@ -349,7 +354,9 @@ Device kind : 0
 - [x] 名前と序数のアドレスが一致する
 - [x] PowerShellから関数を実呼び出しできる
 - [x] LabVIEWのCLFNプロトタイプが確定している
-- [x] `RAMScope_Connect.vi`の最小配線ができている
+- [x] DeviceInitの最小配線ができている
 - [x] 実機未接続時でもクラッシュせずReturnCodeを返す
+- [ ] 作成済みVIを`RS_DLL_GT150DeviceInit.vi`として整理する
 
-次に [10B](./10B_RAMScope_VI作成手順_STEP3_STEP4詳細.md) で、エラー変換の共通化と後続VIを作成する。
+次に [10B](./10B_RAMScope_VI作成手順_STEP3_STEP4詳細.md) で、
+`RAMScope_Code_To_Error.vi`、残りのDLLラッパ、公開API、`PoC_RAMScope_Main.vi`を作成する。
