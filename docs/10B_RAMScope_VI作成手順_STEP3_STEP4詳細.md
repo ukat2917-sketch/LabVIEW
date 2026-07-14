@@ -1,268 +1,224 @@
-# 10B. RAMScope VI作成手順：STEP 3 / STEP 4 詳細
+# 10B. RAMScope VI作成手順：共通エラー変換・各VI詳細
 
-本章は、[10A_RAMScope実装手順_DLL準備とCLFN疎通確認.md](./10A_RAMScope実装手順_DLL準備とCLFN疎通確認.md) の
-「STEP 3：エラー変換を共通化」と「STEP 4：後続VIを1イベント1VIで作成」を、
-LabVIEW上で実際に作業できる粒度まで分解した手順書である。
+> **本章の役割**： [10A](./10A_RAMScope実装手順_DLL準備とCLFN疎通確認.md) のDLL疎通と`RAMScope_Connect.vi` PoC完了後に、共通エラー変換と後続VIをLabVIEW上で作成する。
+>
+> 関数プロトタイプ・構造体・定数は [10](./10_RAMScope実装方針.md) とメーカー提供ヘッダを正とする。
+> TestStandへの配置は [11](./11_TestStandシーケンス構築手順.md)、Cleanupは [12](./12_異常系処理とシャットダウン設計.md) を参照する。
 
-関数プロトタイプ・構造体・定数の正本は、次を参照する。
-
-- [10_RAMScope実装方針.md](./10_RAMScope実装方針.md)
-- [reference/RAMScopeVP.h](./reference/RAMScopeVP.h)
-- [reference/GTHard.h](./reference/GTHard.h)
+**最終整理日：2026-07-14**
 
 ---
 
-## 10B.1 最初に整理する名称
-
-今回、最初に作成した `RAMScopeGT150DeviceInit()` を1個だけ呼ぶVIは、
-役割上は **`RAMScope_Connect.vi`** とする。
+## 10B.1 この章で作るもの
 
 ```text
-RAMScope_Connect.vi
-  └─ RAMScopeGT150DeviceInit()
-
-RAMScope_Init.vi
-  ├─ RAMScopeGT150AllInit()
-  └─ RAMScopeGT150GetSysInfo()
+30_RAMScope\
+├─ RAMScope_Code_To_Error.vi
+├─ RAMScope_Connect.vi          ← 10Aで作成したDeviceInit VIを仕上げる
+├─ RAMScope_Init.vi             ← AllInit + GetSysInfo
+├─ RAMScope_Config.vi           ← PGT_SetMdlConfig
+├─ RAMScope_Set_Cond.vi         ← SetMeasCond + SetMeasCh + SetLoggingInfo
+├─ RAMScope_Log_Start.vi
+├─ RAMScope_Read.vi
+├─ RAMScope_Parse_Buffer.vi
+├─ RAMScope_Log_Stop.vi
+├─ RAMScope_Release.vi
+├─ RAMScope_Close.vi
+└─ RAMScope_Flow_Test.vi
 ```
 
-したがって、既に作成済みの最小VIはそのまま流用できるが、
-保存名は `RAMScope_Connect.vi` とし、後段へ
-`RAMScope_Code_To_Error.vi` と `Error_To_TestStatus.vi` を追加する。
-
-> **結論**：既に作成したDeviceInitのVIは、CLFN設定をやり直す必要はない。
-> エラー変換処理と共通出力を追加すれば `RAMScope_Connect.vi` として完成する。
+最初に作成した`RAMScopeGT150DeviceInit`の最小VIは`RAMScope_Connect.vi`である。`RAMScope_Init.vi`は別VIとして作る。
 
 ---
 
-## 10B.2 全RAMScope VIの共通構成
+## 10B.2 全VIの共通ルール
 
-### 10B.2.1 共通入出力
+### 共通出力
 
-通常の操作VIは、次の端子を共通で持たせる。
+| 端子 | 型 | 用途 |
+|------|----|------|
+| `実行結果ステータス` | `Status.ctl` | TestStandの継続・中断判定 |
+| `エラー情報` | `TestError.ctl` | 機器名・コード・メッセージ・時刻 |
+| `error out` | error cluster | 後段VIへの標準エラー伝播 |
+| `API ReturnCode` | I32 | PoC・ログ用。量産後の公開は任意 |
 
-| 区分 | 端子 | 型 | 用途 |
-|------|------|----|------|
-| 入力 | `error in` | 標準error cluster | 前段エラーの受け取り |
-| 出力 | `実行結果ステータス` | `Status.ctl` | TestStandの継続・中断判定 |
-| 出力 | `エラー情報` | `TestError.ctl` | 機器名・コード・メッセージ等の記録 |
-| 出力 | `error out` | 標準error cluster | 後段VIとTestStandへの伝播 |
-| デバッグ出力 | `API ReturnCode` | I32 | PoC中のAPI戻り値確認。量産後は任意 |
-
-API固有の入力・出力は、上記へ追加する。
-
-### 10B.2.2 通常VIのブロック構成
-
-`RAMScope_Close.vi` 以外は、前段にエラーがあればAPIを呼び出さない。
+### 通常VI
 
 ```text
 error in
-   │
-   ▼
-Case Structure（error in.status）
-   ├─ True : CLFNを実行せず、error inをそのまま出力
-   └─ False: CLFN実行
-                  │
-                  ├─ CLFN error out
-                  └─ API ReturnCode
-                         │
-                         ▼
-              RAMScope_Code_To_Error.vi
-                         │
-                         ▼
-              Error_To_TestStatus.vi
-                 ├─ Status.ctl
-                 ├─ TestError.ctl
-                 └─ error out
+  → Case Structure
+      ├─ errorあり：CLFNを呼ばず元エラーを伝播
+      └─ errorなし：CLFNを実行
+           → RAMScope_Code_To_Error.vi
+           → Error_To_TestStatus.vi
 ```
 
-### 10B.2.3 CLFN共通設定
+### 複数CLFNを持つVI
 
-| 項目 | 共通設定 |
-|------|----------|
+各APIの直後に`RAMScope_Code_To_Error.vi`を置き、変換後の標準error clusterを次のCLFNへ直列で渡す。`Error_To_TestStatus.vi`はVIの最後に1回だけ呼ぶ。
+
+### Cleanup VI
+
+`RAMScope_Close.vi`は前段エラーがあってもDeviceExitを呼び、元エラーとCloseエラーを`Merge Errors`で統合する。
+
+### CLFN共通設定
+
+| 項目 | 設定 |
+|------|------|
 | DLL | `RAMScopeVP_API_x64.dll` |
-| Calling convention | `C` |
-| Thread | 最初は `Run in UI thread` |
-| Error checking | PoC中は `Maximum` |
-| Cの`long` | LabVIEWではI32 |
-| Cの`unsigned long` / `DWORD` | LabVIEWではU32 |
-| `long*` | I32 / Pointer to Value |
-| 構造体・配列ポインタ | 事前確保した配列 / Array Data Pointer |
+| Calling Convention | C |
+| Thread | PoC中はRun in UI thread |
+| Error checking | PoC中はMaximum |
+| `long` | I32 |
+| `unsigned long` / `DWORD` | U32 |
+| `long*` | Pointer to Value |
+| 配列・構造体 | 事前確保した配列をArray Data Pointerで渡す |
 
 ---
 
 # STEP 3：エラー変換を共通化
 
-## 10B.3 `RAMScope_Code_To_Error.vi` の作成
+## 10B.3 `RAMScope_Code_To_Error.vi`
 
-RAMScope APIは標準error clusterではなく、関数の戻り値としてI32の結果コードを返す。
-このVIは、その生コードを標準error clusterへ変換する専用アダプタである。
+RAMScope APIの戻り値を標準error clusterへ変換する。
 
-### 10B.3.1 フロントパネル
+### フロントパネル
 
-| 端子 | 種別 | 型 | 説明 |
-|------|------|----|------|
-| `API ReturnCode` | 入力 | I32 | CLFNの戻り値 |
-| `Function Name` | 入力 | String | 例：`RAMScopeGT150DeviceInit` |
-| `error in` | 入力 | error cluster | CLFN自身のerror out、または前段エラー |
-| `error out` | 出力 | error cluster | APIコードを反映した標準エラー |
+| 端子 | 方向 | 型 |
+|------|------|----|
+| `API ReturnCode` | 入力 | I32 |
+| `Function Name` | 入力 | String |
+| `error in` | 入力 | error cluster |
+| `error out` | 出力 | error cluster |
 
-コネクタペインは、左側に3入力、右側に`error out`を配置する。
+### コネクタペイン
 
-### 10B.3.2 ブロックダイアグラム
+- 左上：`API ReturnCode`
+- 左中：`Function Name`
+- 左下：`error in`
+- 右下：`error out`
 
-1. `error in` を `Unbundle By Name` し、`status` を取得する。
-2. `status` をCase Structureへ接続する。
-3. `True`ケースでは、既存エラーを優先して `error in` をそのまま `error out` へ渡す。
-4. `False`ケースでは、`API ReturnCode == 0` を比較する。
-5. 戻り値が`0`の場合は、`error in`をそのまま出力する。
-6. 戻り値が`0以外`の場合は、次のerror clusterを作る。
+### ブロックダイアグラム
+
+1. `error in`を`Unbundle By Name`し、`status`を取得する。
+2. `status`をCase Structureへ接続する。
+3. `True`ケースでは元の`error in`をそのまま出力する。
+4. `False`ケースでは`API ReturnCode == 0`を判定する。
+5. `0`ならエラーなしのまま出力する。
+6. `0以外`なら次のクラスタを作る。
 
 ```text
 status = True
 code   = API ReturnCode
-source = "RAMScope <Function Name> failed. ReturnCode=0xXXXXXXXX (decimal)"
+source = "RAMScope <Function Name> failed. ReturnCode=0xXXXXXXXX (<decimal>)"
 ```
 
-7. 16進表示は `Format Into String` の `%08X` を使う。
-8. I32コードを16進表示するときは、ビット列を保持するためU32へ `Type Cast` してから整形する。
-9. `Bundle By Name` で `status / code / source` を設定し、`error out`へ出力する。
+7. 16進表示は、I32をU32へ`Type Cast`してから`Format Into String`の`%08X`で整形する。
+8. `Bundle By Name`で`status / code / source`を設定する。
 
-### 10B.3.3 動作確認
+### 単体テスト
 
-| 入力 | 期待結果 |
-|------|----------|
-| `error in.status=False`, ReturnCode=`0` | `error out.status=False` |
-| `error in.status=False`, ReturnCode=`0x30100001` | `error out.status=True`、codeに同値 |
-| `error in.status=True` | 元のエラーを変更せずそのまま出力 |
+| error in | ReturnCode | 期待結果 |
+|----------|------------|----------|
+| 正常 | `0` | error out正常 |
+| 正常 | `0x30100001` | error out.status=True |
+| エラーあり | 任意 | 元エラーを変更しない |
 
-> 標準error clusterの`code`はI32である。
-> `TestError.ctl`でコードをU32保持する場合は、負数表示になり得るコードを数値変換せず、
-> `Type Cast`でビット列を保持して格納する。
-
----
-
-## 10B.4 各VIでのエラー変換接続
-
-各RAMScope VIでは、CLFNの直後を次の順で接続する。
+## 10B.4 `Error_To_TestStatus.vi`へ接続
 
 ```text
 CLFN error out ───────────────┐
-                              ▼
-CLFN API ReturnCode ──▶ RAMScope_Code_To_Error.vi
-                              │
-                              ▼
-                   Error_To_TestStatus.vi
-                       ├─ 実行結果ステータス
-                       ├─ エラー情報
+                               ▼
+API ReturnCode ──→ RAMScope_Code_To_Error.vi
+                               │
+                               ▼
+                    Error_To_TestStatus.vi
+                       ├─ Status.ctl
+                       ├─ TestError.ctl
                        └─ error out
 ```
 
-`Error_To_TestStatus.vi` の `機器名` 入力には、固定文字列 `RAMScope` を渡す。
-
-複数のCLFNを持つVIでは、APIごとに `RAMScope_Code_To_Error.vi` を挟み、
-標準error clusterを次のAPIへ直列で渡す。`Error_To_TestStatus.vi` はVIの最後に1回だけ呼ぶ。
+`Error_To_TestStatus.vi`の機器名には固定文字列`RAMScope`を渡す。
 
 ---
 
-# STEP 4：後続VIを1イベント1VIで作成
+# STEP 4：各VIを作成する
 
 ## 10B.5 `RAMScope_Connect.vi`
-
-### 10B.5.1 既存VIの流用
-
-今回作成済みの `RAMScopeGT150DeviceInit()` 最小VIを「別名で保存」し、
-`RAMScope_Connect.vi` とする。
 
 ```c
 long RAMScopeGT150DeviceInit(long *pUnitNum, long *kind);
 ```
 
-### 10B.5.2 入出力
+### 既存VIの流用
 
-| 端子 | 型 | 説明 |
-|------|----|------|
-| `error in` | error cluster | 前段エラー |
-| `UnitNum` | I32 | 接続台数 |
-| `kind` | I32 | `0=GT150 / 1=GT12x / 2=GT17x` |
-| `API ReturnCode` | I32 | DeviceInit戻り値 |
-| `実行結果ステータス` | `Status.ctl` | 共通出力 |
-| `エラー情報` | `TestError.ctl` | 共通出力 |
-| `error out` | error cluster | 共通出力 |
+10Aで作成済みのDeviceInit最小VIを`RAMScope_Connect.vi`として保存する。CLFN設定は変更しない。
 
-### 10B.5.3 追加作業
+### 入出力
 
-1. 既存のCLFN配線を維持する。
-2. CLFNの標準`error out`と`API ReturnCode`を `RAMScope_Code_To_Error.vi` へ接続する。
-3. `Function Name`には `RAMScopeGT150DeviceInit` を設定する。
-4. 変換後のerror clusterを `Error_To_TestStatus.vi` へ接続する。
-5. `機器名`には `RAMScope` を設定する。
-6. `Status.ctl / TestError.ctl / error out`をコネクタペインへ割り当てる。
+| 端子 | 型 |
+|------|----|
+| `error in` | error cluster |
+| `UnitNum` | I32 |
+| `kind` | I32 |
+| `API ReturnCode` | I32 |
+| `実行結果ステータス` | `Status.ctl` |
+| `エラー情報` | `TestError.ctl` |
+| `error out` | error cluster |
 
-> つまり、既に作成したVIについては、主な追加作業はエラー変換チェーンの接続である。
+### 追加作業
 
-実機接続後は、成功時に `UnitNum >= 1` かつ `kind = 2` であることを確認する。
-正式な成功コードはAPI仕様書・実機結果で確定する。
+1. CLFNの`error out`とReturnCodeを`RAMScope_Code_To_Error.vi`へ接続する。
+2. Function Nameに`RAMScopeGT150DeviceInit`を渡す。
+3. 変換後のerror clusterを`Error_To_TestStatus.vi`へ接続する。
+4. 機器名に`RAMScope`を渡す。
+5. 共通出力をコネクタペインへ割り当てる。
+
+実機接続時は`UnitNum >= 1`、`kind = 2`を期待するが、正式な成功値は実機結果で確定する。
 
 ---
 
 ## 10B.6 `RAMScope_Init.vi`
-
-`RAMScope_Init.vi` は `DeviceInit` ではなく、次の2関数を順番に呼ぶ。
 
 ```c
 long RAMScopeGT150AllInit(long UnitNo);
 long RAMScopeGT150GetSysInfo(long UnitNo, SYSINFO *pSysInfo);
 ```
 
-### 10B.6.1 入出力
+### 入出力
 
 | 端子 | 型 | 説明 |
 |------|----|------|
 | `error in` | error cluster | 前段エラー |
-| `MdlNo_RAM` | I32 | RAMモニタモジュール番号。未検出時は`-1` |
-| `MdlNo_CAN` | I32 | CANモジュール番号。未検出時は`-1` |
-| `Endian_RAM` | I32 | RAMモジュールのエンディアン情報 |
-| `SYSINFO Raw` | U8配列 | PoC用。必要に応じて非公開出力にする |
-| `実行結果ステータス` | `Status.ctl` | 共通出力 |
-| `エラー情報` | `TestError.ctl` | 共通出力 |
-| `error out` | error cluster | 共通出力 |
+| `MdlNo_RAM` | I32 | 未検出時`-1` |
+| `MdlNo_CAN` | I32 | 未検出時`-1` |
+| `Endian_RAM` | I32 | RAMモジュールのEndian |
+| `SYSINFO Raw` | U8配列 | PoC用 |
+| 共通3出力 | 共通型 | Status / TestError / error out |
 
-### 10B.6.2 `AllInit` の作成
+### `AllInit`
 
-1. CLFNを配置し、関数名を `RAMScopeGT150AllInit` にする。
-2. `UnitNo`をI32 / Valueで追加し、定数`0`を接続する。
-3. 戻り値をI32に設定する。
-4. 戻り値を `RAMScope_Code_To_Error.vi` へ接続する。
-5. `Function Name`には `RAMScopeGT150AllInit` を設定する。
-6. 変換後のerror clusterが正常な場合だけ、次の`GetSysInfo`を実行する。
+1. CLFNを配置する。
+2. Function Nameを`RAMScopeGT150AllInit`にする。
+3. `UnitNo`をI32 / Valueで追加し、定数`0`を接続する。
+4. 戻り値をI32にする。
+5. ReturnCodeとCLFN error outを`RAMScope_Code_To_Error.vi`へ接続する。
 
-### 10B.6.3 `GetSysInfo` のCLFN設定
+### `GetSysInfo`
 
-`SYSINFO`は60バイト、配列要素数は16である。
+`SYSINFO`は60バイト、16要素で合計960バイト。
 
-```text
-60 byte × 16 = 960 byte
-```
-
-1. `Initialize Array`でU8の`0`を960要素確保する。
-2. CLFNの関数名を `RAMScopeGT150GetSysInfo` にする。
+1. `Initialize Array`でU8の0を960要素確保する。
+2. Function Nameを`RAMScopeGT150GetSysInfo`にする。
 3. `UnitNo`：I32 / Value / `0`。
 4. `pSysInfo`：Array / U8 / Array Data Pointer。
 5. 戻り値：I32。
-6. API戻り値を `RAMScope_Code_To_Error.vi` へ接続する。
-7. `Function Name`には `RAMScopeGT150GetSysInfo` を設定する。
+6. `AllInit`の変換後error clusterをCLFNへ接続する。
+7. ReturnCodeを`RAMScope_Code_To_Error.vi`で変換する。
 
-### 10B.6.4 SYSINFOの解析
+### SYSINFO解析
 
-For Loopを16回実行し、各ループで60バイトを切り出す。
-
-```text
-開始位置 = ループ番号 × 60
-長さ     = 60
-```
-
-各レコードの主要オフセット：
+For Loopを16回実行し、60バイトずつ解析する。
 
 | フィールド | オフセット | 型 |
 |-----------|-----------|----|
@@ -279,15 +235,12 @@ For Loopを16回実行し、各ループで60バイトを切り出す。
 | `flash_enable` | 40 | I32 |
 | `name[16]` | 44 | U8[16] |
 
-1. 各4バイトを `Array Subset` で切り出す。
-2. `Type Cast`でI32へ変換する。
-3. `module_type == 0x00` のレコードを探し、`module`を `MdlNo_RAM` とする。
-4. 同じレコードの`endian`を `Endian_RAM` とする。
-5. `module_type == 0x02` のレコードを探し、`module`を `MdlNo_CAN` とする。
-6. 初期値は`-1`にする。
-7. `MdlNo_RAM == -1`のままなら「RAMモニタモジュール未検出」として自前エラーを生成する。
-
-最後に1回だけ `Error_To_TestStatus.vi` を呼ぶ。
+1. `module_type == 0x00`なら`module`を`MdlNo_RAM`へ保存する。
+2. 同じレコードの`endian`を`Endian_RAM`へ保存する。
+3. `module_type == 0x02`なら`module`を`MdlNo_CAN`へ保存する。
+4. 初期値を`-1`にする。
+5. RAMモジュールが見つからなければ自前エラーを作る。
+6. 最後に`Error_To_TestStatus.vi`を1回呼ぶ。
 
 ---
 
@@ -297,36 +250,35 @@ For Loopを16回実行し、各ループで60バイトを切り出す。
 long RAMScopeGT150PGT_SetMdlConfig(long UnitNo, long *SlotErr);
 ```
 
-### 10B.7.1 入出力
+### 入出力
 
-| 端子 | 型 | 説明 |
-|------|----|------|
-| `MdlNo_RAM` | I32 | `RAMScope_Init.vi`の出力 |
-| `error in` | error cluster | 前段エラー |
-| `SlotErr` | I32[16] | PoC・ログ用 |
-| 共通3出力 | 各共通型 | Status / TestError / error out |
+| 端子 | 型 |
+|------|----|
+| `MdlNo_RAM` | I32 |
+| `error in` | error cluster |
+| `SlotErr` | I32[16] |
+| 共通3出力 | 共通型 |
 
-### 10B.7.2 作成手順
+### 作成手順
 
-1. `Initialize Array`でI32の`0`を16要素確保する。
-2. CLFNの関数名を `RAMScopeGT150PGT_SetMdlConfig` にする。
+1. I32の0を16要素`Initialize Array`する。
+2. Function Nameを`RAMScopeGT150PGT_SetMdlConfig`にする。
 3. `UnitNo`：I32 / Value / `0`。
 4. `SlotErr`：Array / I32 / Array Data Pointer。
 5. 戻り値：I32。
-6. API戻り値を `RAMScope_Code_To_Error.vi` へ接続する。
-7. API戻り値が正常なら、`Index Array`で `SlotErr[MdlNo_RAM]` を取り出す。
-8. `SlotErr[MdlNo_RAM] != 0` の場合も、`RAMScope_Code_To_Error.vi` でエラー化する。
-9. Function Nameは `RAMScopeGT150PGT_SetMdlConfig/SlotErr` とする。
-10. 最後に `Error_To_TestStatus.vi` を呼ぶ。
+6. API ReturnCodeをエラー変換する。
+7. API正常時に`SlotErr[MdlNo_RAM]`を取り出す。
+8. SlotErrが0以外なら、同じ`RAMScope_Code_To_Error.vi`へ渡してエラー化する。
+9. Function Nameは`RAMScopeGT150PGT_SetMdlConfig/SlotErr`等、判別できる文字列にする。
+10. 最後に`Error_To_TestStatus.vi`を1回呼ぶ。
 
-> `PGTMgrVP.dll`等が使用する既存のPGT設定を暗黙に読み込むため、
-> `endian`やプローブ固有設定をこのVIの引数として渡す必要はない。
+PGTツールの既存設定をAPIが読み込むため、`endian`や非公開プローブ情報をVI入力にしない。
 
 ---
 
 ## 10B.8 `RAMScope_Set_Cond.vi`
 
-このVIは、1つの「測定条件設定イベント」として、次の3関数を直列に呼ぶ。
+次の3関数を直列に呼ぶ。
 
 ```c
 long RAMScopeGT170SetMeasCond(long UnitNo, long MdlNo, MEASINFO_170 *pMeasInfo);
@@ -334,19 +286,19 @@ long RAMScopeGT170SetMeasCh(long UnitNo, long MdlNo, long ChNum, CHINFO_170 *pCh
 long RAMScopeGT150SetLoggingInfo(long UnitNo, LOGINFO *pLogInfo);
 ```
 
-### 10B.8.1 推奨入力
+### 推奨入力
 
-| 端子 | 型 | 説明 |
-|------|----|------|
-| `MdlNo_RAM` | I32 | RAMモジュール番号 |
-| `MeasPeri` | I32 | 測定周期の数値部分 |
-| `MeasUnit` | Enum | `usec=1 / msec=2` |
-| `RAM Channel List` | 型定義クラスタ配列 | 各チャンネルのaddress等 |
-| `LogSize` | I32 | 初期値`1` |
-| `BufferSize` | I32 | 初期値`1` |
-| `error in` | error cluster | 前段エラー |
+| 端子 | 型 |
+|------|----|
+| `MdlNo_RAM` | I32 |
+| `MeasPeri` | I32 |
+| `MeasUnit` | Enum：usec=1 / msec=2 |
+| `RAM Channel List` | `RAMScope_Channel.ctl`配列 |
+| `LogSize` | I32。初期PoCは1 |
+| `BufferSize` | I32。初期PoCは1 |
+| `error in` | error cluster |
 
-推奨するチャンネル型定義 `RAMScope_Channel.ctl`：
+### `RAMScope_Channel.ctl`
 
 | 要素 | 型 | 初期値 |
 |------|----|--------|
@@ -357,37 +309,23 @@ long RAMScopeGT150SetLoggingInfo(long UnitNo, LOGINFO *pLogInfo);
 | `Signed` | Boolean | 対象変数に合わせる |
 | `Speed` | U32 | 0 |
 
-### 10B.8.2 MEASINFO_170の作成
+### MEASINFO_170
 
-1. `Initialize Array`でU8の`0`を72要素確保する。
-2. I32値を4バイトのU8配列へ `Type Cast` し、`Replace Array Subset`で埋める。
+U8配列72要素をゼロ初期化し、I32値を4バイトにType Castして`Replace Array Subset`で埋める。
 
-| 値 | オフセット | 設定 |
-|----|-----------|------|
-| `DummyInterval` | 0 | `100` |
-| `MeasPeri` | 4 | 入力値 |
-| `MeasUnit` | 8 | Enum値`1`または`2` |
-| `MeasPeri_reserve[0]` | 12 | `0` |
-| `MeasPeri_reserve[1]` | 16 | `0` |
+| 値 | オフセット |
+|----|-----------|
+| `DummyInterval=100` | 0 |
+| `MeasPeri` | 4 |
+| `MeasUnit` | 8 |
+| `reserve[0]=0` | 12 |
+| `reserve[1]=0` | 16 |
 
-3. CLFNの`pMeasInfo`へU8[72]をArray Data Pointerで渡す。
-4. API戻り値をエラー変換する。
-5. エラーがあれば以降の2関数を実行しない。
+`pMeasInfo`へArray Data Pointerで渡し、ReturnCodeを変換する。エラーなら後続APIを呼ばない。
 
-### 10B.8.3 CHINFO_170配列の作成
+### CHINFO_170
 
-RAM用 `CHINFO_170` は1要素24バイトである。
-
-```text
-CHINFO_RAM170 = DWORD × 6 = 24 byte
-```
-
-チャンネル数を`N`とする。
-
-1. `Array Size`で`N`を取得する。
-2. `N < 1`または`N > 2048`の場合は自前エラーにする。
-3. U8配列を `N × 24` 要素で確保する。
-4. For Loopで各チャンネルを24バイトへ変換する。
+RAM用1要素は24バイト。
 
 | フィールド | オフセット | 型 |
 |-----------|-----------|----|
@@ -398,37 +336,31 @@ CHINFO_RAM170 = DWORD × 6 = 24 byte
 | `sign` | 16 | U32 |
 | `speed` | 20 | U32 |
 
-5. `Enable=True`をU32の`1`、Falseを`0`へ変換する。
-6. `Signed=True`をU32の`1`、Falseを`0`へ変換する。
-7. CLFNの`ChNum`には`N`を渡す。
-8. `pChInfo`にはU8配列をArray Data Pointerで渡す。
-9. API戻り値をエラー変換する。
+1. チャンネル数`N`を取得する。
+2. `1 <= N <= 2048`を確認する。
+3. U8配列を`N * 24`要素確保する。
+4. For Loopで各クラスタを24バイトへ変換する。
+5. BooleanはU32の0/1へ変換する。
+6. `ChNum=N`を渡す。
+7. `pChInfo`へArray Data Pointerで渡す。
+8. ReturnCodeを変換する。
 
-### 10B.8.4 LOGINFOの作成
+### LOGINFO
 
-`LOGINFO`は136バイトである。
-
-```text
-long × 2 + (long × 2) × 16 = 136 byte
-```
-
-1. U8配列を136要素でゼロ初期化する。
-2. 次を埋める。
+U8配列136要素をゼロ初期化する。
 
 | フィールド | オフセット |
 |-----------|-----------|
 | `logDevice` | 0 |
 | `limitHddSize` | 4 |
-| `mdl[0].logSize` | 8 |
-| `mdl[0].BuffSize` | 12 |
-| `mdl[i].logSize` | `8 + i × 8` |
-| `mdl[i].BuffSize` | `12 + i × 8` |
+| `mdl[i].logSize` | `8 + i * 8` |
+| `mdl[i].BuffSize` | `12 + i * 8` |
 
-3. `logDevice=0`、`limitHddSize=0`を設定する。
-4. 16スロットすべてに、最初は`LogSize=1`、`BufferSize=1`を設定する。
-5. CLFNの`pLogInfo`へArray Data Pointerで渡す。
-6. API戻り値をエラー変換する。
-7. 最後に `Error_To_TestStatus.vi` を1回呼ぶ。
+1. `logDevice=0`、`limitHddSize=0`を設定する。
+2. 16スロットすべてにLogSizeとBufferSizeを設定する。
+3. `pLogInfo`へArray Data Pointerで渡す。
+4. ReturnCodeを変換する。
+5. 最後に`Error_To_TestStatus.vi`を1回呼ぶ。
 
 ---
 
@@ -438,17 +370,16 @@ long × 2 + (long × 2) × 16 = 136 byte
 long RAMScopeGT150MeasStart(long UnitNo);
 ```
 
-### 作成手順
-
-1. `RAMScope_Connect.vi`をテンプレートとして「別名で保存」する。
-2. DeviceInitのCLFNを削除し、`RAMScopeGT150MeasStart`へ置換する。
-3. `UnitNo`：I32 / Value / 固定値`0`。
+1. `RAMScope_Connect.vi`を別名保存してテンプレートにする。
+2. CLFNを`RAMScopeGT150MeasStart`へ変更する。
+3. `UnitNo`：I32 / Value / `0`。
 4. 戻り値：I32。
-5. Function Nameを `RAMScopeGT150MeasStart`としてエラー変換する。
-6. 最後に `Error_To_TestStatus.vi` を呼ぶ。
-7. VI内部に待ち時間を入れない。
+5. Function Nameも同じ関数名へ変更する。
+6. ReturnCodeをエラー変換する。
+7. 最後に`Error_To_TestStatus.vi`を呼ぶ。
+8. VI内部に試験待ち時間を入れない。
 
-> `MeasStart`には`MdlNo`引数はない。入力は`UnitNo=0`のみである。
+`MeasStart`に`MdlNo`引数はない。
 
 ---
 
@@ -460,38 +391,38 @@ long RAMScopeGT150GetBufferData(
     long MdlNo,
     void *pData,
     long *pDataNum,
-    long *pLostDataNum);
+    long *pLostDataNum
+);
 ```
 
-### 10B.10.1 入出力
+### 入出力
 
-| 端子 | 型 | 説明 |
-|------|----|------|
-| `MdlNo_RAM` | I32 | RAMモジュール番号 |
-| `Channel Count` | I32 | 設定済みチャンネル数`N` |
-| `Max Packets` | I32 | 1回で受け取る最大パケット数 |
-| `error in` | error cluster | 前段エラー |
-| `Raw Bytes` | U8配列 | 取得した生データ |
-| `DataNum` | I32 | 実際の取得パケット数 |
-| `LostDataNum` | I32 | 取りこぼし数 |
-| 共通3出力 | 各共通型 | Status / TestError / error out |
+| 端子 | 型 |
+|------|----|
+| `MdlNo_RAM` | I32 |
+| `Channel Count` | I32 |
+| `Max Packets` | I32 |
+| `error in` | error cluster |
+| `Raw Bytes` | U8配列 |
+| `DataNum` | I32 |
+| `LostDataNum` | I32 |
+| 共通3出力 | 共通型 |
 
-### 10B.10.2 バッファ確保
-
-RAMパケット1個のサイズ：
+### バッファ確保
 
 ```text
-PacketSize = 4 × ChannelCount + 12
+PacketSize = 4 * ChannelCount + 12
+BufferBytes = PacketSize * MaxPackets
 ```
 
 1. `Channel Count > 0`を確認する。
 2. `Max Packets > 0`を確認する。
-3. I64で `PacketSize × Max Packets` を計算し、過大値やオーバーフローをチェックする。
-4. `Initialize Array`でU8の`0`を必要バイト数だけ確保する。
-5. `pDataNum`へは、呼び出し前に`Max Packets`を書き込む。
-6. `pLostDataNum`の初期値は`0`にする。
+3. I64でBufferBytesを計算し、オーバーフローと過大値を確認する。
+4. U8の0をBufferBytes要素確保する。
+5. `pDataNum`の入力側へ`Max Packets`を設定する。
+6. `pLostDataNum`の初期値を0にする。
 
-### 10B.10.3 CLFN設定
+### CLFN
 
 | 引数 | 設定 |
 |------|------|
@@ -502,58 +433,51 @@ PacketSize = 4 × ChannelCount + 12
 | `pLostDataNum` | I32 / Pointer to Value |
 | 戻り値 | I32 |
 
-1. API戻り値をエラー変換する。
-2. 正常時は、`DataNum × PacketSize`の長さへRaw Bytesを切り詰めて出力する。
-3. `LostDataNum > 0`はバッファ不足・ポーリング周期不足の兆候としてログへ残す。
-4. このVIでは解析しない。解析は `RAMScope_Parse_Buffer.vi`へ分離する。
+正常時は`DataNum * PacketSize`へRaw Bytesを切り詰める。`LostDataNum > 0`はバッファ不足またはポーリング不足として記録する。
+
+このVIではデータ解析を行わない。
 
 ---
 
 ## 10B.11 `RAMScope_Parse_Buffer.vi`
 
-このVIはDLLを呼ばない純粋なデータ変換VIである。
-実機なしでもダミーデータで単体試験できる。
+DLLを呼ばない純粋な変換VIとして作る。
 
-### 10B.11.1 入出力
+### 入出力
 
-| 端子 | 型 | 説明 |
-|------|----|------|
-| `Raw Bytes` | U8配列 | `RAMScope_Read.vi`の出力 |
-| `DataNum` | I32 | パケット数 |
-| `Channel Count` | I32 | チャンネル数`N` |
-| `Endian` | I32 | `0=Big / 1=Little` |
-| `error in` | error cluster | 前段エラー |
-| `Values` | I32 2次元配列 | `[packet][channel]` |
-| `Flags` | U32配列 | 各パケットのフラグ |
-| `Timestamp Raw` | U64配列 | 20ns単位の生値 |
-| `Timestamp Sec` | DBL配列 | 秒換算値 |
-| 共通3出力 | 各共通型 | Status / TestError / error out |
+| 端子 | 型 |
+|------|----|
+| `Raw Bytes` | U8配列 |
+| `DataNum` | I32 |
+| `Channel Count` | I32 |
+| `Endian` | I32。0=Big / 1=Little |
+| `error in` | error cluster |
+| `Values` | I32 2次元配列 |
+| `Flags` | U32配列 |
+| `Timestamp Raw` | U64配列 |
+| `Timestamp Sec` | DBL配列 |
+| 共通3出力 | 共通型 |
 
-### 10B.11.2 解析手順
+### 解析
 
-1. `PacketSize = 4 × N + 12`を計算する。
-2. `ExpectedBytes = PacketSize × DataNum`を計算する。
-3. `Array Size(Raw Bytes) >= ExpectedBytes`を確認する。
-4. 不足していれば自前エラーを生成する。
-5. For Loopを`DataNum`回実行する。
-6. 各パケットの開始位置を `packet index × PacketSize` とする。
-7. チャンネル値を4バイトずつ、N個読み出してI32へ変換する。
-8. Flagは `開始位置 + 4 × N` から4バイト読み出し、U32へ変換する。
-9. Timestampは `開始位置 + 4 × N + 4` から8バイト読み出し、U64へ変換する。
-10. `Timestamp Sec = Timestamp Raw × 20e-9`で秒へ変換する。
-11. `Endian=0`の場合は、各数値をType Castする前にバイト順を反転する。
-12. 最後に `Error_To_TestStatus.vi` を呼ぶ。
+1. `PacketSize = 4 * N + 12`を計算する。
+2. `ExpectedBytes = PacketSize * DataNum`を計算する。
+3. Raw Bytesが不足していれば自前エラーにする。
+4. For LoopをDataNum回実行する。
+5. 各パケットからI32のチャンネル値をN個取得する。
+6. `4 * N`位置からFlagをU32で取得する。
+7. `4 * N + 4`位置からTimestampをU64で取得する。
+8. `Timestamp Sec = Timestamp Raw * 20e-9`で変換する。
+9. Big Endianの場合はType Cast前にバイト順を反転する。
+10. 最後に`Error_To_TestStatus.vi`を呼ぶ。
 
-### 10B.11.3 単体テスト
+### 単体テスト
 
-最低限、次のダミーパケットを用意する。
-
-- `Channel Count=1`、`DataNum=1`
-- Channel値が既知のI32
-- Flagが既知のU32
-- Timestampが既知のU64
-- 入力配列不足時にエラーになること
-- Big/Little切替時に期待値が一致すること
+- N=1、DataNum=1の既知パケット
+- 複数チャンネル、複数パケット
+- 入力不足
+- Big / Little切替
+- 既知Timestamp
 
 ---
 
@@ -563,16 +487,14 @@ PacketSize = 4 × ChannelCount + 12
 long RAMScopeGT150MeasStop(long UnitNo);
 ```
 
-### 作成手順
-
-1. `RAMScope_Log_Start.vi`を「別名で保存」する。
-2. 関数名を `RAMScopeGT150MeasStop`へ変更する。
+1. `RAMScope_Log_Start.vi`を別名保存する。
+2. Function Nameを`RAMScopeGT150MeasStop`へ変更する。
 3. `UnitNo=0`を渡す。
-4. Function Nameも `RAMScopeGT150MeasStop`へ変更する。
-5. API戻り値をエラー変換する。
-6. 最後に `Error_To_TestStatus.vi` を呼ぶ。
+4. エラー変換のFunction Nameも更新する。
+5. ReturnCodeを変換する。
+6. 最後に`Error_To_TestStatus.vi`を呼ぶ。
 
-> `MeasStop`にも`MdlNo`引数はない。
+`MeasStop`にも`MdlNo`引数はない。
 
 ---
 
@@ -582,23 +504,20 @@ long RAMScopeGT150MeasStop(long UnitNo);
 long RAMScopeGT150ReleaseBufferData(long UnitNo);
 ```
 
-### 作成手順
-
-1. `RAMScope_Log_Stop.vi`を「別名で保存」する。
-2. 関数名を `RAMScopeGT150ReleaseBufferData`へ変更する。
+1. `RAMScope_Log_Stop.vi`を別名保存する。
+2. Function Nameを`RAMScopeGT150ReleaseBufferData`へ変更する。
 3. `UnitNo=0`を渡す。
-4. Function Nameを同じ関数名へ変更する。
-5. API戻り値をエラー変換する。
-6. 最後に `Error_To_TestStatus.vi` を呼ぶ。
+4. ReturnCodeを変換する。
+5. 最後に`Error_To_TestStatus.vi`を呼ぶ。
 
-ベンダー簡易サンプルでは省略されているため、次を実機で比較して要否を確定する。
+ベンダー簡易サンプルでは省略されている。VIは作成し、次を実機比較する。
 
 ```text
 A: MeasStop → ReleaseBufferData → DeviceExit
 B: MeasStop → DeviceExit
 ```
 
-確定するまではVIを作成し、TestStand側で有効・無効を切り替えられるようにする。
+要否確定まではTestStandで有効・無効を切り替えられるようにする。
 
 ---
 
@@ -608,43 +527,31 @@ B: MeasStop → DeviceExit
 long RAMScopeGT150DeviceExit(void);
 ```
 
-`RAMScope_Close.vi` はCleanupで使用するため、前段にエラーがあっても必ず呼び出す。
-通常VIの「error inがTrueならスキップ」パターンを使わない。
+Cleanup専用のため、前段エラーがあっても実行する。
 
-### 10B.14.1 入出力
+### 作成手順
 
-| 端子 | 型 | 説明 |
-|------|----|------|
-| `error in` | error cluster | 試験中に発生した元エラー |
-| 共通3出力 | 各共通型 | Status / TestError / error out |
-| `DeviceExit ReturnCode` | I32 | PoC用 |
-
-### 10B.14.2 作成手順
-
-1. CLFNの関数名を `RAMScopeGT150DeviceExit` にする。
+1. Function Nameを`RAMScopeGT150DeviceExit`にする。
 2. 引数は追加しない。
 3. 戻り値をI32にする。
-4. CLFNの`error in`には、元の`error in`ではなく「エラーなし」のクラスタ定数を接続する。
-   これにより、前段エラーがあってもDeviceExitを実行する。
-5. CLFN error outとAPI戻り値を `RAMScope_Code_To_Error.vi`へ接続する。
-6. `Merge Errors`を使用し、入力順を次にする。
+4. CLFNの`error in`へエラーなしクラスタを接続する。
+5. CLFN error outとReturnCodeを`RAMScope_Code_To_Error.vi`へ接続する。
+6. `Merge Errors`へ次の順で接続する。
 
 ```text
-第1入力：元の error in
-第2入力：DeviceExitで発生したエラー
+第1入力：元のerror in
+第2入力：DeviceExitで発生したerror
 ```
 
-7. 元エラーが存在する場合は元エラーを優先して保持する。
-8. 元エラーがなく、DeviceExitだけ失敗した場合はDeviceExitエラーを出力する。
-9. Merge後のerror clusterを `Error_To_TestStatus.vi`へ渡す。
+7. Merge後のerror clusterを`Error_To_TestStatus.vi`へ渡す。
 
-> Cleanup処理では「元エラーを消さない」「終了処理も可能な限り実行する」の両方を満たす。
+元エラーを消さず、終了処理も可能な範囲で実行する。
 
 ---
 
-## 10B.15 `RAMScope_Flow_Test.vi`
+# STEP 5：LabVIEW単体Flow Test
 
-TestStandへ入れる前に、LabVIEW単体で次を直列実行する。
+## 10B.15 `RAMScope_Flow_Test.vi`
 
 ```text
 RAMScope_Connect.vi
@@ -652,80 +559,77 @@ RAMScope_Connect.vi
   → RAMScope_Config.vi
   → RAMScope_Set_Cond.vi
   → RAMScope_Log_Start.vi
-  → Wait（フロー試験VIのみ）
-  → RAMScope_Read.vi（必要回数ループ）
-  → RAMScope_Parse_Buffer.vi
+  → Wait（Flow Test内だけ）
+  → Loop:
+       RAMScope_Read.vi
+       RAMScope_Parse_Buffer.vi
   → RAMScope_Log_Stop.vi
-  → RAMScope_Release.vi（要否検証中）
+  → RAMScope_Release.vi（要否検証）
   → RAMScope_Close.vi
 ```
 
-### 実機未接続時
+### 実機未接続
 
-- `RAMScope_Connect.vi`でAPIエラーになること
-- 後続の通常VIはCLFNを実行せず、同じエラーを伝播すること
-- `RAMScope_Close.vi`だけはCleanupとして実行されること
-- LabVIEWがクラッシュしないこと
+- ConnectでAPIエラーになる。
+- 後続の通常VIはCLFNを呼ばずエラーを伝播する。
+- CloseだけはCleanupとして実行される。
+- LabVIEWがクラッシュしない。
 
-### 実機接続時
+### 実機接続
 
 - `UnitNum >= 1`
 - `kind = 2`
-- `MdlNo_RAM`が実機構成と一致
-- `MdlNo_CAN`が実機構成と一致
+- `MdlNo_RAM` / `MdlNo_CAN`が実構成と一致
 - `SlotErr[MdlNo_RAM] = 0`
-- `LostDataNum = 0`を維持できること
-- 測定値・Timestampが純正RAMScope表示と一致すること
+- 測定開始・読み出し・停止が通る
+- `LostDataNum = 0`を維持できる
+- 値とTimestampが純正RAMScope表示または既知信号と一致する
+- Close後に再接続できる
 
 ---
 
-## 10B.16 TestStandへの配置
+# STEP 6：TestStandへ移行
 
-| TestStand区分 | VI | 備考 |
-|--------------|----|------|
-| Setup | `RAMScope_Connect.vi` | 接続・機種確認 |
-| Setup | `RAMScope_Init.vi` | 初期化・モジュール番号取得 |
-| Setup | `RAMScope_Config.vi` | PGT設定適用 |
-| Setup | `RAMScope_Set_Cond.vi` | 試験条件を入力 |
-| Main | `RAMScope_Log_Start.vi` | 計測開始 |
-| Main | `RAMScope_Read.vi` | ポーリング |
-| Main | `RAMScope_Parse_Buffer.vi` | 取得値変換・判定 |
-| Main | `RAMScope_Log_Stop.vi` | 計測停止 |
-| Main/Cleanup前 | `RAMScope_Release.vi` | 要否確定後に配置 |
-| Cleanup | `RAMScope_Close.vi` | 前段エラーに関係なく実行 |
+## 10B.16 配置
 
-TestStand側で管理するもの：
+| TestStand | VI |
+|-----------|----|
+| Setup | Connect / Init / Config / Set_Cond |
+| Main | Log_Start / Read / Parse_Buffer / Log_Stop / Release候補 |
+| Cleanup | 必要ならLog_Stop / Release候補 / Close |
 
-- Wait時間
-- Readのポーリング周期
-- タイムアウト
-- リトライ回数
-- 測定周期・チャンネル一覧
-- Setup失敗時のCleanup遷移
+具体的な変数、ポーリング、状態フラグ、レポートは [11](./11_TestStandシーケンス構築手順.md) に従う。
 
 ---
 
-## 10B.17 作成順序チェックリスト
+## 10B.17 完了チェック
 
-### STEP 3
+### 共通
 
-- [ ] `RAMScope_Code_To_Error.vi`を作成
-- [ ] ReturnCode=`0`の正常テスト
-- [ ] ReturnCode=`0x30100001`の異常テスト
-- [ ] 前段エラー優先テスト
-- [ ] `Error_To_TestStatus.vi`へ接続
+- [ ] `RAMScope_Code_To_Error.vi`の正常・異常・前段エラー試験が通る
+- [ ] 全VIに共通3出力がある
+- [ ] 通常VIは前段エラーでCLFNをスキップする
+- [ ] Closeは前段エラーでも実行する
 
-### STEP 4
+### 各VI
 
-- [ ] 既存DeviceInit VIを `RAMScope_Connect.vi`として保存
-- [ ] `RAMScope_Connect.vi`へエラー変換を追加
-- [ ] `RAMScope_Init.vi`を作成
-- [ ] `RAMScope_Config.vi`を作成
-- [ ] `RAMScope_Set_Cond.vi`を作成
-- [ ] `RAMScope_Log_Start.vi`を作成
-- [ ] `RAMScope_Read.vi`を作成
-- [ ] `RAMScope_Parse_Buffer.vi`を作成・単体試験
-- [ ] `RAMScope_Log_Stop.vi`を作成
-- [ ] `RAMScope_Release.vi`を作成
-- [ ] `RAMScope_Close.vi`をCleanup専用構成で作成
-- [ ] `RAMScope_Flow_Test.vi`で通し確認
+- [ ] Connect
+- [ ] Init
+- [ ] Config
+- [ ] Set_Cond
+- [ ] Log_Start
+- [ ] Read
+- [ ] Parse_Buffer
+- [ ] Log_Stop
+- [ ] Release
+- [ ] Close
+- [ ] Flow_Test
+
+### 実機
+
+- [ ] 連続試験
+- [ ] 長時間ポーリング
+- [ ] USB切断
+- [ ] 異常中断からCleanup
+- [ ] 再接続
+- [ ] Releaseあり/なし比較
