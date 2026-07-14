@@ -1,110 +1,50 @@
-# 10A. RAMScope 実装手順：DLL準備・CLFN疎通確認
+# 10A. RAMScope 実装手順：環境準備・DLL疎通・Connect PoC
 
-本章は、[10_RAMScope実装方針.md](./10_RAMScope実装方針.md) に整理した API 関数仕様を、
-実際の LabVIEW VI へ実装する前段の**作業手順書**としてまとめたものである。
+> **本章の役割**：RAMScope VIを量産する前に、64bit DLLを正しくロードし、`RAMScopeGT150DeviceInit`をLabVIEWから呼べる状態まで確認する。
+>
+> 本章完了後は [10B](./10B_RAMScope_VI作成手順_STEP3_STEP4詳細.md) へ進む。
+> API関数・構造体の確認は [10](./10_RAMScope実装方針.md) を参照する。
 
-特に、2026-07-14 に確認した次の問題を再発防止事項として反映する。
-
-- 64bit版 `RAMScopeVP_API_x64.dll` 自体は存在し、対象関数もエクスポートされている
-- それでも LabVIEW の CLFN から関数を認識できない
-- PowerShell の DLL ロード確認でエラー `193 (0xC1)` が発生する
-- 64bit API フォルダ内に 32bit版の Visual C++ 2013 ランタイム DLL が混在していた
-- 該当する 32bit ランタイムを隔離し、x64 ランタイムを利用可能にした後、DLL と関数の認識に成功した
+**最終整理日：2026-07-14**
 
 ---
 
-## 10A.1 適用範囲
+## 10A.1 適用構成
 
-対象構成は次のとおり。
-
-| 項目 | 対象 |
-|------|------|
+| 項目 | 使用するもの |
+|------|--------------|
 | RAMScope | GT170 |
+| 接続 | USB3.0 |
+| LabVIEW | 64bit版 |
+| PowerShell | 64bitプロセス |
 | API | RAMScopeVP API 64bit版 |
 | API DLL | `RAMScopeVP_API_x64.dll` |
-| LabVIEW | 64bit版 |
-| 呼び出し方式 | Call Library Function Node（CLFN） |
-| TestStand | Setup / Main / Cleanup から 1イベント1VI で呼び出す |
+| CLFN | Call Library Function Node |
+| C/C++ランタイム | Visual C++ 2013 Redistributable x64 |
 
-本章は、最初の疎通確認関数として次を使用する。
+この章では最小疎通関数として次を使用する。
 
 ```c
 long RAMScopeGT150DeviceInit(long *pUnitNum, long *kind);
 ```
 
-GT170 を使用する場合でも、接続・初期化・終了などのライフサイクル管理には
-`RAMScopeGT150*` の共通関数を使用する。
+GT170でも接続・初期化・終了の共通処理には`RAMScopeGT150*`関数を使用する。
 
 ---
 
-## 10A.2 本システムの実装ルール
+# STEP 0：必要ソフトとファイルを準備する
 
-RAMScope 系 VI も、[05_VI設計方針と共通仕様.md](./05_VI設計方針と共通仕様.md) と
-[06_VIの作り方_手順.md](./06_VIの作り方_手順.md) の共通ルールに従う。
+## 10A.2 必要ソフトウェア
 
-### 10A.2.1 1イベント1VI
+- LabVIEW 64bit
+- RAMScopeVP / RAMScopeVP API 64bit版
+- RAMScope USBドライバ
+- PGTツール
+- Visual C++ 2013 Redistributable x64
 
-| イベント | VI名 |
-|----------|------|
-| デバイス接続 | `RAMScope_Connect.vi` |
-| API・ハードウェア初期化 | `RAMScope_Init.vi` |
-| プローブ構成適用 | `RAMScope_Config.vi` |
-| 測定条件設定 | `RAMScope_Set_Cond.vi` |
-| 計測開始 | `RAMScope_Log_Start.vi` |
-| データ取得 | `RAMScope_Read.vi` |
-| 計測停止 | `RAMScope_Log_Stop.vi` |
-| バッファ解放 | `RAMScope_Release.vi` |
-| デバイス終了 | `RAMScope_Close.vi` |
+Visual C++ 2015-2022 Redistributable x64は、別コンポーネントが要求する場合に導入する。ただし、Visual C++ 2013の代替ではない。
 
-### 10A.2.2 エラー経路を2系統に分ける
-
-CLFN の標準 `error in / error out` と、RAMScope API の戻り値は別物である。
-
-```text
-CLFN error out
-  └─ DLL未検出、関数未検出、呼び出し失敗など LabVIEW 側のエラー
-
-RAMScope API 戻り値
-  └─ デバイス未接続、設定不正、状態遷移不正など API 側の結果コード
-```
-
-したがって、`error out` が「エラーなし」でも、RAMScope API の戻り値が異常コードになる場合がある。
-
-RAMScope API の戻り値は次の順で変換する。
-
-```text
-CLFN戻り値(I32)
-  → RAMScope_Code_To_Error.vi
-  → Error_To_TestStatus.vi
-  → Status.ctl / TestError.ctl / error out
-```
-
-### 10A.2.3 TestStand 側の配置
-
-```text
-Setup
-  RAMScope_Connect.vi
-  RAMScope_Init.vi
-  RAMScope_Config.vi
-  RAMScope_Set_Cond.vi
-
-Main
-  RAMScope_Log_Start.vi
-  RAMScope_Read.vi
-  RAMScope_Log_Stop.vi
-  RAMScope_Release.vi（要否は実機検証で確定）
-
-Cleanup
-  RAMScope_Close.vi
-```
-
-待ち時間、繰り返し条件、タイムアウト、異常時の分岐は TestStand 側で管理する。
-
----
-
-## 10A.3 必要ファイルと配置
-
-### 10A.3.1 使用したパス
+## 10A.3 確認済みパス
 
 ```text
 API DLL:
@@ -114,9 +54,11 @@ C:\DTSinsight\RAMScopeVP\app\RAMScopeVP_API(64bit)\RAMScopeVP_API_x64.dll
 C:\DTSinsight\RAMScopeVP_API\header\RAMScopeVP.h
 ```
 
-### 10A.3.2 ベンダーマニュアルに従う相対配置
+環境差がある場合は実際のインストール先へ読み替える。
 
-`RAMScopeVP_API_x64.dll` を起点として、関連ファイルの相対位置を維持する。
+## 10A.4 ベンダー指定の相対配置
+
+`RAMScopeVP_API_x64.dll`を起点として、関連ファイルの相対位置を維持する。
 
 ```text
 RAMScopeVP_API(64bit)\
@@ -133,33 +75,27 @@ RAMScopeVP_API(64bit)\
      └─ PGT10xX0x_ENG.dll
 ```
 
-注意点：
+### 配置ルール
 
-- `RAMScopeVP_API_x64.dll` は任意のフォルダへ配置可能
-- `UtilLCServer.exe`、`PGTMgrServer.exe`、`GT170_x64.dll`、`GT170USB_x64.dll` は API DLL と同じフォルダ
-- `utillc.dll` は `UtilLCServer.exe` と同じフォルダ
-- `PGTMgrVP.dll` / `PGTMgrVP_ENG.dll` は `PGTMgrServer.exe` と同じフォルダ
-- `PGT10xX0x*.dll` は API DLL フォルダ直下の `pgtlib` フォルダに格納
-- 「64bit フォルダにあるファイルを一律で削除・移動する」運用は禁止
+- `UtilLCServer.exe`、`PGTMgrServer.exe`、`GT170_x64.dll`、`GT170USB_x64.dll`はAPI DLLと同じフォルダへ置く。
+- `utillc.dll`は`UtilLCServer.exe`と同じフォルダへ置く。
+- `PGTMgrVP.dll`、`PGTMgrVP_ENG.dll`は`PGTMgrServer.exe`と同じフォルダへ置く。
+- PGTライブラリはAPI DLLフォルダ直下の`pgtlib`へ置く。
+- 「64bitフォルダにあるx86ファイルをすべて削除する」という対応は禁止する。
 
 ---
 
-## 10A.4 Visual C++ ランタイムの考え方
+## 10A.5 Visual C++ 2013 Redistributable x64の役割
 
-### 10A.4.1 役割
-
-Visual C++ Redistributable は RAMScope の USB ドライバではない。
-RAMScope の DLL が内部で使用する Microsoft C/C++ 共通ライブラリを Windows へ提供する。
+Visual C++ RedistributableはRAMScopeのUSBドライバではない。RAMScopeのDLLが内部で使用するMicrosoft C/C++共通ライブラリをWindowsへ提供する。
 
 ```text
-64bit LabVIEW
+LabVIEW 64bit
   → RAMScopeVP_API_x64.dll
-    → Visual C++ ランタイム
+    → Visual C++ 2013 x64ランタイム
 ```
 
-### 10A.4.2 今回確認したランタイム世代
-
-問題が発生したフォルダには、次の `120` 系 DLL が存在していた。
+今回問題になったファイル：
 
 ```text
 mfc120jpn.dll
@@ -168,49 +104,33 @@ msvcp120.dll
 msvcr120.dll
 ```
 
-`120` 系は Visual C++ 2013（v12）世代である。
-Visual C++ 2015-2022（v14）をインストールしても、Visual C++ 2013 の代替にはならない。
-
-本構成では、次を前提条件とする。
-
-> **Visual C++ 2013 Redistributable（x64）が利用可能であること。**
-
-既にインストール済みの場合は再インストール不要。
-未導入、破損、または x86 版しかない場合は x64 版を導入する。
-
-Visual C++ 2015-2022 Redistributable（x64）は、他コンポーネントが要求する場合に導入するが、
-今回の `120` 系依存関係に対する直接の代替ではない。
+`120`はVisual C++ 2013世代を表す。正しいx64版がWindowsから利用可能であることを確認する。
 
 ---
 
-## 10A.5 既知事象：CLFN が関数を認識しない
+## 10A.6 既知事象：CLFNが関数を認識しない
 
-### 10A.5.1 現象
+### 現象
 
-- CLFN で `RAMScopeVP_API_x64.dll` を指定しても `RAMScopeGT150DeviceInit` を認識できない
-- `GetProcAddress` で関数アドレスを取得できない
-- DLL ロード時に次のエラーが発生する
+- CLFNでDLLを指定しても`RAMScopeGT150DeviceInit`を選択・認識できない。
+- `GetProcAddress`で関数アドレスを取得できない。
+- DLLロード時にエラー193が発生する。
 
 ```text
 Error 193 (0xC1)
 %1 は有効な Win32 アプリケーションではありません。
 ```
 
-### 10A.5.2 確認結果
-
-静的な PE 解析では次を確認した。
+### 確認結果
 
 ```text
-DLL                : RAMScopeVP_API_x64.dll
-Architecture       : x64
-Named exports      : 182
-Function           : RAMScopeGT150DeviceInit
-Ordinal            : 14
+DLL          : RAMScopeVP_API_x64.dll
+Architecture : x64
+Function     : RAMScopeGT150DeviceInit
+Ordinal      : 14
 ```
 
-したがって、DLL 本体とエクスポート関数は存在していた。
-
-一方、同じフォルダには次の x86 DLL が混在していた。
+DLL本体と関数は存在していた。一方、API DLLと同じフォルダにx86版の次のランタイムが混在していた。
 
 ```text
 mfc120jpn.dll
@@ -219,12 +139,12 @@ msvcp120.dll
 msvcr120.dll
 ```
 
-DLL ローダーは対象 DLL と同じフォルダにある同名依存 DLL を優先的に解決する場合がある。
-そのため、x64 プロセスがローカルの x86 ランタイムを読み込もうとして、エラー193になった可能性が高い。
+x64プロセスがローカルのx86 DLLを依存DLLとして読み込もうとし、エラー193になった可能性が高い。
 
-### 10A.5.3 対策
+### 対策
 
-次の4ファイルだけを、復元可能なバックアップフォルダへ隔離する。
+1. Visual C++ 2013 Redistributable x64を利用可能にする。
+2. 次の4ファイルがx86であり、64bit APIフォルダへ混在している場合だけ、復元可能なフォルダへ隔離する。
 
 ```text
 mfc120jpn.dll
@@ -239,7 +159,7 @@ msvcr120.dll
 C:\DTSinsight\RAMScopeVP\app\RAMScopeVP_API(64bit)\_x86_runtime_backup
 ```
 
-PowerShell 例：
+PowerShell例：
 
 ```powershell
 $root = "C:\DTSinsight\RAMScopeVP\app\RAMScopeVP_API(64bit)"
@@ -260,9 +180,9 @@ New-Item -ItemType Directory -Path $backup -Force | Out-Null
 }
 ```
 
-### 10A.5.4 移動してはいけないファイル
+### 移動してはいけないファイル
 
-次のファイルは、ベンダー指定の相対配置を維持する。
+次はベンダー指定の配置を維持する。
 
 ```text
 PGTMgrVP.dll
@@ -271,16 +191,13 @@ utillc.dll
 pgtlib\*.dll
 ```
 
-これらはサーバー EXE や PGT 構成と連携する可能性があるため、
-「x86 と判定された DLL を一律で隔離する」対策は行わない。
+これらは32bitヘルパープロセスやPGT構成で使用される可能性がある。x86と表示されたことだけを理由に隔離しない。
 
 ---
 
-## 10A.6 LabVIEW 実装前の DLL 疎通確認
+# STEP 1：PowerShellでDLLと関数を確認する
 
-CLFN を作成する前に、64bit PowerShell から DLL と関数を確認する。
-
-本リポジトリのスクリプトを使用する。
+## 10A.7 疎通スクリプト
 
 ```powershell
 powershell.exe -ExecutionPolicy Bypass `
@@ -290,110 +207,104 @@ powershell.exe -ExecutionPolicy Bypass `
   -ExportOrdinal 14
 ```
 
-### 10A.6.1 合格条件
+### 合格条件
 
 ```text
 PowerShell 64-bit : True
-Loaded module path: 指定した RAMScopeVP_API_x64.dll
-Handle            : 0x0 以外
+Loaded module path: 指定したRAMScopeVP_API_x64.dll
+Handle            : 0x0以外
 Name Found        : True
 Ordinal Found     : True
-名前と序数の Address が一致
+Name Address      : Ordinal Address
 ```
 
-### 10A.6.2 実測結果
+### 重要な判定
+
+- `Handle=0x0`は必ずロード失敗。
+- 画面に「OK」と表示されてもハンドルが0なら成功扱いしない。
+- 無効なハンドルで`GetProcAddress`を呼ぶとエラー127になり、関数が存在しないように見える。
+
+### 実測結果
+
+対策後、次を確認済み。
 
 ```text
 PowerShell 64-bit : True
-Loaded module path: C:\DTSinsight\RAMScopeVP\app\RAMScopeVP_API(64bit)\RAMScopeVP_API_x64.dll
 Handle            : 非ゼロ
 Name Found        : True
 Ordinal Found     : True
+Address           : 名前と序数で一致
 ```
-
-DLL と `RAMScopeGT150DeviceInit` の認識に成功した。
-
-### 10A.6.3 注意
-
-`Handle: 0x0` は必ずロード失敗である。
-表示上「DLLロード成功」と出ていても、ハンドルが `0x0` の場合は成功扱いしない。
-無効なハンドルへ `GetProcAddress` を実行すると、二次的にエラー127が発生し、
-「関数が存在しない」と誤判定する可能性がある。
 
 ---
 
-## 10A.7 `RAMScope_Connect.vi` の作成
+# STEP 2：最小`RAMScope_Connect.vi`を作る
 
-### 10A.7.1 ヘッダ定義
-
-`RAMScopeVP.h` の定義：
+## 10A.8 ヘッダ定義
 
 ```c
 typedef long (*RAMScopeGT150DeviceInitPtr)(long *pUnitNum, long *kind);
 ```
 
-実質的な関数プロトタイプ：
+実質的な関数：
 
 ```c
 long RAMScopeGT150DeviceInit(long *pUnitNum, long *kind);
 ```
 
-Windows の `long` は 32bit であるため、LabVIEW では I32 を使用する。
-64bit DLL だからといって I64 にしない。
+Windowsの`long`は32bitである。64bit DLLでもI64にはしない。
 
-### 10A.7.2 CLFN 設定
+## 10A.9 CLFN設定
 
 | 項目 | 設定 |
 |------|------|
-| Library name or path | `RAMScopeVP_API_x64.dll` のパス |
+| Library name or path | `RAMScopeVP_API_x64.dll`のフルパス |
 | Function name | `RAMScopeGT150DeviceInit` |
-| Calling convention | C |
-| Thread | 最初は UI thread |
-| Error checking | PoC 中は Maximum |
+| Calling Convention | C |
+| Thread | Run in UI thread |
+| Error checking | Maximum |
 | 戻り値 | Numeric / Signed 32-bit Integer / Value |
 | `pUnitNum` | Numeric / Signed 32-bit Integer / Pointer to Value |
 | `kind` | Numeric / Signed 32-bit Integer / Pointer to Value |
 
-CLFN の表示プロトタイプが次になればよい。
+表示プロトタイプ：
 
 ```c
-int32_t RAMScopeGT150DeviceInit(int32_t *pUnitNum, int32_t *kind);
+int32_t RAMScopeGT150DeviceInit(
+    int32_t *pUnitNum,
+    int32_t *kind
+);
 ```
 
-### 10A.7.3 ブロックダイアグラム
+## 10A.10 最小配線
 
 ```text
-error in
-  ───────────────────────────────┐
-                                 ▼
-I32 0 → pUnitNum ────────────── CLFN ──→ pUnitNum indicator
-I32 0 → kind     ────────────────┤    └→ kind indicator
-                                 ├─────→ ReturnCode indicator
-error out ◀──────────────────────┘
+error in ─────────────────────────────────────┐
+                                               ▼
+I32 0 → pUnitNum ─────────────────────────── CLFN ─→ UnitNum
+I32 0 → kind ──────────────────────────────────┤  └→ kind
+                                               └────→ API ReturnCode
+error out ◀─────────────────────────────────────────
 ```
 
-- `pUnitNum` と `kind` の入力には I32 の `0` を接続する
-- 右側端子から API が書き込んだ値を取得する
-- 標準 `error in / error out` を必ず配線する
-- API 戻り値を `RAMScope_Code_To_Error.vi` へ渡す
+- `pUnitNum`と`kind`の入力側へI32の0を接続する。
+- 右側端子からDLLが書き込んだ値を取得する。
+- 標準`error in / error out`を配線する。
+- この段階ではReturnCodeを表示し、関数呼び出しが成立することを優先する。
 
-### 10A.7.4 戻り値と error out の扱い
+### VI名
 
-次の状態は矛盾しない。
+最初に作成したDeviceInitの最小VIは、次の名称で保存する。
 
 ```text
-CLFN error out : エラーなし
-API ReturnCode : 異常コード
+RAMScope_Connect.vi
 ```
 
-これは「LabVIEW から DLL 関数を呼び出すことには成功したが、RAMScope API 内部では処理結果が異常」
-という意味である。
+`RAMScope_Init.vi`は別VIで、`AllInit`と`GetSysInfo`を担当する。
 
----
+## 10A.11 実機未接続PoC
 
-## 10A.8 実機未接続での PoC 結果
-
-RAMScope 実機を接続していない状態で `RAMScopeGT150DeviceInit` を呼び出し、次を確認した。
+実機を接続していない状態で次を観測した。
 
 ```text
 DeviceInit completed
@@ -403,129 +314,42 @@ Unit count  : 0
 Device kind : 0
 ```
 
-この結果から確定できること：
+ここから確定できること：
 
-- DLL ロード成功
-- エクスポート関数解決成功
+- DLLロード成功
+- 関数解決成功
 - 引数の型とポインタ渡しでクラッシュしない
 - 関数の実呼び出し成功
-- 接続デバイス数は 0
+- 接続デバイス数は0
 
-`0x30100001` の正式な意味は、ベンダーのエラーコード表で確認する。
-本章では「実機未接続時に観測したコード」として記録し、
-コード値だけから意味を断定しない。
+`0x30100001`の正式定義は未確認である。実機未接続時の観測コードとして記録し、意味を断定しない。
 
 ---
 
-## 10A.9 実装の段階
+## 10A.12 トラブルシュート
 
-### STEP 0：環境準備
-
-- [ ] 64bit LabVIEW を使用
-- [ ] 64bit RAMScope API DLL を使用
-- [ ] ベンダー指定の相対配置を維持
-- [ ] Visual C++ 2013 Redistributable（x64）が利用可能
-- [ ] 64bit API フォルダ内に x86 版 `mfc120*` / `msvc*120` を混在させない
-
-### STEP 1：DLL 疎通確認
-
-- [ ] `Test-RAMScopeDll.ps1` を実行
-- [ ] DLL Handle が非ゼロ
-- [ ] 名前検索 `Found=True`
-- [ ] 序数14検索 `Found=True`
-- [ ] 名前と序数のアドレスが一致
-
-### STEP 2：最小 `RAMScope_Connect.vi`
-
-- [ ] CLFN を1個だけ配置
-- [ ] `error in / error out` を配線
-- [ ] `pUnitNum` / `kind` を I32 Pointer to Value に設定
-- [ ] API 戻り値を I32 で取得
-- [ ] 実機なしでもクラッシュせず戻ることを確認
-
-### STEP 3：エラー変換を共通化
-
-- [ ] `RAMScope_Code_To_Error.vi` を作成
-- [ ] `Error_To_TestStatus.vi` へ接続
-- [ ] `Status.ctl` / `TestError.ctl` / 標準 error cluster を出力
-
-### STEP 4：後続 VI を1イベント1VIで作成
-
-- [ ] `RAMScope_Init.vi`
-- [ ] `RAMScope_Config.vi`
-- [ ] `RAMScope_Set_Cond.vi`
-- [ ] `RAMScope_Log_Start.vi`
-- [ ] `RAMScope_Read.vi`
-- [ ] `RAMScope_Parse_Buffer.vi`
-- [ ] `RAMScope_Log_Stop.vi`
-- [ ] `RAMScope_Release.vi`
-- [ ] `RAMScope_Close.vi`
-
-各関数のプロトタイプ、構造体、呼び出し順序は
-[10_RAMScope実装方針.md](./10_RAMScope実装方針.md) を正とする。
-
-### STEP 5：TestStand なしのフローテスト
-
-```text
-Connect
-  → Init
-  → Config
-  → Set_Cond
-  → Log_Start
-  → Read
-  → Log_Stop
-  → Release（要否確認）
-  → Close
-```
-
-### STEP 6：TestStand へ組み込み
-
-- Setup / Main / Cleanup へ VI を配置
-- API 戻り値を TestStand の判定へ反映
-- Cleanup で `RAMScope_Close.vi` を必ず実行
-- 待ち時間、リトライ、タイムアウトを TestStand 側で明示管理
+| 症状 | 確認 | 対応 |
+|------|------|------|
+| エラー193 | x64/x86不一致、ローカルx86依存DLL | PowerShell/LabVIEW/DLLのbit数確認。対象4ファイルだけ隔離 |
+| エラー126 | DLL本体または依存DLL不足 | ベンダー相対配置、VC++2013 x64、GT170 DLLを確認 |
+| エラー127 | 関数名不一致、または無効ハンドル | 先にHandle非ゼロを確認。関数名を完全一致 |
+| Handle `0x0` | DLLロード失敗 | Load errorを確認。GetProcAddress結果を評価しない |
+| CLFN errorなし、ReturnCode異常 | API内部結果エラー | ReturnCodeを別経路で評価する |
+| LabVIEWクラッシュ | 引数型、配列サイズ、ポインタ、関数設定 | ヘッダとCLFNを再照合。UI thread / Maximumで再試験 |
+| UnitNum `0` | 機器未接続、電源、USBドライバ、排他使用 | 実機・デバイスマネージャー・純正アプリ終了を確認 |
 
 ---
 
-## 10A.10 トラブルシュート表
+## 10A.13 本章の完了条件
 
-| 症状 / コード | 主な確認事項 | 対応 |
-|----------------|--------------|------|
-| `193 (0xC1)` | x64/x86 不一致、ローカルに同名 x86 依存 DLL | PowerShell と LabVIEW のbit数確認。x86版 `mfc120*` / `msvc*120` を隔離 |
-| `126` | DLL本体または依存 DLL 不足 | ベンダー指定相対配置、VC++ 2013 x64、GT170 DLL、サーバー EXE を確認 |
-| `127` | 関数名不一致、または無効ハンドルで検索 | 先に DLL Handle が非ゼロか確認。エクスポート名を完全一致で指定 |
-| Handle `0x0` | DLL ロード失敗 | 成功表示を信用せず Load error を確認 |
-| CLFN `error out` は正常、ReturnCode は異常 | API 内部の処理結果エラー | ReturnCode を別経路で判定。実機接続・状態・設定を確認 |
-| LabVIEW がクラッシュ | 引数型、ポインタ、配列サイズ、呼び出し規約不一致 | ヘッダ定義と CLFN 設定を再照合。UI thread と Maximum checking で PoC |
-| UnitNum `0` | 接続デバイスなし、USBドライバ、電源、排他使用 | 実機電源・USB・デバイスマネージャー・純正アプリ終了を確認 |
+- [x] x64 PowerShellでDLLをロードできる
+- [x] DLL Handleが非ゼロ
+- [x] `RAMScopeGT150DeviceInit`を名前で取得できる
+- [x] 序数14でも取得できる
+- [x] 名前と序数のアドレスが一致する
+- [x] PowerShellから関数を実呼び出しできる
+- [x] LabVIEWのCLFNプロトタイプが確定している
+- [x] `RAMScope_Connect.vi`の最小配線ができている
+- [x] 実機未接続時でもクラッシュせずReturnCodeを返す
 
----
-
-## 10A.11 完了条件
-
-### DLL・CLFN PoC 完了
-
-- [x] `RAMScopeVP_API_x64.dll` を x64 プロセスでロード可能
-- [x] `RAMScopeGT150DeviceInit` を名前で認識
-- [x] 序数14でも認識
-- [x] 名前と序数で同じ関数アドレスを取得
-- [x] PowerShell から実呼び出し可能
-- [x] LabVIEW CLFN のプロトタイプ設定を確定
-- [x] `error in / error out` を含む最小 VI の配線を確定
-
-### 残確認
-
-- [ ] GT170 実機接続時の `ReturnCode` / `UnitNum` / `kind`
-- [ ] 正常終了コードと全エラーコードの正式な意味
-- [ ] `AllInit` 以降の実機フロー
-- [ ] 長時間ポーリング時の安定性
-- [ ] `ReleaseBufferData` の必須性
-- [ ] TestStand Setup / Main / Cleanup の通し試験
-
----
-
-## 10A.12 変更履歴
-
-| 日付 | 内容 |
-|------|------|
-| 2026-07-14 | x86版 VC++ 2013 ランタイム混在による DLL ロードエラー193、関数未認識の切り分け結果を反映。PowerShell疎通スクリプトと CLFN 最小構成を追加 |
+次に [10B](./10B_RAMScope_VI作成手順_STEP3_STEP4詳細.md) で、エラー変換の共通化と後続VIを作成する。
