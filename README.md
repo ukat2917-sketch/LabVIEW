@@ -31,7 +31,8 @@ VI（バーチャルインスツルメント）の作り方、TestStand シー�
 | 07  | [docs/07_機器別VI構築手順.md](./docs/07_機器別VI構築手順.md) | 各測定器・電源ごとの VI 構築手順 |
 | 08  | [docs/08_負荷電流VIと並列処理.md](./docs/08_負荷電流VIと並列処理.md) | 負荷電流ランプ制御 VI（割り込み可能設計） |
 | 09  | [docs/09_CAN通信の実装.md](./docs/09_CAN通信の実装.md) | CAN 操作（USB-CAN / NI-XNET / dbc）の実装方針 |
-| 10  | [docs/10_RAMScope実装方針.md](./docs/10_RAMScope実装方針.md) | RAMScope（API / マックシステムズドライバ）の比較と方針 |
+| 10  | [docs/10_RAMScope実装方針.md](./docs/10_RAMScope実装方針.md) | RAMScope API の関数・構造体・ライフサイクルと実装方針 |
+| 10A | [docs/10A_RAMScope実装手順_DLL準備とCLFN疎通確認.md](./docs/10A_RAMScope実装手順_DLL準備とCLFN疎通確認.md) | **検証済み手順**：DLL配置、x64/x86混在対策、CLFN疎通確認、最小VI、エラー193の再発防止 |
 | 11  | [docs/11_TestStandシーケンス構築手順.md](./docs/11_TestStandシーケンス構築手順.md) | シーケンス作成、変数管理、サブシーケンス化、同期／非同期設定 |
 | 12  | [docs/12_異常系処理とシャットダウン設計.md](./docs/12_異常系処理とシャットダウン設計.md) | 異常系のシャットダウン順序、データ退避 |
 | 13  | [docs/13_構築ロードマップ.md](./docs/13_構築ロードマップ.md) | 推奨する構築の進め方（段階的導入） |
@@ -40,6 +41,7 @@ VI（バーチャルインスツルメント）の作り方、TestStand シー�
 | 参考 | [docs/reference/GTHard.h](./docs/reference/GTHard.h) | RAMScope ハードウェア定数定義（機種判定・module_type・モジュール/チャンネル数上限）|
 | 参考 | [docs/reference/samp_simple.cpp](./docs/reference/samp_simple.cpp) | ベンダー提供の実装サンプル（RAM モニタ測定の一連の呼び出し順序の実例）|
 | 参考 | [docs/reference/samp_simple.vcxproj](./docs/reference/samp_simple.vcxproj) | サンプルのビルド設定（Win32 専用・呼び出し規約推定の根拠）|
+| ツール | [scripts/Test-RAMScopeDll.ps1](./scripts/Test-RAMScopeDll.ps1) | 64bit PowerShell から RAMScope API DLL のロードとエクスポート関数を確認する疎通スクリプト |
 
 ---
 
@@ -50,8 +52,8 @@ VI（バーチャルインスツルメント）の作り方、TestStand シー�
                   │                  PC (Windows)               │
                   │  ┌───────────────┐     ┌─────────────────┐  │
                   │  │   TestStand   │────▶│     LabVIEW     │  │
-                  │  │  (試験フロー)  │ VI  │  (機器個別制御)  │  │
-                  │  │  条件/結果管理 │ Call│  ms単位の制御    │  │
+                  │  │  (試験フロー)  │ VI  │  (機器個別制御)  │
+                  │  │  条件/結果管理 │ Call│  ms単位の制御    │
                   │  └───────────────┘     └─────────────────┘  │
                   └───────────────┬────────────────┬────────────┘
                                   │ Ethernet (LAN) │ USB/専用IF
