@@ -2,10 +2,10 @@
 
 NI社製 LabVIEW と TestStand を利用し、複数機器を連携させる自動テストシステムの構築手順をまとめた資料です。
 
-> **最終整理日：2026-07-14**
+> **最終整理日：2026-07-15**
 >
 > RAMScope は **64bit版 RAMScopeVP APIをLabVIEW 64bitのCLFNから直接呼び出す方式**を採用する。
-> 実装は「薄いDLLラッパ → 公開API → RAMScope単体PoC → CAN単体PoC → TestStand」の順で進める。
+> 実装は「薄いDLLラッパ → 構造体生成・Parser → 公開API → RAMScope単体PoC → CAN単体PoC → TestStand」の順で進める。
 
 ---
 
@@ -38,21 +38,25 @@ NI社製 LabVIEW と TestStand を利用し、複数機器を連携させる自�
 5. 機器別実装
    ├─ 一般機器：07 / 08
    ├─ CAN方式検討：09
-   └─ RAMScope：10A → 10B → 10B-1 / 10B-2
+   └─ RAMScope：10A → 10B → 10B-1 → 10B-2 → 10B-3 → 10B-4
         10A：DLL準備・疎通確認
-        10B：DLLラッパ → 公開API → PoC_RAMScope_Main.vi
-        10B-1：RAMScope_Code_To_Error.viの詳細作成手順
-        10B-2：各RS_DLLラッパのCLFN設定・配線手順
+        10B：全体の実装順と公開API・PoC構成
+        10B-1：RAMScope_Code_To_Error.vi
+        10B-2：全RS_DLLラッパのCLFN設定・配線
+        10B-3：MEASINFO / CHINFO / LOGINFO構造体生成
+        10B-4：SYSINFO / 測定バッファParser
    ↓
-6. RAMScope RAM計測単体PoCを完了
+6. RAMScope公開APIを作成
    ↓
-7. CAN方式を確定し、採用方式のCAN単体PoCを完了
+7. RAMScope RAM計測単体PoCを完了
    ↓
-8. 11 TestStandへ組み込み
+8. CAN方式を確定し、採用方式のCAN単体PoCを完了
    ↓
-9. 12 Cleanup・異常系を実装
+9. 11 TestStandへ組み込み
    ↓
-10. 13 ロードマップと完了条件を確認
+10. 12 Cleanup・異常系を実装
+   ↓
+11. 13 ロードマップと完了条件を確認
 ```
 
 ### RAMScope資料の役割分担
@@ -64,10 +68,12 @@ NI社製 LabVIEW と TestStand を利用し、複数機器を連携させる自�
 | [10B](./docs/10B_RAMScope_VI作成手順_STEP3_STEP4詳細.md) | 薄いDLLラッパ、Parser、公開API、`PoC_RAMScope_Main.vi`、CAN/TestStandへの移行条件 | 10A完了後 |
 | [10B-1](./docs/10B1_RAMScope_Code_To_Error_VI作成手順.md) | `RAMScope_Code_To_Error.vi`の配置関数、Case条件、文字列変換、単体テスト | 共通エラー変換VIを作るとき |
 | [10B-2](./docs/10B2_RAMScope_DLLラッパVI_CLFN配線手順.md) | 全`RS_DLL_*`ラッパのCLFNパラメータ、配列初期化、端子配線 | DLLラッパを1本ずつ作るとき |
+| [10B-3](./docs/10B3_RAMScope_構造体生成VI作成手順.md) | `MEASINFO_170`、`CHINFO_170[]`、`LOGINFO`のtypedef、バイト配列生成、自動ChNum算出 | DLLラッパ完成後 |
+| [10B-4](./docs/10B4_RAMScope_Parser_VI作成手順.md) | `SYSINFO`と測定バッファのtypedef、offset解析、符号・Byte Order・Timestamp処理 | 構造体生成VIと並行または後 |
 | [09](./docs/09_CAN通信の実装.md) | CANalyzer / NI-XNET / USB-CAN / RAMScope CANの方式選定 | RAM計測PoC後、CAN着手前 |
 | [11](./docs/11_TestStandシーケンス構築手順.md) | PoC済み公開APIをSetup/Main/Cleanupへ配置 | RAM/CAN単体PoC後 |
 
-> `07_機器別VI構築手順.md`のRAMScope記述は概要のみとし、実装時は**10A / 10B / 10B-1 / 10B-2を正本**とする。
+> `07_機器別VI構築手順.md`のRAMScope記述は概要のみとし、実装時は**10A / 10B / 10B-1 / 10B-2 / 10B-3 / 10B-4を正本**とする。
 
 ---
 
@@ -76,16 +82,17 @@ NI社製 LabVIEW と TestStand を利用し、複数機器を連携させる自�
 ```text
 TestStand
   → RAMScope_* 公開API
-      → RS_DLL_* 薄いDLLラッパ
-          → CLFN
-              → RAMScopeVP_API_x64.dll
+      → Builder / Parser / Common
+          → RS_DLL_* 薄いDLLラッパ
+              → CLFN
+                  → RAMScopeVP_API_x64.dll
 ```
 
 | レイヤ | 役割 |
 |--------|------|
 | `RS_DLL_*` | DLL関数を1個だけ呼び、ReturnCodeとerror clusterを返す |
-| Parser / Common | SYSINFO・測定バッファ解析、APIコード変換 |
-| `RAMScope_*` | 複数ラッパを接続し、1イベントを完結させる公開API |
+| Builder / Parser / Common | 構造体U8配列の生成、SYSINFO・測定バッファ解析、APIコード変換 |
+| `RAMScope_*` | ラッパとBuilder/Parserを接続し、1イベントを完結させる公開API |
 | `PoC_*` | 公開APIを順番に呼び、TestStandなしで単体確認する |
 | TestStand | 条件、順序、Wait、Loop、分岐、レポート、Cleanupを管理する |
 
@@ -113,6 +120,8 @@ TestStandは`RS_DLL_*`を直接呼ばない。
 | 10B | [docs/10B_RAMScope_VI作成手順_STEP3_STEP4詳細.md](./docs/10B_RAMScope_VI作成手順_STEP3_STEP4詳細.md) | DLLラッパ、公開API、最小PoC、CAN/TestStandへの移行手順 |
 | 10B-1 | [docs/10B1_RAMScope_Code_To_Error_VI作成手順.md](./docs/10B1_RAMScope_Code_To_Error_VI作成手順.md) | API戻り値をerror clusterへ変換するVIの初心者向け作成手順 |
 | 10B-2 | [docs/10B2_RAMScope_DLLラッパVI_CLFN配線手順.md](./docs/10B2_RAMScope_DLLラッパVI_CLFN配線手順.md) | 全DLLラッパのCLFN設定、初期配列、入力・出力配線の詳細 |
+| 10B-3 | [docs/10B3_RAMScope_構造体生成VI作成手順.md](./docs/10B3_RAMScope_構造体生成VI作成手順.md) | MEASINFO/CHINFO/LOGINFOのtypedef、バイト変換、Builder詳細 |
+| 10B-4 | [docs/10B4_RAMScope_Parser_VI作成手順.md](./docs/10B4_RAMScope_Parser_VI作成手順.md) | SYSINFO/測定バッファのtypedef、offset解析、Parser詳細 |
 | 11 | [docs/11_TestStandシーケンス構築手順.md](./docs/11_TestStandシーケンス構築手順.md) | TestStandへの組み込み |
 | 12 | [docs/12_異常系処理とシャットダウン設計.md](./docs/12_異常系処理とシャットダウン設計.md) | Cleanup、安全停止、データ退避 |
 | 13 | [docs/13_構築ロードマップ.md](./docs/13_構築ロードマップ.md) | 現在地、残作業、完了条件 |
@@ -134,9 +143,11 @@ TestStandは`RS_DLL_*`を直接呼ばない。
 6. RAMScope APIの戻り値はCLFNの`error out`とは別に判定する。
 7. RAMScopeはネイティブSessionハンドルを返さないグローバル状態型APIである。
 8. `RAMScope_Set_Cond.vi`を測定開始前に必ず実行する。
-9. `ReleaseBufferData`は必須性が確定するまで独立VIとして検証する。
-10. RAMScopeの終了はCleanupで`RAMScope_Close.vi`を必ず実行する。
-11. 高圧停止を最優先し、データ退避、DUT低圧停止、RAMScope終了の順で安全停止する。
+9. `ChNum`は`RAMScope_Channel.ctl`配列の`Array Size`から自動算出する。
+10. 構造体BuilderとParserはDLLを呼ばない純粋処理VIとする。
+11. `ReleaseBufferData`は必須性が確定するまで独立VIとして検証する。
+12. RAMScopeの終了はCleanupで`RAMScope_Close.vi`を必ず実行する。
+13. 高圧停止を最優先し、データ退避、DUT低圧停止、RAMScope終了の順で安全停止する。
 
 ---
 
@@ -146,6 +157,8 @@ TestStandは`RS_DLL_*`を直接呼ばない。
 - `0x30100001`のベンダー正式定義
 - `AllInit`以降の通し動作
 - 実データのEndianとTimestamp
+- `Size`、`Sign`、`Speed`コードの正式な意味
+- 既存RAMScopeコンフィグファイルの正式な読込仕様またはエクスポート形式
 - `ReleaseBufferData`の必須性と呼び出し位置
 - APIのスレッドセーフ性
 - CANの最終方式とRAMScope CAN機能の使用範囲
