@@ -52,7 +52,123 @@ RAMScopeは最初からTestStandへ組み込まない。各レイヤを単体確
 
 # 10.2 採用構成とフォルダ構成
 
-## 10.2.1 採用構成
+## 10.2.1 なぜこの構成を採用するのか
+
+RAMScopeVP APIは、LabVIEW向けに作られたVIライブラリではなく、C言語用のDLL APIである。そのため、LabVIEWから利用するには、次の差を吸収する仕組みが必要になる。
+
+```text
+RAMScopeVP API側
+  C関数
+  C構造体
+  ポインタ
+  生バイト列
+  API独自ReturnCode
+
+        ↓ そのままではLabVIEW / TestStandから扱いにくい
+
+LabVIEW / TestStand側
+  数値・配列・Cluster
+  error cluster
+  1イベント単位の公開VI
+  試験条件・順序・結果管理
+```
+
+すべてを1個の巨大なVIへ入れると、DLL呼び出し、構造体変換、データ解析、試験フローのどこで失敗したかを切り分けにくい。そこで、責務ごとに段階を分ける。
+
+### 問題と必要なレイヤの対応
+
+| RAMScope実装で発生する問題 | 必要な仕組み | 配置先・主なVI |
+|---|---|---|
+| C関数をLabVIEWから呼ぶ必要がある | CLFN設定を1関数単位で隔離する | `10_DLL_Wrapper\RS_DLL_*` |
+| CLFNエラーとAPI ReturnCodeが別経路で返る | 2系統のエラーを標準error clusterへ統合する | `RAMScope_Code_To_Error.vi` |
+| API入力がC構造体ポインタである | LabVIEWの設定値をC互換U8配列へ組み立てる | `Build_MEASINFO_170_Raw.vi`等 |
+| API出力が構造体や生バッファである | U8配列をLabVIEWのClusterや数値へ解析する | `Parse_SYSINFO_Array.vi`等 |
+| Endianと符号を意識して数値変換する必要がある | 数値とU8配列の変換を共通部品化する | `U8x4_To_U32.vi`等 |
+| TestStandからCLFN単位では扱いづらい | 接続、初期化、読出し等のイベント単位へまとめる | `30_Public\RAMScope_*` |
+| TestStand組み込み前に下位層を検証したい | 公開APIだけを順番に呼ぶ単体PoCを用意する | `PoC_RAMScope_Main.vi` |
+
+### レイヤを分ける理由
+
+```text
+TestStand
+  試験条件、順序、Wait、Loop、分岐、レポート、Cleanup
+        ↓
+30_Public
+  人が理解できる1イベント単位へまとめる
+        ↓
+20_Data_Conversion / 00_Common
+  C構造体とLabVIEWデータ型の差を吸収する
+        ↓
+10_DLL_Wrapper
+  DLL関数を1個だけ安全に呼ぶ
+        ↓
+RAMScopeVP_API_x64.dll
+```
+
+この構成にすると、次の切り分けができる。
+
+- DLLがロードできない場合は`10_DLL_Wrapper`より下を確認する。
+- ReturnCodeの表現がおかしい場合は`RAMScope_Code_To_Error.vi`を確認する。
+- 設定値がDLLへ正しく渡らない場合はBuilderを確認する。
+- 読み出した値がずれる場合はParserとByte Orderを確認する。
+- 呼び出し順が違う場合は公開APIまたはPoCを確認する。
+- 試験条件や繰り返しが違う場合はTestStandを確認する。
+
+### なぜ各VIが必要なのか
+
+#### `00_Common`
+
+| VI / ctl | 必要な理由 |
+|---|---|
+| `RAMScope_Code_To_Error.vi` | CLFN自体のエラーとRAMScope API ReturnCodeを同じerror clusterへ流すため |
+| `RAMScope_Byte_Order.ctl` | Little / Big Endianを数値ではなく意味のある選択肢として扱うため |
+| `RAMScope_Channel.ctl` | 1個の監視RAM変数について、アドレス、符号、スケール等を1つにまとめるため |
+| `RAMScope_Meas_Config.ctl` | 測定周期関係の設定をBuilderへまとめて渡すため |
+| `RAMScope_Module_Log_Config.ctl` | モジュールごとのログ条件を配列で管理するため |
+| `RAMScope_Module_Info.ctl` | SYSINFO 1レコードの解析結果を型として固定するため |
+| `RAMScope_Channel_Value.ctl` | 1チャンネル分のRaw値と工学値を関連付けるため |
+| `RAMScope_Packet.ctl` | 1パケットのチャンネル値、Flag、Timestampをまとめるため |
+| 数値⇔U8変換VI | Endian、符号、4byte / 8byte変換をBuilderやParserへ重複実装しないため |
+
+#### `10_DLL_Wrapper`
+
+`RS_DLL_*`は、ヘッダに定義されたDLL関数と1対1で対応する。1関数1VIにすることで、CLFNの引数型、Pointer設定、事前確保サイズ、関数名を個別にテストできる。
+
+```text
+RS_DLL_GT150GetSysInfo.vi
+  担当：GetSysInfoを呼び、U8[960]を受け取るところまで
+
+Parse_SYSINFO_Array.vi
+  担当：U8[960]の意味を解析する
+```
+
+DLLラッパへParserを入れないのは、DLL呼び出し成功とデータ解析成功を別々に判断するためである。
+
+#### `20_Data_Conversion`
+
+BuilderとParserはDLLを呼ばない純粋処理VIとする。実機がなくてもダミーデータで単体テストでき、CLFNクラッシュの影響を受けずにバイト配置を検証できる。
+
+```text
+LabVIEW設定値
+  → Builder
+  → C構造体互換U8配列
+  → DLLラッパ
+
+DLLラッパ
+  → 生U8配列
+  → Parser
+  → LabVIEW Cluster / 数値
+```
+
+#### `30_Public`
+
+TestStandが必要としているのは、`GetSysInfo`や`SetMeasCh`というDLL関数名ではなく、「接続する」「初期化する」「測定条件を設定する」「読む」「閉じる」という試験イベントである。公開APIは複数の下位VIを正しい順番で接続し、TestStandへ安定した端子を提供する。
+
+#### `40_PoC`
+
+公開APIをTestStandへ組み込む前に、LabVIEWだけで通し動作を確認する。これにより、実機・DLL・Parserの問題とTestStand設定の問題を混ぜずに済む。
+
+## 10.2.2 採用構成
 
 | 項目 | 採用内容 |
 |---|---|
@@ -72,7 +188,7 @@ RAMScopeは最初からTestStandへ組み込まない。各レイヤを単体確
 - マックシステムズ製LabVIEWドライバを本線とする方式
 - ヘッダを参照せず引数型を推測する方式
 
-## 10.2.2 正式なフォルダ構成
+## 10.2.3 正式なフォルダ構成
 
 ```text
 30_RAMScope\
@@ -133,7 +249,7 @@ RAMScopeは最初からTestStandへ組み込まない。各レイヤを単体確
 
 `RAMScope_Context.ctl`は現時点では作成しない。PoC中は`UnitNo`、`MdlNo_RAM`、`MdlNo_CAN`、`Endian_RAM`、`Channel List`を個別配線する。
 
-## 10.2.3 レイヤ責務
+## 10.2.4 レイヤ責務
 
 | レイヤ | 責務 | 含めないもの |
 |---|---|---|
