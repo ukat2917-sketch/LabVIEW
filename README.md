@@ -38,9 +38,11 @@ NI社製 LabVIEW と TestStand を利用し、複数機器を連携させる自�
 5. 機器別実装
    ├─ 一般機器：07 / 08
    ├─ CAN方式検討：09
-   └─ RAMScope：10A → 10B
+   └─ RAMScope：10A → 10B → 10B-1 / 10B-2
         10A：DLL準備・疎通確認
         10B：DLLラッパ → 公開API → PoC_RAMScope_Main.vi
+        10B-1：RAMScope_Code_To_Error.viの詳細作成手順
+        10B-2：各RS_DLLラッパのCLFN設定・配線手順
    ↓
 6. RAMScope RAM計測単体PoCを完了
    ↓
@@ -60,10 +62,12 @@ NI社製 LabVIEW と TestStand を利用し、複数機器を連携させる自�
 | [10](./docs/10_RAMScope実装方針.md) | API関数、構造体、定数、ライフサイクルの**技術リファレンス** | 関数・型を確認するとき |
 | [10A](./docs/10A_RAMScope実装手順_DLL準備とCLFN疎通確認.md) | DLL配置、VC++ランタイム、x64/x86混在対策、CLFN疎通確認 | RAMScope実装の最初 |
 | [10B](./docs/10B_RAMScope_VI作成手順_STEP3_STEP4詳細.md) | 薄いDLLラッパ、Parser、公開API、`PoC_RAMScope_Main.vi`、CAN/TestStandへの移行条件 | 10A完了後 |
+| [10B-1](./docs/10B1_RAMScope_Code_To_Error_VI作成手順.md) | `RAMScope_Code_To_Error.vi`の配置関数、Case条件、文字列変換、単体テスト | 共通エラー変換VIを作るとき |
+| [10B-2](./docs/10B2_RAMScope_DLLラッパVI_CLFN配線手順.md) | 全`RS_DLL_*`ラッパのCLFNパラメータ、配列初期化、端子配線 | DLLラッパを1本ずつ作るとき |
 | [09](./docs/09_CAN通信の実装.md) | CANalyzer / NI-XNET / USB-CAN / RAMScope CANの方式選定 | RAM計測PoC後、CAN着手前 |
 | [11](./docs/11_TestStandシーケンス構築手順.md) | PoC済み公開APIをSetup/Main/Cleanupへ配置 | RAM/CAN単体PoC後 |
 
-> `07_機器別VI構築手順.md`のRAMScope記述は概要のみとし、実装時は**10A / 10Bを正本**とする。
+> `07_機器別VI構築手順.md`のRAMScope記述は概要のみとし、実装時は**10A / 10B / 10B-1 / 10B-2を正本**とする。
 
 ---
 
@@ -107,6 +111,8 @@ TestStandは`RS_DLL_*`を直接呼ばない。
 | 10 | [docs/10_RAMScope実装方針.md](./docs/10_RAMScope実装方針.md) | RAMScope API技術リファレンス |
 | 10A | [docs/10A_RAMScope実装手順_DLL準備とCLFN疎通確認.md](./docs/10A_RAMScope実装手順_DLL準備とCLFN疎通確認.md) | RAMScope環境準備とDLL疎通確認 |
 | 10B | [docs/10B_RAMScope_VI作成手順_STEP3_STEP4詳細.md](./docs/10B_RAMScope_VI作成手順_STEP3_STEP4詳細.md) | DLLラッパ、公開API、最小PoC、CAN/TestStandへの移行手順 |
+| 10B-1 | [docs/10B1_RAMScope_Code_To_Error_VI作成手順.md](./docs/10B1_RAMScope_Code_To_Error_VI作成手順.md) | API戻り値をerror clusterへ変換するVIの初心者向け作成手順 |
+| 10B-2 | [docs/10B2_RAMScope_DLLラッパVI_CLFN配線手順.md](./docs/10B2_RAMScope_DLLラッパVI_CLFN配線手順.md) | 全DLLラッパのCLFN設定、初期配列、入力・出力配線の詳細 |
 | 11 | [docs/11_TestStandシーケンス構築手順.md](./docs/11_TestStandシーケンス構築手順.md) | TestStandへの組み込み |
 | 12 | [docs/12_異常系処理とシャットダウン設計.md](./docs/12_異常系処理とシャットダウン設計.md) | Cleanup、安全停止、データ退避 |
 | 13 | [docs/13_構築ロードマップ.md](./docs/13_構築ロードマップ.md) | 現在地、残作業、完了条件 |
