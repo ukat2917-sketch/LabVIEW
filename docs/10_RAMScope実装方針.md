@@ -40,7 +40,28 @@ STEP 9  TestStand組み込み
 
 RAMScopeは最初からTestStandへ組み込まない。各レイヤを単体確認してから次へ進む。
 
-## 10.1.2 状態表記
+## 10.1.2 VI作成手順の統一書式
+
+本章で新規作成するVIは、原則として次の順番で説明する。
+
+```text
+1. 入出力
+2. 配置する関数およびSubVI等
+3. 配線順
+4. 単体テスト
+```
+
+「配置する」「接続する」だけで終わらせず、次を明記する。
+
+- 関数の日本語名と英語名
+- 関数パレット上の配置場所
+- ケースストラクチャの条件
+- Forループの自動指標付け
+- シフトレジスタの追加方法、初期値、左右端子の役割
+- 全入力と全出力の接続先
+- 異常ケースの安全な初期出力
+
+## 10.1.3 状態表記
 
 | 表記 | 意味 |
 |---|---|
@@ -291,6 +312,7 @@ Packet Size  = 4 × ChNum + 12
 |---|---|---|
 | ケースストラクチャ | Case Structure | プログラミング → ストラクチャ |
 | Forループ | For Loop | プログラミング → ストラクチャ |
+| シフトレジスタ | Shift Register | Forループ枠を右クリック → シフトレジスタを追加 |
 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
 | 名前でバンドル | Bundle By Name | プログラミング → クラスタ、クラス、バリアント |
 | 配列サイズ | Array Size | プログラミング → 配列 |
@@ -306,6 +328,7 @@ Packet Size  = 4 × ChNum + 12
 | 文字列にフォーマット | Format Into String | プログラミング → 文字列 |
 | バイト配列から文字列 | Byte Array To String | プログラミング → 文字列 → 文字列/配列/パス変換 |
 | 等しい? | Equal? | プログラミング → 比較 |
+| 等しくない? | Not Equal? | プログラミング → 比較 |
 | 以上? | Greater Or Equal? | プログラミング → 比較 |
 | 以下? | Less Or Equal? | プログラミング → 比較 |
 | 選択 | Select | プログラミング → 比較 |
@@ -328,7 +351,26 @@ error in
 
 全ケースの出力トンネルを配線し、`Use default if unwired`へ依存しない。
 
-## 10.5.3 ローカル検証エラーコード
+## 10.5.3 シフトレジスタの基本
+
+シフトレジスタは、Forループの前回反復で作った値を次の反復へ渡すための左右一組の端子である。
+
+追加方法：
+
+1. Forループの枠を右クリックする。
+2. `シフトレジスタを追加（Add Shift Register）`を選択する。
+3. ループの左枠と右枠へ対になった端子が追加されたことを確認する。
+
+```text
+左外側端子 : ループ開始前の初期値を接続
+左内側端子 : 前回反復までの値を受け取る
+右内側端子 : 今回反復後の値を接続
+右外側端子 : 全反復終了後の最終値を取得
+```
+
+本章では、累積配列、error cluster、検出済みモジュール番号、重複判定配列などを保持するために使用する。
+
+## 10.5.4 ローカル検証エラーコード
 
 | コード | 用途 |
 |---:|---|
@@ -340,7 +382,7 @@ error in
 | `-700130` | Buffer Parser入力不正 |
 | `-700131` | Raw Buffer不足 |
 
-## 10.5.4 U8配列の単体テスト表示設定
+## 10.5.5 U8配列の単体テスト表示設定
 
 U8配列のバイト値を16進数で確認するときは、配列枠ではなく**配列内の数値セル**を右クリックして設定する。
 
@@ -380,14 +422,14 @@ LabVIEW上では`0x78`ではなく`x78`と表示される。資料上の`0x78`�
 
 ## 10.6.2 配置する関数およびSubVI等
 
-| 日本語名 | 英語名 | 配置場所 |
-|---|---|---|
-| 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
-| ケースストラクチャ | Case Structure | プログラミング → ストラクチャ |
-| 等しい? | Equal? | プログラミング → 比較 |
-| 型変換 | Type Cast | プログラミング → 数値 → データ操作 |
-| 文字列にフォーマット | Format Into String | プログラミング → 文字列 |
-| 名前でバンドル | Bundle By Name | プログラミング → クラスタ、クラス、バリアント |
+| 数 | 日本語名 | 英語名 | 配置場所 |
+|---:|---|---|---|
+| 1 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
+| 2 | ケースストラクチャ | Case Structure | プログラミング → ストラクチャ |
+| 1 | 等しい? | Equal? | プログラミング → 比較 |
+| 1 | 型変換 | Type Cast | プログラミング → 数値 → データ操作 |
+| 1 | 文字列にフォーマット | Format Into String | プログラミング → 文字列 |
+| 1 | 名前でバンドル | Bundle By Name | プログラミング → クラスタ、クラス、バリアント |
 
 ## 10.6.3 配線順
 
@@ -403,8 +445,9 @@ LabVIEW上では`0x78`ではなく`x78`と表示される。資料上の`0x78`�
 RAMScope %s failed. ReturnCode=0x%08X (%d)
 ```
 
-8. 名前でバンドルへ正常クラスタを接続し、`status=True`、`code=API ReturnCode`、`source=生成文字列`を設定する。
-9. 名前でバンドル出力を`error out`へ接続する。
+8. `%s`へ`Function Name`、`%08X`へU32変換値、`%d`へ元のI32 ReturnCodeを接続する。
+9. 名前でバンドルへ正常クラスタを接続し、`status=True`、`code=API ReturnCode`、`source=生成文字列`を設定する。
+10. 名前でバンドル出力を`error out`へ接続する。
 
 ## 10.6.4 単体テスト
 
@@ -458,11 +501,14 @@ RAMScope %s failed. ReturnCode=0x%08X (%d)
 
 1. プロジェクトエクスプローラで`30_RAMScope\00_Common`を右クリックする。
 2. `新規 → タイプ定義`を選ぶ。
-3. 制御器エディタへクラスタまたは列挙体を配置する。
-4. 必要な制御器をクラスタ内へ配置する。
-5. 数値制御器を右クリックし、表現形式をI32、U32、U64、DBLへ合わせる。
-6. フィールド名を設定する。
-7. `.ctl`として保存する。
+3. 制御器エディタが開いたことを確認する。
+4. クラスタ型の場合は、制御器パレットからクラスタを配置する。
+5. 列挙体型の場合は、制御器パレットから列挙体を配置する。
+6. 必要な数値、文字列、Boolean、配列をクラスタ内へ配置する。
+7. 数値制御器を右クリックし、`表現形式`をI32、U32、U64、DBLへ合わせる。
+8. フィールド名を設定する。
+9. `.ctl`として保存する。
+10. プロジェクトエクスプローラ上へ作成した`.ctl`が表示されることを確認する。
 
 `新規 → タイプ定義`から作成した場合、後からType Def.へ切り替える操作は不要。
 
@@ -478,7 +524,23 @@ RAMScope %s failed. ReturnCode=0x%08X (%d)
 | `RAMScope_Channel_Value.ctl` | 1チャンネルのRaw値、実値、工学値 |
 | `RAMScope_Packet.ctl` | Channel Values、Flag、Timestamp |
 
-`ChNum`は`Array Size(Channel List)`で算出し、手入力値を別に持たせない。
+## 10.8.3 `RAMScope_Channel.ctl`配列の作り方
+
+`RAMScope_Channel.ctl`は1チャンネル分のクラスタであり、配列型ではない。`Channel List`入力は、このctlを要素に持つ一次元配列として作成する。
+
+1. 対象VIのフロントパネルへ空の配列枠を配置する。
+2. プロジェクトエクスプローラから`RAMScope_Channel.ctl`を配列枠の内側へドラッグする。
+3. 配列全体のラベルを`Channel List`へ変更する。
+4. ブロックダイアグラムで太いピンク色の配列ワイヤになることを確認する。
+5. 単体テストで1要素を使う場合は、配列内クラスタを右クリックし、`データ操作 → 要素を挿入`を実行する。
+6. 配列サイズ（Array Size）へ接続し、1要素なら`ChNum=1`になることを確認する。
+
+```text
+RAMScope_Channel.ctl          = 1チャンネル分
+Channel List                 = RAMScope_Channel.ctlの一次元配列
+ChNum                        = Array Size(Channel List)
+CHINFO_170 Rawの必要バイト数 = 24 × ChNum
+```
 
 ---
 
@@ -515,11 +577,20 @@ RAMScope %s failed. ReturnCode=0x%08X (%d)
 2. 外側TrueでU32定数`0`を`Value`へ、`error in`を`error out`へ接続する。
 3. 外側Falseで`Bytes`を配列サイズへ接続する。
 4. 配列サイズ出力とI32定数`4`を等しい?へ接続し、結果を2個目のケースストラクチャへ接続する。
-5. サイズ不正のFalseケースではValue=0とし、code=`-700101`のerror clusterを生成する。
-6. サイズ正常のTrueケースで指標配列を4出力へ広げる。
-7. 4個のindex端子へ上から`0`、`1`、`2`、`3`を接続する。
-8. 出力を上から`b0`、`b1`、`b2`、`b3`としてByte Orderケースへ渡す。
-9. Little Endianケースでは次の順で数値結合する。
+5. サイズ不正のFalseケースでは、U32定数`0`を`Value`へ接続する。
+6. 同ケースへ文字列にフォーマットを置き、次を設定する。
+
+```text
+U8x4_To_U32.vi: Input size must be 4. Actual=%d
+```
+
+7. `%d`へ配列サイズ出力を接続する。
+8. 名前でバンドルへ`error in`を基準クラスタとして接続し、`status=True`、`code=-700101`、`source=生成文字列`を設定する。
+9. 名前でバンドル出力を`error out`へ接続する。
+10. サイズ正常のTrueケースで指標配列を4出力へ広げる。
+11. 4個のindex端子へ上から`0`、`1`、`2`、`3`を接続する。
+12. 出力を上から`b0`、`b1`、`b2`、`b3`としてByte Orderケースへ渡す。
+13. Little Endianケースでは次の順で数値結合する。
 
 ```text
 低位16bit: high=b1, low=b0
@@ -527,7 +598,7 @@ RAMScope %s failed. ReturnCode=0x%08X (%d)
 U32      : high=高位16bit, low=低位16bit
 ```
 
-10. Big Endianケースでは次の順で数値結合する。
+14. Big Endianケースでは次の順で数値結合する。
 
 ```text
 高位16bit: high=b0, low=b1
@@ -535,9 +606,11 @@ U32      : high=高位16bit, low=低位16bit
 U32      : high=高位16bit, low=低位16bit
 ```
 
-11. Byte Orderの両ケースで変換値を`Value`へ、正常なerror clusterを`error out`へ接続する。
+15. Byte Orderの両ケースで変換値を`Value`へ、正常なerror clusterを`error out`へ接続する。
 
 ### 4. 単体テスト
+
+事前に`Bytes`配列内セルと`Value`表示器を16進数表示へ変更し、基数を表示する。
 
 | Bytes | Byte Order | 期待Value |
 |---|---|---|
@@ -624,31 +697,27 @@ U32      : high=高位16bit, low=低位16bit
 2. 外側TrueではU64定数`0`を`Value`へ、`error in`を`error out`へ接続する。
 3. 外側Falseで`Bytes`を配列サイズへ接続する。
 4. 配列サイズ出力とI32定数`8`を等しい?へ接続し、結果をサイズ判定ケースへ接続する。
-5. サイズ不正のFalseケースでValue=0、status=True、code=`-700102`、sourceに実サイズを含むerror clusterを生成する。
-6. サイズ正常のTrueケースへ部分配列を2個配置する。
-7. 1個目の部分配列へ`Bytes`、index=`0`、length=`4`を接続し、`First4`を作る。
-8. 2個目の部分配列へ`Bytes`、index=`4`、length=`4`を接続し、`Last4`を作る。
-9. `U8x4_To_U32.vi`を2個横に配置する。
-10. `First4`を1個目SubVIの`Bytes`へ、`Last4`を2個目SubVIの`Bytes`へ接続する。
-11. `Byte Order`を両SubVIの`Byte Order`へ分岐して接続する。
-12. `error in`を1個目SubVIへ、1個目の`error out`を2個目SubVIの`error in`へ直列接続する。
-13. Byte Orderを3個目のケースストラクチャへ接続する。
-14. Little Endianケースでは数値結合へ次を接続する。
+5. サイズ不正のFalseケースでU64定数`0`を`Value`へ接続する。
+6. 文字列にフォーマットへ次を設定し、`%d`へ実サイズを接続する。
 
 ```text
-high ← Last4のU32
-low  ← First4のU32
+U8x8_To_U64.vi: Input size must be 8. Actual=%d
 ```
 
-15. Big Endianケースでは数値結合へ次を接続する。
-
-```text
-high ← First4のU32
-low  ← Last4のU32
-```
-
-16. 両ケースの数値結合出力を`Value`へ接続する。
-17. 2個目SubVIの`error out`を本VIの`error out`へ接続する。
+7. 名前でバンドルへ`error in`を接続し、`status=True`、`code=-700102`、`source=生成文字列`を設定する。
+8. 名前でバンドル出力を`error out`へ接続する。
+9. サイズ正常のTrueケースへ部分配列を2個配置する。
+10. 1個目の部分配列へ`Bytes`、index=`0`、length=`4`を接続し、`First4`を作る。
+11. 2個目の部分配列へ`Bytes`、index=`4`、length=`4`を接続し、`Last4`を作る。
+12. `U8x4_To_U32.vi`を2個横に配置する。
+13. `First4`を1個目SubVIの`Bytes`へ、`Last4`を2個目SubVIの`Bytes`へ接続する。
+14. `Byte Order`を両SubVIの`Byte Order`へ分岐して接続する。
+15. `error in`を1個目SubVIへ、1個目の`error out`を2個目SubVIの`error in`へ直列接続する。
+16. Byte Orderを3個目のケースストラクチャへ接続する。
+17. Little Endianケースでは数値結合へ`high=Last4のU32`、`low=First4のU32`を接続する。
+18. Big Endianケースでは数値結合へ`high=First4のU32`、`low=Last4のU32`を接続する。
+19. 両ケースの数値結合出力を`Value`へ接続する。
+20. 2個目SubVIの`error out`を本VIの`error out`へ接続する。
 
 ### 4. 単体テスト
 
@@ -679,22 +748,25 @@ low  ← Last4のU32
 | 1 | ケースストラクチャ | Case Structure | プログラミング → ストラクチャ |
 | 3 | 数値分割 | Split Number | プログラミング → 数値 → データ操作 |
 | 1 | 配列連結追加 | Build Array | プログラミング → 配列 |
+| 1 | 配列定数 | Array Constant | プログラミング → 配列 |
 
 ### 3. 配線順
 
 1. `error in`を名前でバンドル解除へ接続し、`status`をケースストラクチャへ接続する。
-2. Trueケースで空のU8一次元配列を`Bytes`へ、`error in`を`error out`へ接続する。
-3. Falseケースへ数値分割を3個配置する。
-4. `Value`を1個目の数値分割へ接続する。
-5. 1個目の上側出力`most significant half`を`High Word`、下側出力`least significant half`を`Low Word`として扱う。
-6. `Low Word`を2個目の数値分割へ接続する。
-7. 2個目の上側出力を`b1`、下側出力を`b0`として扱う。
-8. `High Word`を3個目の数値分割へ接続する。
-9. 3個目の上側出力を`b3`、下側出力を`b2`として扱う。
-10. 配列連結追加を4入力へ広げる。
-11. 上から`b0`、`b1`、`b2`、`b3`を接続する。
-12. 配列連結追加のU8一次元配列を`Bytes`へ接続する。
-13. `error in`を変更せず`error out`へ接続する。
+2. Trueケースへ空の配列定数を配置する。
+3. 配列定数の中へU8数値定数を入れ、U8一次元配列型にする。
+4. 空U8配列を`Bytes`へ、`error in`を`error out`へ接続する。
+5. Falseケースへ数値分割を3個配置する。
+6. `Value`を1個目の数値分割へ接続する。
+7. 1個目の上側出力`most significant half`を`High Word`、下側出力`least significant half`を`Low Word`として扱う。
+8. `Low Word`を2個目の数値分割へ接続する。
+9. 2個目の上側出力を`b1`、下側出力を`b0`として扱う。
+10. `High Word`を3個目の数値分割へ接続する。
+11. 3個目の上側出力を`b3`、下側出力を`b2`として扱う。
+12. 配列連結追加を4入力へ広げる。
+13. 上から`b0`、`b1`、`b2`、`b3`を接続する。
+14. 配列連結追加のU8一次元配列を`Bytes`へ接続する。
+15. `error in`を変更せず`error out`へ接続する。
 
 ### 4. 単体テスト
 
@@ -764,27 +836,28 @@ low  ← Last4のU32
 |---:|---|---|---|
 | 2 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
 | 1 | ケースストラクチャ | Case Structure | プログラミング → ストラクチャ |
-| 1 | 配列初期化 | Initialize Array | プログラミング → 配列 |
+| 2 | 配列初期化 | Initialize Array | プログラミング → 配列 |
 | 3 | `I32_To_LE_U8x4.vi` | SubVI | `30_RAMScope\00_Common` |
 | 3 | 部分配列置換 | Replace Array Subset | プログラミング → 配列 |
 
 ### 3. 配線順
 
 1. `error in`を1個目の名前でバンドル解除へ接続し、`status`をケースストラクチャへ接続する。
-2. TrueケースでU8定数`0`とI32定数`72`を配列初期化へ接続し、U8[72]を`MEASINFO_170 Raw`へ接続する。
-3. Trueケースで`error in`を`error out`へ接続する。
-4. Falseケースで同じくU8[72]のゼロ配列を作成する。
-5. `Meas Config`を2個目の名前でバンドル解除へ接続し、`DummyInterval`、`MeasPeri`、`MeasUnit`を表示する。
-6. `I32_To_LE_U8x4.vi`を3個横に配置する。
-7. `DummyInterval`を1個目、`MeasPeri`を2個目、`MeasUnit`を3個目の`Value`へ接続する。
-8. `error in`を1個目SubVIへ、1個目の`error out`を2個目へ、2個目を3個目へ直列接続する。
-9. 部分配列置換を3個直列に配置する。
-10. U8[72]を1個目の配列入力へ接続し、index=`0`、new element/subarray=`DummyInterval Bytes`とする。
-11. 1個目の出力配列を2個目へ接続し、index=`4`、new element/subarray=`MeasPeri Bytes`とする。
-12. 2個目の出力配列を3個目へ接続し、index=`8`、new element/subarray=`MeasUnit Bytes`とする。
-13. 3個目の出力配列を`MEASINFO_170 Raw`へ接続する。
-14. 3個目SubVIの`error out`を本VIの`error out`へ接続する。
-15. offset 12～71はゼロのまま残す。
+2. Trueケースへ配列初期化を配置する。
+3. U8定数`0`を`element`、I32定数`72`を`dimension size`へ接続する。
+4. U8[72]を`MEASINFO_170 Raw`へ、`error in`を`error out`へ接続する。
+5. Falseケースへ2個目の配列初期化を配置し、同じくU8[72]のゼロ配列を作成する。
+6. `Meas Config`を2個目の名前でバンドル解除へ接続し、`DummyInterval`、`MeasPeri`、`MeasUnit`を表示する。
+7. `I32_To_LE_U8x4.vi`を3個横に配置する。
+8. `DummyInterval`を1個目、`MeasPeri`を2個目、`MeasUnit`を3個目の`Value`へ接続する。
+9. `error in`を1個目SubVIへ、1個目の`error out`を2個目へ、2個目を3個目へ直列接続する。
+10. 部分配列置換を3個直列に配置する。
+11. U8[72]を1個目の`array`へ接続し、index=`0`、`new element/subarray=DummyInterval Bytes`とする。
+12. 1個目の出力配列を2個目へ接続し、index=`4`、`new element/subarray=MeasPeri Bytes`とする。
+13. 2個目の出力配列を3個目へ接続し、index=`8`、`new element/subarray=MeasUnit Bytes`とする。
+14. 3個目の出力配列を`MEASINFO_170 Raw`へ接続する。
+15. 3個目SubVIの`error out`を本VIの`error out`へ接続する。
+16. offset 12～71はゼロのまま残す。
 
 ### 4. 単体テスト
 
@@ -819,45 +892,169 @@ error out    = 正常
 | `CHINFO_170 Raw` | 出力 | U8一次元配列 |
 | `error out` | 出力 | error cluster |
 
+`Channel List`は`RAMScope_Channel.ctl`単体ではなく、10.8.3で作成した一次元配列を使用する。
+
 ### 2. 配置する関数およびSubVI等
 
-| 数 | 日本語名 | 英語名 | 配置場所 |
+| 数 | 日本語名 | 英語名 | 配置場所・追加方法 |
 |---:|---|---|---|
 | 1 | 配列サイズ | Array Size | プログラミング → 配列 |
-| 1 | 以上? | Greater Or Equal? | プログラミング → 比較 |
-| 1 | 以下? | Less Or Equal? | プログラミング → 比較 |
+| 2 | 以上? / 以下? | Greater Or Equal? / Less Or Equal? | プログラミング → 比較 |
 | 1 | 複合演算 | Compound Arithmetic | プログラミング → ブール |
-| 1 | ケースストラクチャ | Case Structure | プログラミング → ストラクチャ |
+| 3 | ケースストラクチャ | Case Structure | プログラミング → ストラクチャ |
 | 1 | Forループ | For Loop | プログラミング → ストラクチャ |
-| 1 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
+| 2 | シフトレジスタ | Shift Register | Forループ枠を右クリック → シフトレジスタを追加 |
+| 2 | 配列初期化 | Initialize Array | プログラミング → 配列 |
+| 2 | 乗算 | Multiply | プログラミング → 数値 |
+| 2 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
 | 6 | `U32_To_LE_U8x4.vi` | SubVI | `30_RAMScope\00_Common` |
-| 2 | 配列連結追加 | Build Array | プログラミング → 配列 |
+| 1 | 配列連結追加 | Build Array | プログラミング → 配列 |
+| 1 | 部分配列置換 | Replace Array Subset | プログラミング → 配列 |
+| 1 | 文字列にフォーマット | Format Into String | プログラミング → 文字列 |
+| 1 | 名前でバンドル | Bundle By Name | プログラミング → クラスタ、クラス、バリアント |
 
 ### 3. 配線順
 
-1. `Channel List`を配列サイズへ接続し、出力を`ChNum`へ接続する。
-2. `ChNum >= 1`と`ChNum <= 2048`を作り、複合演算ANDへ接続する。
-3. AND出力をケースストラクチャへ接続する。
-4. Falseケースで空U8配列、ChNum、code=`-700111`のerror clusterを出力する。
-5. TrueケースへForループを配置し、`Channel List`を自動指標付け入力する。
-6. ForループへU8空配列用シフトレジスタとerror cluster用シフトレジスタを追加する。
-7. 各反復のChannelを名前でバンドル解除へ接続し、Enable、Core、Address、Size、Sign、Speedを取り出す。
-8. 6値を6個の`U32_To_LE_U8x4.vi`へ接続し、error clusterを直列接続する。
-9. 1個目の配列連結追加を右クリックし、`入力を連結`を有効にする。
-10. Enable、Core、Address、Size、Sign、Speedの各U8[4]を順に接続し、U8[24]を作る。
-11. 2個目の配列連結追加も`入力を連結`にする。
-12. 左へシフトレジスタの累積配列、右へ今回のU8[24]を接続する。
-13. 出力を右シフトレジスタへ接続する。
-14. ループ後の累積配列を`CHINFO_170 Raw`へ接続する。
-15. ループ後のerror clusterを`error out`へ接続する。
+#### A. ChNum算出と入力範囲判定
+
+1. `Channel List`を配列サイズへ接続する。
+2. 配列サイズ出力を`ChNum`出力へ直接接続する。
+3. `ChNum`を以上?へ接続し、もう一方へI32定数`1`を接続する。
+4. `ChNum`を以下?へ接続し、もう一方へI32定数`2048`を接続する。
+5. 2個のBoolean出力を複合演算へ接続し、演算をANDにする。
+6. AND出力をチャンネル数判定ケースストラクチャへ接続する。
+
+#### B. チャンネル数不正のFalseケース
+
+1. Falseケースへ配列初期化を配置する。
+2. U8定数`0`を`element`へ接続する。
+3. I32定数`0`を`dimension size`へ接続する。
+4. 配列初期化の空U8一次元配列を`CHINFO_170 Raw`出力トンネルへ接続する。
+5. 文字列にフォーマットを配置し、次を設定する。
+
+```text
+Build_CHINFO_170_Raw.vi: Channel count must be 1..2048. ChNum=%d
+```
+
+6. `%d`へ`ChNum`を接続する。
+7. 名前でバンドルへ`error in`を基準クラスタとして接続する。
+8. Boolean定数Trueを`status`へ接続する。
+9. I32定数`-700111`を`code`へ接続する。
+10. 文字列にフォーマット出力を`source`へ接続する。
+11. 名前でバンドル出力を`error out`出力トンネルへ接続する。
+12. `ChNum`はケース外で出力へ接続済みなので、Falseケース内に追加トンネルは作らない。
+
+#### C. TrueケースへForループを配置する
+
+1. Trueケース内へForループを配置する。
+2. Forループの`N`端子は未配線にする。
+3. `Channel List`をForループ左枠へ接続する。
+4. 作成された入力トンネルを右クリックし、`指標付けを有効（Enable Indexing）`にする。
+5. トンネルに`[]`記号が表示されることを確認する。
+6. ループ外では`Channel List`配列、ループ内では1反復につき`RAMScope_Channel.ctl`単体が出力される。
+7. `N`端子を未配線にしているため、ForループはChannel Listの要素数と同じ回数実行される。
+
+#### D. CHINFO出力バッファ用シフトレジスタを追加する
+
+1. Forループ枠を右クリックし、`シフトレジスタを追加（Add Shift Register）`を選ぶ。
+2. 左右の枠へ対になった端子が追加されたことを確認する。
+3. Trueケース内かつForループ外で、`ChNum`とI32定数`24`を乗算し、`Total Byte Size`を作る。
+4. 配列初期化を配置する。
+5. U8定数`0`を`element`へ、`Total Byte Size`を`dimension size`へ接続する。
+6. U8[`24 × ChNum`]のゼロ配列を、CHINFO出力バッファ用シフトレジスタの左外側端子へ接続する。
+
+```text
+左外側端子 : ループ開始前のゼロ配列
+左内側端子 : 前回反復までに書き込んだ配列
+右内側端子 : 今回反復で更新した配列
+右外側端子 : 全反復終了後の完成配列
+```
+
+#### E. error cluster用シフトレジスタを追加する
+
+1. Forループ枠をもう一度右クリックし、2本目のシフトレジスタを追加する。
+2. `error in`をerror cluster用シフトレジスタの左外側端子へ接続する。
+
+```text
+左外側端子 : ループ開始時のerror in
+左内側端子 : 前回反復までのerror
+右内側端子 : 今回反復後のerror
+右外側端子 : ループ全体終了後のerror out
+```
+
+#### F. 各反復の先頭で既存エラーを確認する
+
+1. error用シフトレジスタの左内側端子を名前でバンドル解除へ接続する。
+2. 要素を`status`へ変更する。
+3. `status`をループ内ケースストラクチャへ接続する。
+4. Trueケースでは、CHINFO配列用左内側端子を右内側端子へそのまま接続する。
+5. 同ケースで、error用左内側端子を右内側端子へそのまま接続する。
+6. Falseケースに1チャンネル分の変換処理を作る。
+
+#### G. 1チャンネル分を24バイトへ変換する
+
+1. 自動指標付けトンネルのループ内出力を2個目の名前でバンドル解除へ接続する。
+2. `Enable`、`Core`、`Address`、`Size`、`Sign`、`Speed`を表示する。
+3. `U32_To_LE_U8x4.vi`を6個横に配置する。
+4. 各フィールドを対応するSubVIの`Value`へ接続する。
+5. error用シフトレジスタの左内側端子を1個目SubVIの`error in`へ接続する。
+6. 1個目SubVIの`error out`を2個目の`error in`へ接続し、6個目まで直列接続する。
+7. 配列連結追加を6入力へ広げる。
+8. 配列連結追加を右クリックし、`入力を連結（Concatenate Inputs）`を有効にする。
+9. 次の順で各U8[4]を接続し、`Current Channel Bytes` U8[24]を作る。
+
+```text
+Enable Bytes
+Core Bytes
+Address Bytes
+Size Bytes
+Sign Bytes
+Speed Bytes
+```
+
+#### H. 今回の24バイトを累積バッファへ書き込む
+
+1. Forループの反復端子`i`とI32定数`24`を乗算し、`Write Index`を作る。
+2. 部分配列置換を配置する。
+3. CHINFO配列用シフトレジスタの左内側端子を`array`へ接続する。
+4. `Write Index`を`index`へ接続する。
+5. `Current Channel Bytes`を`new element/subarray`へ接続する。
+6. 更新後の配列をCHINFO配列用シフトレジスタの右内側端子へ接続する。
+7. 6個目の`U32_To_LE_U8x4.vi`の`error out`をerror用シフトレジスタの右内側端子へ接続する。
+
+各反復の書込位置：
+
+```text
+i=0 → index 0～23
+i=1 → index 24～47
+i=2 → index 48～71
+```
+
+#### I. Forループ終了後の出力を接続する
+
+1. CHINFO配列用シフトレジスタの右外側端子を`CHINFO_170 Raw`出力トンネルへ接続する。
+2. error用シフトレジスタの右外側端子を`error out`出力トンネルへ接続する。
+3. チャンネル数判定ケースのTrue/False両方で`CHINFO_170 Raw`と`error out`のトンネルが配線済みであることを確認する。
 
 ### 4. 単体テスト
 
-| Channel List | 期待ChNum | 期待Array Size |
-|---|---:|---:|
-| 1要素 | 1 | 24 |
-| 2要素 | 2 | 48 |
-| 0要素 | 0 | code=`-700111` |
+| Channel List | 期待ChNum | 期待Array Size | 期待error |
+|---|---:|---:|---|
+| 1要素 | 1 | 24 | 正常 |
+| 2要素 | 2 | 48 | 正常 |
+| 0要素 | 0 | 0 | code=`-700111` |
+| 2049要素 | 2049 | 0 | code=`-700111` |
+| 既存エラー | 要素数 | `24×ChNum`の初期ゼロ配列 | 既存エラー保持 |
+
+2チャンネルのAddressを異なる値にした確認例：
+
+```text
+Channel 0 Address = x12345678
+Channel 1 Address = xABCDEF01
+
+CHINFO Raw index 8..11  = x78 x56 x34 x12
+CHINFO Raw index 32..35 = x01 xEF xCD xAB
+```
 
 ## 10.10.3 `Build_LOGINFO_Raw.vi`
 
@@ -874,13 +1071,13 @@ error out    = 正常
 
 ### 2. 配置する関数およびSubVI等
 
-| 数 | 日本語名 | 英語名 | 配置場所 |
+| 数 | 日本語名 | 英語名 | 配置場所・追加方法 |
 |---:|---|---|---|
-| 1 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
-| 2以上 | ケースストラクチャ | Case Structure | プログラミング → ストラクチャ |
+| 2 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
+| 3以上 | ケースストラクチャ | Case Structure | プログラミング → ストラクチャ |
 | 2 | 配列初期化 | Initialize Array | プログラミング → 配列 |
 | 1 | Forループ | For Loop | プログラミング → ストラクチャ |
-| 1 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
+| 3 | シフトレジスタ | Shift Register | Forループ枠を右クリック → シフトレジスタを追加 |
 | 4 | `I32_To_LE_U8x4.vi` | SubVI | `30_RAMScope\00_Common` |
 | 5 | 部分配列置換 | Replace Array Subset | プログラミング → 配列 |
 | 1 | 指標配列 | Index Array | プログラミング → 配列 |
@@ -893,48 +1090,100 @@ error out    = 正常
 
 ### 3. 配線順
 
-1. `error in`を名前でバンドル解除へ接続し、`status`を外側ケースストラクチャへ接続する。
-2. 外側TrueでU8[136]のゼロ配列を`LOGINFO Raw`へ、`error in`を`error out`へ接続する。
-3. 外側FalseでU8定数`0`とI32定数`136`を配列初期化へ接続し、LOGINFO初期配列を作る。
-4. Boolean定数FalseとI32定数`16`を2個目の配列初期化へ接続し、Seen Boolean[16]を作る。
-5. `I32_To_LE_U8x4.vi`を2個配置し、`LogDevice`と`LimitHddSize`を変換する。
-6. `error in`をLogDevice変換へ、LogDevice変換のerror outをLimitHddSize変換へ接続する。
-7. 部分配列置換を2個直列に配置する。
-8. U8[136]へLogDevice Bytesをindex=`0`で書き込む。
-9. 続けてLimitHddSize Bytesをindex=`4`で書き込む。
-10. Forループを配置し、`Module Log Configs`を自動指標付け入力する。
-11. Forループへ次の3本のシフトレジスタを追加する。
+#### A. 外側エラーガード
+
+1. `error in`を1個目の名前でバンドル解除へ接続し、`status`を外側ケースストラクチャへ接続する。
+2. 外側Trueへ配列初期化を配置する。
+3. U8定数`0`とI32定数`136`を接続し、U8[136]ゼロ配列を作る。
+4. U8[136]を`LOGINFO Raw`へ、元の`error in`を`error out`へ接続する。
+
+#### B. 初期配列とヘッダを作る
+
+1. 外側Falseへ1個目の配列初期化を配置し、U8[136]ゼロ配列を作る。
+2. 2個目の配列初期化へBoolean定数FalseとI32定数`16`を接続し、`Seen Boolean[16]`を作る。
+3. `I32_To_LE_U8x4.vi`を2個配置する。
+4. `LogDevice`を1個目、`LimitHddSize`を2個目の`Value`へ接続する。
+5. `error in`を1個目SubVIへ、1個目の`error out`を2個目SubVIへ接続する。
+6. 部分配列置換を2個直列に配置する。
+7. U8[136]を1個目の`array`へ、LogDevice Bytesを`new element/subarray`へ、I32定数`0`を`index`へ接続する。
+8. 1個目の出力配列を2個目の`array`へ、LimitHddSize Bytesを`new element/subarray`へ、I32定数`4`を`index`へ接続する。
+9. 2個目の出力を`Header Written LOGINFO`として扱う。
+
+#### C. Forループと3本のシフトレジスタ
+
+1. Forループを配置する。
+2. `Module Log Configs`をForループ左枠へ接続し、自動指標付けを有効にする。
+3. `N`端子は未配線にする。
+4. Forループ枠を右クリックし、シフトレジスタを3本追加する。
+5. 1本目の左外側へ`Header Written LOGINFO`を接続する。
+6. 2本目の左外側へ`Seen Boolean[16]`を接続する。
+7. 3本目の左外側へ2個目`I32_To_LE_U8x4.vi`の`error out`を接続する。
 
 ```text
-LOGINFO U8[136]
-Seen Boolean[16]
-error cluster
+シフトレジスタ1 : 累積LOGINFO U8[136]
+シフトレジスタ2 : Seen Boolean[16]
+シフトレジスタ3 : error cluster
 ```
 
-12. ループ内で先にerror statusをケースストラクチャへ接続する。Trueなら3本のシフトレジスタを変更せず右側へ渡す。
-13. errorなしのFalseケースで1要素のModule Log Configを名前でバンドル解除し、MdlNo、LogSize、BufferSizeを取り出す。
-14. `MdlNo >= 0`と`MdlNo <= 15`を作る。
-15. Seen配列を指標配列へ接続し、indexへMdlNoを接続する。
-16. Seen[MdlNo]へNOTを接続する。
-17. 範囲内判定2個とNOT出力を複合演算ANDへ接続する。
-18. AND出力を有効/無効判定ケースストラクチャへ接続する。
-19. 有効Trueケースで`Log index = 8 + MdlNo × 8`を計算する。
-20. 同じケースで`Buffer index = 12 + MdlNo × 8`を計算する。
-21. `I32_To_LE_U8x4.vi`を2個配置し、LogSizeとBufferSizeを変換する。error clusterを直列接続する。
-22. 累積LOGINFO配列へLogSize BytesをLog indexで書き込む。
-23. 続けてBufferSize BytesをBuffer indexで書き込む。
-24. Seen配列へBoolean Trueをindex=MdlNoで書き込み、重複済みとして更新する。
-25. 更新したLOGINFO、Seen、errorを右シフトレジスタへ接続する。
-26. 無効FalseケースではLOGINFOとSeenを変更せず、code=`-700112`のerror clusterを生成して右シフトレジスタへ接続する。
-27. ループ後のLOGINFO配列を`LOGINFO Raw`へ接続する。
-28. ループ後のerror clusterを`error out`へ接続する。
+#### D. 各反復の既存エラー確認
+
+1. errorシフトレジスタの左内側端子を名前でバンドル解除へ接続する。
+2. `status`をループ内ケースストラクチャへ接続する。
+3. Trueケースでは、LOGINFO、Seen、errorの3本を左内側から右内側へそのまま接続する。
+4. Falseケースにモジュール設定処理を作る。
+
+#### E. MdlNoの範囲と重複を判定する
+
+1. 自動指標付けされた1要素を2個目の名前でバンドル解除へ接続する。
+2. `MdlNo`、`LogSize`、`BufferSize`を表示する。
+3. `MdlNo >= 0`と`MdlNo <= 15`を作る。
+4. Seenシフトレジスタの左内側を指標配列へ接続し、indexへ`MdlNo`を接続する。
+5. `Seen[MdlNo]`をNOTへ接続する。
+6. 範囲内判定2個とNOT出力を複合演算ANDへ接続する。
+7. AND出力を有効/無効判定ケースストラクチャへ接続する。
+
+#### F. 有効Trueケース
+
+1. `MdlNo × 8`を計算する。
+2. I32定数`8`を加えて`Log index`を作る。
+3. I32定数`12`を加えて`Buffer index`を作る。
+4. `I32_To_LE_U8x4.vi`を2個配置する。
+5. `LogSize`を1個目、`BufferSize`を2個目の`Value`へ接続する。
+6. errorシフトレジスタ左内側を1個目SubVIへ、1個目の`error out`を2個目SubVIへ接続する。
+7. 部分配列置換を2個直列に配置する。
+8. 累積LOGINFO左内側を1個目の`array`へ、Log Bytesを`new element/subarray`へ、Log indexを`index`へ接続する。
+9. 1個目出力を2個目の`array`へ、Buffer Bytesを`new element/subarray`へ、Buffer indexを`index`へ接続する。
+10. Seen配列更新用の部分配列置換へSeen左内側を接続する。
+11. Boolean定数Trueを`new element/subarray`へ、MdlNoを`index`へ接続する。
+12. 更新LOGINFOを1本目右内側、更新Seenを2本目右内側、2個目SubVIの`error out`を3本目右内側へ接続する。
+
+#### G. 無効Falseケース
+
+1. 累積LOGINFO左内側を1本目右内側へ変更せず接続する。
+2. Seen左内側を2本目右内側へ変更せず接続する。
+3. 文字列にフォーマットへ次を設定する。
+
+```text
+Build_LOGINFO_Raw.vi: MdlNo must be 0..15 and must not be duplicated. MdlNo=%d
+```
+
+4. `%d`へMdlNoを接続する。
+5. 名前でバンドルへerror左内側を基準クラスタとして接続する。
+6. `status=True`、`code=-700112`、`source=生成文字列`を設定する。
+7. 名前でバンドル出力を3本目右内側へ接続する。
+
+#### H. Forループ終了後
+
+1. LOGINFOシフトレジスタの右外側を`LOGINFO Raw`へ接続する。
+2. errorシフトレジスタの右外側を`error out`へ接続する。
+3. Seen右外側は本VIの出力にはしない。
 
 ### 4. 単体テスト
 
 入力例：
 
 ```text
-LogDevice   = 1
+LogDevice    = 1
 LimitHddSize = 0
 Module Log Configs[0]
   MdlNo      = 0
@@ -952,8 +1201,6 @@ index 12..15 = xC8 x00 x00 x00
 Array Size   = 136
 error out    = 正常
 ```
-
-異常テスト：
 
 | 条件 | 期待結果 |
 |---|---|
@@ -984,54 +1231,72 @@ error out    = 正常
 
 ### 2. 配置する関数およびSubVI等
 
-| 数 | 日本語名 | 英語名 | 配置場所 |
+| 数 | 日本語名 | 英語名 | 配置場所・追加方法 |
 |---:|---|---|---|
-| 1 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
+| 2 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
 | 複数 | ケースストラクチャ | Case Structure | プログラミング → ストラクチャ |
 | 1 | 配列サイズ | Array Size | プログラミング → 配列 |
-| 1 | 等しい? | Equal? | プログラミング → 比較 |
+| 複数 | 等しい? / 以上? | Equal? / Greater Or Equal? | プログラミング → 比較 |
+| 1 | 等しくない? | Not Equal? | プログラミング → 比較 |
 | 1 | Forループ | For Loop | プログラミング → ストラクチャ |
+| 4 | シフトレジスタ | Shift Register | Forループ枠を右クリック → シフトレジスタを追加 |
 | 1 | 乗算 | Multiply | プログラミング → 数値 |
 | 12以上 | 部分配列 | Array Subset | プログラミング → 配列 |
 | 11 | `U8x4_To_I32.vi` | SubVI | `30_RAMScope\00_Common` |
 | 1 | 1D配列検索 | Search 1D Array | プログラミング → 配列 |
 | 1 | バイト配列から文字列 | Byte Array To String | プログラミング → 文字列 → 文字列/配列/パス変換 |
 | 1 | 名前でバンドル | Bundle By Name | プログラミング → クラスタ、クラス、バリアント |
-| 複数 | 等しい? / 以上? | Equal? / Greater Or Equal? | プログラミング → 比較 |
 | 複数 | 複合演算 | Compound Arithmetic | プログラミング → ブール |
-| 1 | 文字列にフォーマット | Format Into String | プログラミング → 文字列 |
+| 2 | 文字列にフォーマット / 名前でバンドル | Format Into String / Bundle By Name | プログラミング → 文字列 / クラスタ |
 
 ### 3. 配線順
 
-1. `error in`を名前でバンドル解除へ接続し、`status`を外側ケースストラクチャへ接続する。
-2. 外側Trueでは次を出力する。
+#### A. 外側エラーガード
+
+1. `error in`を1個目の名前でバンドル解除へ接続する。
+2. `status`を外側ケースストラクチャへ接続する。
+3. Trueケースで空の`RAMScope_Module_Info.ctl`一次元配列を`Module List`へ接続する。
+4. I32定数`-1`を`MdlNo_RAM`と`MdlNo_CAN`へ接続する。
+5. I32定数`0`を`Endian_RAM`へ接続する。
+6. Boolean定数Falseを`RAM Module Found?`と`CAN Module Found?`へ接続する。
+7. `error in`を`error out`へ接続する。
+
+#### B. SYSINFOサイズ判定
+
+1. 外側Falseで`SYSINFO Raw`を配列サイズへ接続する。
+2. 配列サイズ出力とI32定数`960`を等しい?へ接続する。
+3. Boolean出力をサイズ判定ケースへ接続する。
+4. サイズ不正Falseケースでは、Aと同じ安全値を各出力へ接続する。
+5. 文字列にフォーマットへ次を設定し、実サイズを接続する。
 
 ```text
-Module List      = 空配列
-MdlNo_RAM        = -1
-MdlNo_CAN        = -1
-Endian_RAM       = 0
-RAM Found?       = False
-CAN Found?       = False
-error out        = error in
+Parse_SYSINFO_Array.vi: SYSINFO Raw size must be 960. Actual=%d
 ```
 
-3. 外側Falseで`SYSINFO Raw`を配列サイズへ接続する。
-4. 配列サイズ出力とI32定数`960`を等しい?へ接続し、サイズ判定ケースへ接続する。
-5. サイズ不正のFalseケースでは上記安全値とcode=`-700120`を出力する。
-6. サイズ正常のTrueケースへForループを配置し、N端子へI32定数`16`を接続する。
-7. Forループへ次のシフトレジスタを追加する。
+6. 名前でバンドルへ`error in`を接続し、`status=True`、`code=-700120`、`source=生成文字列`を設定して`error out`へ接続する。
 
-```text
-MdlNo_RAM  初期値 -1
-MdlNo_CAN  初期値 -1
-Endian_RAM 初期値 0
-error      初期値 error in
-```
+#### C. Forループとシフトレジスタ
 
-8. 反復端子`i`とI32定数`60`を乗算し、Record Startを作る。
-9. 部分配列へ`SYSINFO Raw`、index=`Record Start`、length=`60`を接続し、Record U8[60]を作る。
-10. Recordから以下の11個の4バイト部分配列を取り出す。
+1. サイズ正常TrueケースへForループを配置する。
+2. Forループの`N`端子へI32定数`16`を接続する。
+3. Forループ枠を右クリックし、シフトレジスタを4本追加する。
+4. 1本目左外側へI32定数`-1`を接続し、MdlNo_RAM用とする。
+5. 2本目左外側へI32定数`-1`を接続し、MdlNo_CAN用とする。
+6. 3本目左外側へI32定数`0`を接続し、Endian_RAM用とする。
+7. 4本目左外側へ`error in`を接続し、error用とする。
+
+#### D. 各60バイトレコードを切り出す
+
+1. 反復端子`i`とI32定数`60`を乗算し、`Record Start`を作る。
+2. 部分配列へ`SYSINFO Raw`、index=`Record Start`、length=`60`を接続する。
+3. 出力を`Record U8[60]`として扱う。
+4. errorシフトレジスタ左内側を2個目の名前でバンドル解除へ接続し、`status`をループ内ケースへ接続する。
+5. status=Trueケースでは4本のシフトレジスタを変更せず右へ渡し、空の`RAMScope_Module_Info.ctl`定数をループ出力へ接続する。
+6. status=Falseケースに以下の解析処理を作る。
+
+#### E. 11個のI32フィールドを解析する
+
+Recordから以下の4バイトを部分配列で切り出す。
 
 | フィールド | index | length |
 |---|---:|---:|
@@ -1047,52 +1312,58 @@ error      初期値 error in
 | security_id_size | 36 | 4 |
 | flash_enable | 40 | 4 |
 
-11. `U8x4_To_I32.vi`を11個配置する。
-12. 各4バイト配列を対応するSubVIの`Bytes`へ接続する。
-13. `Byte Order`を11個のSubVIへ分岐して接続する。
-14. error clusterはmodule変換からflash_enable変換まで直列接続する。
-15. Recordへ部分配列を接続し、index=`44`、length=`16`でName Bytesを取得する。
-16. Name Bytesを1D配列検索へ接続し、検索要素へU8定数`0`を接続する。
-17. 検索結果をケースストラクチャへ接続する。
-18. `-1`ケースではName Bytes全体をバイト配列から文字列へ接続する。
-19. Defaultケースでは部分配列へName Bytes、index=`0`、length=`検索結果`を接続し、NULLより前だけをバイト配列から文字列へ接続する。
-20. `RAMScope_Module_Info.ctl`定数を名前でバンドルへ接続し、次を設定する。
+1. `U8x4_To_I32.vi`を11個配置する。
+2. 各4バイト配列を対応するSubVIの`Bytes`へ接続する。
+3. `Byte Order`を11個のSubVIへ分岐して接続する。
+4. errorシフトレジスタ左内側をmodule変換の`error in`へ接続する。
+5. module変換からflash_enable変換までerror clusterを直列接続する。
 
-```text
-Record Index
-ModuleNo
-Module Type
-Probe ID
-Interface ID
-Version
-AddInfo
-Endian
-Probe Version
-Security ID Required
-Security ID Size
-Flash Enable
-Name
-Connected?
-```
+#### F. name[16]を文字列へ変換する
 
-21. `Connected?`は`module_type != 0x0F`で生成する。
-22. 名前でバンドル出力をForループ右枠へ接続し、出力トンネルの自動指標付けを有効にして`Module List`を作る。
-23. RAM判定として`module_type == 0x00`かつ現在の`MdlNo_RAM == -1`を複合演算ANDへ接続する。
-24. RAM判定Trueでは`module`をMdlNo_RAM、`endian`をEndian_RAMの右シフトレジスタへ接続する。
-25. Falseでは左シフトレジスタ値をそのまま右へ渡す。
-26. CAN判定として`module_type == 0x02`かつ現在の`MdlNo_CAN == -1`を作る。
-27. CAN判定Trueでは`module`をMdlNo_CANへ、Falseでは以前の値を保持する。
-28. 最後の変換SubVIのerror outをerrorシフトレジスタへ接続する。
-29. ループ後のMdlNo_RAM、MdlNo_CAN、Endian_RAMを各出力へ接続する。
-30. `MdlNo_RAM >= 0`を`RAM Module Found?`へ接続する。
-31. `MdlNo_CAN >= 0`を`CAN Module Found?`へ接続する。
-32. ループ後のerror clusterを`error out`へ接続する。
+1. Recordへ部分配列を接続し、index=`44`、length=`16`で`Name Bytes`を取得する。
+2. Name Bytesを1D配列検索へ接続する。
+3. 検索要素へU8定数`0`を接続する。
+4. 検索結果をケースストラクチャへ接続する。
+5. `-1`ケースではName Bytes全体をバイト配列から文字列へ接続する。
+6. Defaultケースでは部分配列へName Bytes、index=`0`、length=`検索結果`を接続する。
+7. NULLより前の部分配列をバイト配列から文字列へ接続する。
+
+#### G. Module Infoクラスタを作る
+
+1. `RAMScope_Module_Info.ctl`定数を名前でバンドルへ接続する。
+2. `Record Index`へForループ反復端子`i`を接続する。
+3. 11個の解析値を対応フィールドへ接続する。
+4. Name文字列を`Name`へ接続する。
+5. `module_type != 0x0F`を作り、`Connected?`へ接続する。
+6. 名前でバンドル出力をForループ右枠へ接続し、自動指標付けを有効にする。
+7. ループ終了後、この配列を`Module List`へ接続する。
+
+#### H. RAM/CANモジュール番号を保持する
+
+1. `module_type == 0x00`を作る。
+2. MdlNo_RAMシフトレジスタ左内側とI32定数`-1`を等しい?へ接続する。
+3. 2条件を複合演算ANDへ接続する。
+4. RAM判定ケースTrueで`module`をMdlNo_RAM右内側、`endian`をEndian_RAM右内側へ接続する。
+5. RAM判定FalseでMdlNo_RAMとEndian_RAMの左内側を右内側へそのまま接続する。
+6. `module_type == 0x02`を作る。
+7. MdlNo_CAN左内側と`-1`を等しい?へ接続する。
+8. 2条件をANDへ接続する。
+9. CAN判定Trueで`module`をMdlNo_CAN右内側へ接続する。
+10. CAN判定FalseでMdlNo_CAN左内側を右内側へ接続する。
+11. flash_enable変換の`error out`をerror右内側へ接続する。
+
+#### I. Forループ終了後の出力
+
+1. MdlNo_RAM右外側を`MdlNo_RAM`へ接続する。
+2. MdlNo_CAN右外側を`MdlNo_CAN`へ接続する。
+3. Endian_RAM右外側を`Endian_RAM`へ接続する。
+4. `MdlNo_RAM >= 0`を`RAM Module Found?`へ接続する。
+5. `MdlNo_CAN >= 0`を`CAN Module Found?`へ接続する。
+6. error右外側を`error out`へ接続する。
 
 ### 4. 単体テスト
 
 ダミーSYSINFOを作るときは、未使用レコードの`module_type`を`0x0F`へ設定する。全960バイトをゼロのままにすると、未使用レコードもRAMモジュールとして誤検出する可能性がある。
-
-テスト例：
 
 ```text
 Record 0
@@ -1122,8 +1393,6 @@ CAN Module Found?       = True
 error out               = 正常
 ```
 
-異常テスト：
-
 | 条件 | 期待結果 |
 |---|---|
 | SYSINFO Rawが959要素 | code=`-700120`、MdlNo=-1 |
@@ -1148,85 +1417,114 @@ error out               = 正常
 
 ### 2. 配置する関数およびSubVI等
 
-| 数 | 日本語名 | 英語名 | 配置場所 |
+| 数 | 日本語名 | 英語名 | 配置場所・追加方法 |
 |---:|---|---|---|
-| 1 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
+| 2以上 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
 | 複数 | ケースストラクチャ | Case Structure | プログラミング → ストラクチャ |
 | 3以上 | 配列サイズ | Array Size | プログラミング → 配列 |
 | 複数 | 加算、減算、乗算 | Add, Subtract, Multiply | プログラミング → 数値 |
 | 複数 | 以上?、等しい? | Greater Or Equal?, Equal? | プログラミング → 比較 |
 | 複数 | 複合演算 | Compound Arithmetic | プログラミング → ブール |
 | 2 | Forループ | For Loop | プログラミング → ストラクチャ |
+| 2 | シフトレジスタ | Shift Register | 各Forループ枠を右クリック → シフトレジスタを追加 |
 | 複数 | 部分配列 | Array Subset | プログラミング → 配列 |
 | 複数 | `U8x4_To_U32.vi` | SubVI | `30_RAMScope\00_Common` |
 | 1 | `U8x8_To_U64.vi` | SubVI | `30_RAMScope\00_Common` |
-| 1 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント |
 | 2 | 名前でバンドル | Bundle By Name | プログラミング → クラスタ、クラス、バリアント |
 | 1 | 型変換 | Type Cast | プログラミング → 数値 → データ操作 |
 | 2 | 倍精度浮動小数点に変換 | To Double Precision Float | プログラミング → 数値 → 変換 |
 | 1 | 選択 | Select | プログラミング → 比較 |
-| 1 | 文字列にフォーマット | Format Into String | プログラミング → 文字列 |
+| 2 | 文字列にフォーマット / 名前でバンドル | Format Into String / Bundle By Name | プログラミング → 文字列 / クラスタ |
 
 ### 3. 配線順
 
+#### A. 外側エラーガード
+
 1. `error in`を名前でバンドル解除へ接続し、`status`を外側ケースストラクチャへ接続する。
-2. 外側Trueでは空Packets、Parsed Packet Count=0、Unused Byte Count=0、元のerrorを出力する。
-3. 外側Falseで`Channel List`を配列サイズへ接続し、`ChNum`を作る。
-4. I32定数`4`とChNumを乗算し、I32定数`12`を加算して`Packet Size`を作る。
-5. `Packet Size × DataNum`で`Expected Byte Count`を作る。
-6. `Raw Buffer`を配列サイズへ接続し、`Actual Byte Count`を作る。
-7. `Actual - Expected`を`Unused Byte Count`へ接続する。
-8. 次の3条件を作る。
+2. 外側Trueへ空の`RAMScope_Packet.ctl`一次元配列を接続する。
+3. I32定数`0`を`Parsed Packet Count`と`Unused Byte Count`へ接続する。
+4. 元の`error in`を`error out`へ接続する。
 
-```text
-ChNum >= 1
-DataNum >= 0
-Actual Byte Count >= Expected Byte Count
-```
+#### B. サイズ計算と入力検証
 
-9. 3条件を複合演算ANDへ接続し、入力検証ケースストラクチャへ接続する。
-10. ChNumまたはDataNum不正の場合は空Packets、count=0、code=`-700130`を出力する。
-11. Actual不足の場合は空Packets、count=0、code=`-700131`を出力する。
-12. `DataNum == 0`を判定するケースを作り、Trueでは空Packets、count=0、正常errorを出力する。
-13. DataNum>0のケースへ外側Forループを配置し、N端子へDataNumを接続する。
-14. 外側Forループへerror cluster用シフトレジスタを追加する。
-15. 反復端子`i × Packet Size`で`Packet Start`を作る。
-16. 内側Forループを配置し、`Channel List`を自動指標付け入力する。
-17. 内側Forループの反復端子`j × 4`へPacket Startを加算し、`Value Start`を作る。
-18. 部分配列へRaw Buffer、index=`Value Start`、length=`4`を接続する。
-19. 4バイト配列を`U8x4_To_U32.vi`へ接続し、Raw U32を取得する。
-20. Byte OrderをSubVIへ接続し、error clusterを内側ループの処理順に直列接続する。
-21. 自動指標付けされたChannelクラスタを名前でバンドル解除へ接続し、Name、Address、Sign、Scale、Offset、Unitを取り出す。
-22. Raw U32を1個目の倍精度浮動小数点に変換へ接続し、符号なしDBLを作る。
-23. Raw U32を型変換へ接続し、型指定入力へI32定数`0`を接続する。
-24. 型変換出力I32を2個目の倍精度浮動小数点に変換へ接続し、符号ありDBLを作る。
-25. `Sign == 0`を作る。
-26. 選択へ次を接続する。
+1. 外側Falseで`Channel List`を配列サイズへ接続し、`ChNum`を作る。
+2. I32定数`4`とChNumを乗算し、I32定数`12`を加算して`Packet Size`を作る。
+3. `Packet Size × DataNum`で`Expected Byte Count`を作る。
+4. `Raw Buffer`を配列サイズへ接続し、`Actual Byte Count`を作る。
+5. `Actual Byte Count - Expected Byte Count`を`Unused Byte Count`へ接続する。
+6. `ChNum >= 1`と`DataNum >= 0`をANDへ接続する。
+7. AND出力を基本入力判定ケースへ接続する。
+8. 基本入力不正Falseケースでは空Packets、count=0、Unused=0を出力する。
+9. 文字列にフォーマットへChNumとDataNumを入れ、名前でバンドルによりcode=`-700130`を生成する。
+10. 基本入力正常Trueケースで`Actual Byte Count >= Expected Byte Count`を判定する。
+11. Raw不足Falseケースでは空Packets、count=0を出力し、code=`-700131`を生成する。
+12. Raw十分Trueケースで`DataNum == 0`を判定する。
+13. DataNum=0のTrueケースでは空Packets、count=0、計算済みUnused、正常errorを出力する。
+14. DataNum>0のFalseケースへパケット解析処理を作る。
 
-```text
-s = Sign == 0
-True入力  = 符号なしDBL
-False入力 = 符号ありDBL
-```
+#### C. 外側Forループでパケットを繰り返す
 
-27. 選択出力を`Value`とする。
-28. `Value × Scale + Offset`を計算し、`Engineering Value`を作る。
-29. `RAMScope_Channel_Value.ctl`定数を名前でバンドルへ接続する。
-30. Channel Index、Name、Address、Raw U32、Value、Engineering Value、Unitを接続する。
-31. 名前でバンドル出力を内側Forループ右枠へ接続し、自動指標付けで`Channel Values`配列を作る。
-32. `Packet Start + 4 × ChNum`で`Flag Start`を作る。
-33. 部分配列へRaw Buffer、Flag Start、length=`4`を接続する。
-34. Flag Bytesを`U8x4_To_U32.vi`へ接続し、Flagを取得する。
-35. `Flag Start + 4`で`Timestamp Start`を作る。
-36. 部分配列へRaw Buffer、Timestamp Start、length=`8`を接続する。
-37. Timestamp Bytesを`U8x8_To_U64.vi`へ接続し、Timestamp Rawを取得する。
-38. 現行作業仮定として`Timestamp Raw × 20e-9`を計算し、Timestamp Secondsを作る。
-39. `RAMScope_Packet.ctl`定数を名前でバンドルへ接続する。
-40. Packet Index、Channel Values、Flag、Timestamp Raw、Timestamp Secondsを接続する。
-41. Packetクラスタを外側Forループ右枠へ接続し、自動指標付けで`Packets`を作る。
-42. 外側Forループ後のPacketsを配列サイズへ接続し、`Parsed Packet Count`へ接続する。
-43. 外側Forループ後のerror clusterを`error out`へ接続する。
-44. すべての異常ケースでも`Packets`、`Parsed Packet Count`、`Unused Byte Count`、`error out`の4出力を必ず配線する。
+1. 外側Forループを配置し、N端子へ`DataNum`を接続する。
+2. Forループ枠を右クリックし、error cluster用シフトレジスタを追加する。
+3. 左外側端子へ正常系ケースへ入ってきたerror clusterを接続する。
+4. 反復端子`i × Packet Size`で`Packet Start`を作る。
+5. error左内側を名前でバンドル解除へ接続し、`status`をパケット処理ケースへ接続する。
+6. status=Trueケースでは空のPacketクラスタをループ出力へ接続し、error左内側を右内側へ接続する。
+7. status=Falseケースにチャンネル、Flag、Timestamp解析を作る。
+
+#### D. 内側Forループでチャンネル値を解析する
+
+1. 内側Forループを外側Forループのstatus=Falseケースへ配置する。
+2. `Channel List`を内側Forループ左枠へ接続し、自動指標付けを有効にする。
+3. `N`端子は未配線にする。
+4. 内側Forループ枠を右クリックし、error cluster用シフトレジスタを追加する。
+5. 左外側端子へ外側errorシフトレジスタの左内側を接続する。
+6. 内側反復端子`j × 4`へPacket Startを加算し、`Value Start`を作る。
+7. 部分配列へRaw Buffer、index=`Value Start`、length=`4`を接続する。
+8. 4バイト配列を`U8x4_To_U32.vi`へ接続する。
+9. Byte OrderをSubVIへ接続する。
+10. 内側error左内側をSubVIの`error in`へ接続する。
+11. 自動指標付けされたChannelクラスタを名前でバンドル解除へ接続する。
+12. `Name`、`Address`、`Sign`、`Scale`、`Offset`、`Unit`を取り出す。
+13. Raw U32を1個目の倍精度浮動小数点に変換へ接続し、符号なしDBLを作る。
+14. Raw U32を型変換の`x`へ接続し、型指定へI32定数`0`を接続する。
+15. 型変換出力I32を2個目の倍精度浮動小数点に変換へ接続し、符号ありDBLを作る。
+16. `Sign == 0`を作る。
+17. 選択へ`selector=Sign == 0`、True入力=符号なしDBL、False入力=符号ありDBLを接続する。
+18. 選択出力を`Value`として、`Value × Scale + Offset`を計算する。
+19. `RAMScope_Channel_Value.ctl`定数を名前でバンドルへ接続する。
+20. Channel Index、Name、Address、Raw U32、Value、Engineering Value、Unitを接続する。
+21. 名前でバンドル出力を内側Forループ右枠へ接続し、自動指標付けで`Channel Values`配列を作る。
+22. `U8x4_To_U32.vi`の`error out`を内側errorシフトレジスタ右内側へ接続する。
+23. 内側ループ後のerror右外側を後続Flag解析の`error in`へ渡す。
+
+#### E. FlagとTimestampを解析する
+
+1. `Packet Start + 4 × ChNum`で`Flag Start`を作る。
+2. 部分配列へRaw Buffer、Flag Start、length=`4`を接続する。
+3. Flag Bytesを`U8x4_To_U32.vi`へ接続する。
+4. Byte Orderを接続し、内側ループ後errorを`error in`へ接続する。
+5. `Flag Start + 4`で`Timestamp Start`を作る。
+6. 部分配列へRaw Buffer、Timestamp Start、length=`8`を接続する。
+7. Timestamp Bytesを`U8x8_To_U64.vi`へ接続する。
+8. Byte Orderを接続し、Flag変換の`error out`をTimestamp変換の`error in`へ接続する。
+9. 現行作業仮定として`Timestamp Raw × 20e-9`を計算し、Timestamp Secondsを作る。
+
+#### F. Packetクラスタを作る
+
+1. `RAMScope_Packet.ctl`定数を名前でバンドルへ接続する。
+2. Packet Indexへ外側Forループ反復端子`i`を接続する。
+3. Channel Values、Flag、Timestamp Raw、Timestamp Secondsを接続する。
+4. Packetクラスタを外側Forループ右枠へ接続し、自動指標付けで`Packets`を作る。
+5. Timestamp変換の`error out`を外側errorシフトレジスタ右内側へ接続する。
+
+#### G. Forループ終了後と全出力
+
+1. 外側Forループ後のPacketsを`Packets`出力へ接続する。
+2. Packetsを配列サイズへ接続し、`Parsed Packet Count`へ接続する。
+3. 外側errorシフトレジスタ右外側を`error out`へ接続する。
+4. Bで計算した`Unused Byte Count`を出力へ接続する。
+5. すべての異常ケースで`Packets`、`Parsed Packet Count`、`Unused Byte Count`、`error out`の4出力が配線済みであることを確認する。
 
 ### 4. 単体テスト
 
@@ -1249,16 +1547,16 @@ Channel 1
 Raw Buffer：
 
 ```text
-x01 x00 x00 x00              Channel 0 = 1
-xFE xFF xFF xFF              Channel 1 = -2
-xA5 x00 x00 x00              Flag = xA5
-x32 x00 x00 x00 x00 x00 x00 x00   Timestamp = 50
+x01 x00 x00 x00                    Channel 0 = 1
+xFE xFF xFF xFF                    Channel 1 = -2
+xA5 x00 x00 x00                    Flag = xA5
+x32 x00 x00 x00 x00 x00 x00 x00  Timestamp = 50
 ```
 
 入力：
 
 ```text
-DataNum   = 1
+DataNum    = 1
 Byte Order = Little Endian
 ```
 
@@ -1273,8 +1571,6 @@ Parsed Packet Count                = 1
 Unused Byte Count                  = 0
 error out                          = 正常
 ```
-
-異常テスト：
 
 | 条件 | 期待結果 |
 |---|---|
@@ -1422,7 +1718,11 @@ TestStandから`RS_DLL_*`を直接呼ばない。
 | LabVIEWクラッシュ | 引数型、配列サイズ | ヘッダとCLFN再照合 |
 | U8変換値が逆 | Byte Order | Little/Bigの数値結合順を確認 |
 | 同じバイトが4回出る | 指標配列index | `0,1,2,3`を接続 |
+| 16進数入力が`4E`等へ変わる | 10進入力後に表示だけ変更 | 16進表示へ変更後に値を再入力 |
+| 3要素試験にならない | 表示行数と実要素数を混同 | `データ操作 → 要素を削除`後、Array Sizeで確認 |
+| Channel ListをArray Sizeへ接続できない | ctl単体を置いている | 配列枠の要素として`RAMScope_Channel.ctl`を配置 |
 | CHINFOが2次元 | 配列連結追加 | `入力を連結`を有効化 |
+| シフトレジスタが見つからない | 関数パレットを探している | Forループ枠を右クリックして追加 |
 | Buffer不足 | Buffer Byte Size | `(4×ChNum+12)×MaxDataNum`を確認 |
 | 値と変数名がずれる | Channel List順序 | BuilderとParserへ同一配列を渡す |
 
@@ -1458,7 +1758,6 @@ TestStandから`RS_DLL_*`を直接呼ばない。
 
 ## 次に作成・確認
 
-- [ ] `RAMScope_Byte_Order.ctl`
 - [ ] `U8x4_To_U32.vi`のBig Endian、3要素、既存エラー試験
 - [ ] `U8x4_To_I32.vi`
 - [ ] `U8x8_To_U64.vi`
@@ -1474,9 +1773,11 @@ TestStandから`RS_DLL_*`を直接呼ばない。
 
 # 10.18 参照した公式資料
 
-- NI LabVIEWプログラミングリファレンス：配列サイズ関数
-- NI LabVIEWプログラミングリファレンス：指標配列
-- NI LabVIEWプログラミングリファレンス：型変換関数
+- NI LabVIEWプログラミングリファレンス：配列サイズ（Array Size）
+- NI LabVIEWプログラミングリファレンス：指標配列（Index Array）
+- NI LabVIEWプログラミングリファレンス：型変換（Type Cast）
+- NI LabVIEWプログラミングリファレンス：Forループ（For Loop）
+- NI LabVIEWプログラミングリファレンス：シフトレジスタ（Shift Register）
 - NI LabVIEWプログラミングリファレンス内の各関数ページ
 - `docs/reference/RAMScopeVP.h`
 - `docs/reference/GTHard.h`
