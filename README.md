@@ -2,10 +2,10 @@
 
 NI社製LabVIEWとTestStandを利用し、複数機器を連携させる自動テストシステムの構築手順をまとめた資料です。
 
-> **最終整理日：2026-07-15**
+> **最終整理日：2026-07-16**
 >
-> RAMScopeは、64bit版RAMScopeVP APIをLabVIEW 64bitのCLFNから直接呼び出す。
-> RAMScope関連の環境準備、DLLラッパ、構造体生成、Parser、公開API、PoCは、すべて[10_RAMScope実装方針.md](./docs/10_RAMScope実装方針.md)へ統合した。
+> 実装手順の書き方は[00A_LabVIEW実装資料の記述ルール.md](./docs/00A_LabVIEW実装資料の記述ルール.md)を正とする。
+> RAMScopeの環境準備、DLLラッパ、構造体生成、Parser、公開API、PoCは[10_RAMScope実装方針.md](./docs/10_RAMScope実装方針.md)を唯一の正本とする。
 
 ---
 
@@ -23,25 +23,27 @@ NI社製LabVIEWとTestStandを利用し、複数機器を連携させる自動�
 ## 2. 最初に読む順番
 
 ```text
-00 資料の読み方と正本ルール
+00  資料の読み方と正本ルール
   ↓
-01 システム概要
+00A LabVIEW実装資料の記述ルール
   ↓
-02 LabVIEW / TestStandの役割分担
+01  システム概要
   ↓
-03 開発PC・試験PCの環境構築
+02  LabVIEW / TestStandの役割分担
   ↓
-04 LabVIEW基礎
+03  開発PC・試験PCの環境構築
   ↓
-05 VI設計方針と共通仕様
+04  LabVIEW基礎
   ↓
-06 共通部品とVI雛形
+05  VI設計方針と共通仕様
+  ↓
+06  共通部品とVI雛形
   ↓
 07 / 08 一般機器
   ↓
-09 CAN方式検討
+09  CAN方式検討
   ↓
-10 RAMScope GT170実装ガイド
+10  RAMScope GT170実装ガイド
   ├─ 環境準備・DLL疎通
   ├─ RAMScope_Code_To_Error.vi
   ├─ 薄いDLLラッパ12個
@@ -53,18 +55,40 @@ NI社製LabVIEWとTestStandを利用し、複数機器を連携させる自動�
   ↓
 CAN方式確定・CAN単体PoC
   ↓
-11 TestStand組み込み
+11  TestStand組み込み
   ↓
-12 Cleanup・異常系
+12  Cleanup・異常系
   ↓
-13 ロードマップと完了条件
+13  ロードマップと完了条件
 ```
 
 RAMScope実装では旧`10A`、`10B`、`10B-1`から`10B-4`を参照しない。第10章だけを正本とする。
 
 ---
 
-## 3. RAMScope実装レイヤ
+## 3. 実装資料の読み方
+
+### 設計章
+
+01、02、05、13は「なぜその構成にするか」「責務をどこへ置くか」を説明する。画面操作の正本にはしない。
+
+### 操作手順章
+
+03、06～12、付録A1でVIやTestStandを作る場合は、次の形式を使用する。
+
+```text
+0. 目的と処理概要
+1. 入出力
+2. 配置する関数およびSubVI等
+3. 配線順
+4. 単体テスト
+```
+
+接続元、接続先、関数名、端子名、数値型、自動指標付け、シフトレジスタ、テストデータ生成方法を省略しない。詳細は[00A](./docs/00A_LabVIEW実装資料の記述ルール.md)を参照する。
+
+---
+
+## 4. RAMScope実装レイヤ
 
 ```text
 TestStand
@@ -87,12 +111,13 @@ TestStandは`RS_DLL_*`を直接呼ばない。
 
 ---
 
-## 4. ドキュメント構成
+## 5. ドキュメント構成
 
 | No. | ファイル | 内容 |
 |---|---|---|
 | Index | [README.md](./README.md) | 全体索引と採用方針 |
 | 00 | [docs/00_資料の読み方と正本ルール.md](./docs/00_資料の読み方と正本ルール.md) | 情報の優先順位、確定・未確定、更新ルール |
+| 00A | [docs/00A_LabVIEW実装資料の記述ルール.md](./docs/00A_LabVIEW実装資料の記述ルール.md) | 初心者が再現できる手順記載の共通ルール |
 | 01 | [docs/01_システム概要と構成.md](./docs/01_システム概要と構成.md) | 目的、機器構成、接続方式 |
 | 02 | [docs/02_役割分担とアーキテクチャ.md](./docs/02_役割分担とアーキテクチャ.md) | LabVIEWとTestStandの責務 |
 | 03 | [docs/03_LabVIEW環境構築.md](./docs/03_LabVIEW環境構築.md) | 開発PC、試験PC、ドライバ、DLL準備 |
@@ -114,7 +139,7 @@ TestStandは`RS_DLL_*`を直接呼ばない。
 
 ---
 
-## 5. 現在確定している設計
+## 6. 現在確定している設計
 
 1. 1イベントを1公開API VIにする。
 2. DLL層は1関数を1個の薄い`RS_DLL_*`ラッパにする。
@@ -122,7 +147,7 @@ TestStandは`RS_DLL_*`を直接呼ばない。
 4. DLLラッパは標準error clusterとAPI ReturnCodeを分けて扱う。
 5. 公開APIだけが`Status.ctl`と`TestError.ctl`を出力する。
 6. `RAMScope_Set_Cond.vi`を測定開始前に実行する。
-7. `ChNum`は`RAMScope_Channel.ctl`配列の`Array Size`から算出する。
+7. `ChNum`は`RAMScope_Channel.ctl`配列の配列サイズ（Array Size）から算出する。
 8. BuilderとParserはDLLを呼ばない純粋処理VIにする。
 9. `ReleaseBufferData`は要否確定まで独立VIとする。
 10. `RAMScope_Close.vi`はCleanupで必ず実行する。
@@ -131,7 +156,7 @@ TestStandは`RS_DLL_*`を直接呼ばない。
 
 ---
 
-## 6. 未確定・実機確認待ち
+## 7. 未確定・実機確認待ち
 
 - GT170接続時のDeviceInit正常値
 - `0x30100001`の正式定義
