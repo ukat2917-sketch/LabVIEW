@@ -1,18 +1,7 @@
 name: Merge RAMScope supplement once
 
 on:
-  push:
-    branches:
-      - claude/labview-teststand-automation-docs-fri3r4
-    paths:
-      - .github/workflows/merge-ramscope-supplement-once.yml
-      - docs/.trigger-ramscope-doc-merge
-  pull_request:
-    branches:
-      - claude/labview-teststand-automation-docs-fri3r4
-    types:
-      - opened
-      - synchronize
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -27,7 +16,7 @@ jobs:
           ref: claude/labview-teststand-automation-docs-fri3r4
           fetch-depth: 0
 
-      - name: Append supplement without replacing original text
+      - name: Append supplement and documentation rules
         shell: bash
         run: |
           python3 - <<'PY'
@@ -36,18 +25,23 @@ jobs:
 
           main_path = Path('docs/10_RAMScope実装方針.md')
           supplement_path = Path('docs/10A_RAMScope実装ガイド_20260717改訂追補.md')
-          marker = '<!-- RAMSCOPE_20260717_APPEND_START -->'
+          rules_path = Path('docs/00A_LabVIEW実装資料の記述ルール.md')
+          trigger_path = Path('docs/.trigger-ramscope-doc-merge')
+          workflow_path = Path('.github/workflows/merge-ramscope-supplement-once.yml')
+
+          main_marker = '<!-- RAMSCOPE_20260717_APPEND_START -->'
+          rules_marker = '<!-- LABVIEW_RULES_20260717_APPEND_START -->'
 
           if not main_path.exists():
               raise SystemExit(f'Main document not found: {main_path}')
-          if not supplement_path.exists():
+          if not supplement_path.exists() and main_marker not in main_path.read_text(encoding='utf-8'):
               raise SystemExit(f'Supplement not found: {supplement_path}')
+          if not rules_path.exists():
+              raise SystemExit(f'Rules document not found: {rules_path}')
 
           main = main_path.read_text(encoding='utf-8')
-          if marker in main:
-              print('Supplement is already appended. No document change required.')
-              supplement_path.unlink()
-          else:
+
+          if main_marker not in main:
               supplement = supplement_path.read_text(encoding='utf-8')
               start = re.search(r'^# 1\.\s+', supplement, flags=re.MULTILINE)
               if start is None:
@@ -59,19 +53,21 @@ jobs:
               plain_heading = re.compile(r'^(#{1,5})\s+(.*)$')
 
               for line in body.splitlines():
-                  m = numbered_heading.match(line)
-                  if m:
-                      hashes, number, title = m.groups()
+                  numbered = numbered_heading.match(line)
+                  if numbered:
+                      hashes, number, title = numbered.groups()
                       transformed.append('#' * min(len(hashes) + 1, 6) + f' 10.19.{number} {title}')
                       continue
-                  m = plain_heading.match(line)
-                  if m:
-                      hashes, title = m.groups()
+
+                  plain = plain_heading.match(line)
+                  if plain:
+                      hashes, title = plain.groups()
                       transformed.append('#' * min(len(hashes) + 1, 6) + ' ' + title)
                       continue
+
                   transformed.append(line)
 
-              appendix = '''
+              appendix_header = '''
 
 ---
 
@@ -85,21 +81,394 @@ jobs:
 > 手順の表記は[00A_LabVIEW実装資料の記述ルール.md](./00A_LabVIEW実装資料の記述ルール.md)に従う。
 
 '''
-              main_path.write_text(main.rstrip() + appendix + '\n'.join(transformed).rstrip() + '\n', encoding='utf-8')
-              supplement_path.unlink()
 
-          print('RAMScope supplement integration completed.')
+              logging_api_addition = r'''
+
+---
+
+## 10.19.12 RAMScope内部保存データの取得経路を追加する
+
+### 10.19.12.1 目的と処理概要
+
+`Build_LOGINFO_Raw.vi`と`RS_DLL_GT150SetLoggingInfo.vi`は、RAMScopeVP API内部の保存用データバッファ条件を設定する。一方、設定しただけでは測定結果をLabVIEW側のファイルへ保存したことにはならない。
+
+本番構成では、次の2経路を区別する。
+
+```text
+A. 測定中の監視・逐次取得
+   RAMScope_Read.vi
+     → RAMScopeGT150GetBufferData
+     → RAMScope_Parse_Buffer.vi
+     → 必要に応じてTDMSへ追記
+
+B. 測定停止後の内部保存データ回収
+   MeasStop
+     → アイドル状態を確認
+     → GetMeasNum
+     → GetBlockNum
+     → GetLoggingDataNum
+     → GetLoggingData
+     → RAMScope_Parse_Buffer.vi
+     → TDMSへ保存
+     → ReleaseBufferData
+```
+
+`GetLoggingDataNum`と`GetLoggingData`は、RAMScopeVP API内部の保存用データバッファを対象とする。オフライン状態および測定中は発行せず、アイドル状態で発行する。
+
+### 10.19.12.2 追加するDLL Wrapper
+
+```text
+30_RAMScope\10_DLL_Wrapper\
+├─ RS_DLL_GT150GetMeasNum.vi
+├─ RS_DLL_GT150GetBlockNum.vi
+├─ RS_DLL_GT150GetLoggingDataNum.vi
+└─ RS_DLL_GT150GetLoggingData.vi
+```
+
+`GetMeasNum`と`GetBlockNum`の正式な関数宣言、引数および応答コードは、対応するベンダー資料を入手後に確定する。推測した引数でCLFNを作成してはならない。
+
+### 10.19.12.3 `RS_DLL_GT150GetLoggingDataNum.vi`
+
+#### 0. 目的と処理概要
+
+指定した測定番号および測定データブロック番号について、保存用データバッファに保存されているPacket数を取得する。
+
+#### 1. 入出力
+
+| 端子 | 方向 | 型 |
+|---|---|---|
+| `UnitNo` | 入力 | I32 |
+| `MdlNo` | 入力 | I32 |
+| `MeasNo` | 入力 | I32 |
+| `BlockNo` | 入力 | I32 |
+| `error in` | 入力 | error cluster |
+| `DataNum` | 出力 | I32 |
+| `API ReturnCode` | 出力 | I32 |
+| `error out` | 出力 | error cluster |
+
+#### 2. DLL関数宣言
+
+```c
+long RAMScopeGT150GetLoggingDataNum(
+    long UnitNo,
+    long MdlNo,
+    long MeasNo,
+    long BlockNo,
+    long *pDataNum
+);
+```
+
+#### 3. CLFN引数順
+
+| 順番 | 引数 | CLFN設定 |
+|---:|---|---|
+| 1 | `UnitNo` | Signed 32-bit Integer / Value |
+| 2 | `MdlNo` | Signed 32-bit Integer / Value |
+| 3 | `MeasNo` | Signed 32-bit Integer / Value |
+| 4 | `BlockNo` | Signed 32-bit Integer / Value |
+| 5 | `pDataNum` | Signed 32-bit Integer / Pointer to Value |
+
+#### 4. 配線順
+
+作業領域：
+
+```text
+外側error Case Structure
+selector = error in.status
+```
+
+1. `error in.status`を外側Case Structureのselectorへ接続する。
+2. Trueケース（既存エラーあり）ではI32定数`0`を`DataNum`および`API ReturnCode`へ接続し、元の`error in`を`error out`へ接続する。
+3. Falseケース（既存エラーなし）へライブラリ関数呼び出しノード（Call Library Function Node）を1個配置する。
+4. I32定数`0`をCLFN左側の`pDataNum`端子へ接続する。
+5. `UnitNo`、`MdlNo`、`MeasNo`、`BlockNo`を、上表の順番でCLFN入力端子へ接続する。
+6. CLFN右側の`pDataNum`を`DataNum`へ接続する。
+7. CLFN戻り値を`API ReturnCode`および`RAMScope_Code_To_Error.vi`の`API ReturnCode`へ接続する。
+8. 文字列定数`RAMScopeGT150GetLoggingDataNum`を同SubVIの`Function Name`へ接続する。
+9. CLFNの`error out`を同SubVIの`error in`へ接続する。
+10. 同SubVIの`error out`を本VIの`error out`へ接続する。
+
+#### 5. 発行条件
+
+```text
+オフライン → 発行しない
+測定中     → 発行しない
+アイドル   → 発行可能
+```
+
+### 10.19.12.4 `RS_DLL_GT150GetLoggingData.vi`
+
+#### 0. 目的と処理概要
+
+RAMScopeVP API内部の保存用データバッファから、測定データをPacket単位で取得する。
+
+#### 1. 入出力
+
+| 端子 | 方向 | 型 |
+|---|---|---|
+| `UnitNo` | 入力 | I32 |
+| `MdlNo` | 入力 | I32 |
+| `MeasNo` | 入力 | I32 |
+| `BlockNo` | 入力 | I32 |
+| `Requested DataNum` | 入力 | I32 |
+| `Packet Size` | 入力 | I32 |
+| `error in` | 入力 | error cluster |
+| `Raw Buffer` | 出力 | U8一次元配列 |
+| `Actual DataNum` | 出力 | I32 |
+| `LostDataNum` | 出力 | I32 |
+| `API ReturnCode` | 出力 | I32 |
+| `error out` | 出力 | error cluster |
+
+#### 2. DLL関数宣言
+
+```c
+long RAMScopeGT150GetLoggingData(
+    long UnitNo,
+    long MdlNo,
+    long MeasNo,
+    long BlockNo,
+    void *pData,
+    long *pDataNum,
+    long *pLostDataNum
+);
+```
+
+#### 3. バッファサイズ
+
+```text
+Buffer Byte Size = Requested DataNum × Packet Size
+Packet Size       = ChNum × 4 + 12
+```
+
+`Requested DataNum`は、`GetLoggingDataNum`で取得したPacket数以下とする。ポイント指定ロギングが有効な場合、要求数より少ないPacket数が返ることがあるため、出力`Actual DataNum`を正として扱う。
+
+#### 4. 配線順
+
+作業領域：
+
+```text
+外側error Case Structure
+selector = error in.status
+```
+
+1. `error in.status`を外側Case Structureのselectorへ接続する。
+2. Trueケース（既存エラーあり）では空U8配列、I32定数`0`の`Actual DataNum`、I32定数`0`の`LostDataNum`、I32定数`0`の`API ReturnCode`および元の`error in`を出力する。
+3. Falseケース（既存エラーなし）で`Requested DataNum >= 0`と`Packet Size >= 12`を比較し、AND出力を`Input Valid?` Case Structureのselectorへ接続する。
+4. Falseケース（Input Valid?=False：入力値不正）では安全出力を返し、次のFormat Stringでローカルエラーを生成する。
+
+```text
+RAMScopeGT150GetLoggingData.vi: Requested DataNum must be >= 0 and Packet Size must be >= 12. Requested DataNum=%d, Packet Size=%d
+```
+
+```text
+1個目の%d ← Requested DataNum I32
+2個目の%d ← Packet Size I32
+```
+
+5. 名前でバンドル（Bundle By Name）の基準クラスタへ、外側Falseケースへ入ってきた正常な`error in`を接続する。
+6. Boolean定数`True`を`status`、I32定数`-700150`を`code`、文字列にフォーマット（Format Into String）の出力を`source`へ接続する。
+7. Trueケース（Input Valid?=True：入力値正常）で`Requested DataNum × Packet Size`を計算し、`Buffer Byte Size`とする。
+8. U8定数`0`と`Buffer Byte Size`を配列初期化（Initialize Array）へ接続し、取得用U8配列を作る。
+9. I32定数`0`を`pLostDataNum`の初期値へ接続する。
+10. `Requested DataNum`を`pDataNum`の入力値へ接続する。
+11. `UnitNo`、`MdlNo`、`MeasNo`、`BlockNo`、U8配列、`Requested DataNum`、I32定数`0`を、関数宣言順にCLFNへ接続する。
+12. CLFN右側のU8配列を`Raw Buffer`、`pDataNum`を`Actual DataNum`、`pLostDataNum`を`LostDataNum`へ接続する。
+13. CLFN戻り値を`API ReturnCode`および`RAMScope_Code_To_Error.vi`へ接続する。
+14. 文字列定数`RAMScopeGT150GetLoggingData`を同SubVIの`Function Name`へ接続する。
+15. 同SubVIの`error out`を本VIの`error out`へ接続する。
+
+### 10.19.12.5 公開VI `RAMScope_Export_Internal_Log.vi`
+
+#### 0. 目的と処理概要
+
+測定停止後、RAMScope内部の保存用データバッファを測定番号およびブロック番号単位で回収し、Parserで解析してTDMSへ保存する。
+
+#### 1. 主な入出力
+
+```text
+入力：UnitNo、MdlNo_RAM、Channel List、Byte Order、Log State、error in
+出力：Total Packet Count、Total LostDataNum、Actual File Path、Status、TestError、error out
+```
+
+#### 2. 実行順
+
+```text
+RAMScope_Log_Stop.vi
+  → 測定停止成功を確認
+  → GetMeasNum
+  → 外側Forループ：MeasNo
+       → GetBlockNum
+       → 内側Forループ：BlockNo
+            → GetLoggingDataNum
+            → GetLoggingData
+            → RAMScope_Parse_Buffer.vi
+            → RAMScope_File_Log_Append.vi
+  → RAMScope_Release.vi
+```
+
+`GetMeasNum`と`GetBlockNum`の正式仕様が未確定の間は、本VIを完成扱いにしない。
+
+#### 3. エラー時の方針
+
+- `MeasStop`が失敗し、測定中の可能性がある場合は`GetLoggingDataNum`、`GetLoggingData`および`ReleaseBufferData`を呼ばない。
+- 1ブロックの取得またはParserでエラーが発生した場合、その時点までのTDMSをCloseし、最初のエラーを保持する。
+- `Actual DataNum=0`は正常な空データとして扱う。
+- `LostDataNum`はTDMSの`ReadStatus`または`InternalLogStatus` Groupへ保存する。
+
+### 10.19.12.6 最終的な本番フロー
+
+```text
+RAMScope_Connect.vi
+  → RAMScope_Init.vi
+  → RAMScope_Set_Cond.vi
+  → RAMScope_File_Log_Open.vi
+  → RAMScope_Log_Start.vi
+  → 測定処理
+  → RAMScope_Log_Stop.vi
+  → RAMScope_Export_Internal_Log.vi
+  → RAMScope_File_Log_Close.vi
+  → RAMScope_Close.vi
+```
+
+測定中に`RAMScope_Read.vi`で表示・判定用データを取得する場合でも、最終保存の正本を内部保存データ回収経路とするか、逐次TDMS追記経路とするかを試験仕様ごとに明記する。同じPacketを二重保存しない。
+'''
+
+              integrated = main.rstrip() + appendix_header + '\n'.join(transformed).rstrip() + logging_api_addition.rstrip() + '\n'
+              main_path.write_text(integrated, encoding='utf-8')
+
+          rules = rules_path.read_text(encoding='utf-8')
+          if rules_marker not in rules:
+              rules_addition = r'''
+
+---
+
+<!-- LABVIEW_RULES_20260717_APPEND_START -->
+## 5. 2026-07-17追加ルール
+
+### 5.1 既存本文を維持して追記する
+
+既存資料へ新しい確定情報を反映する場合、利用者が実装中の既存手順を不用意に失わないようにする。
+
+```text
+1. 既存本文を削除・置換しない
+2. 章末へ日付付き追記節を作る
+3. 既存記述と競合する場合は、追記節を優先すると明記する
+4. 旧記述は変更履歴として維持する
+5. 最終統合時に内容を削る場合は、利用者の確認を得る
+```
+
+### 5.2 Case StructureはTrue／Falseを先に書く
+
+`正常ケース`、`不正ケース`、`Raw不足ケース`等の意味名だけで記載してはならない。
+
+```text
+Falseケース（Input Valid?=False：入力値不正）
+Trueケース（Input Valid?=True：入力値正常）
+Falseケース（Raw Buffer Sufficient?=False：Raw Buffer不足）
+Trueケース（Raw Buffer Sufficient?=True：Raw Buffer十分）
+Trueケース（DataNum == 0：空配列を返す）
+Falseケース（DataNum != 0：解析する）
+```
+
+Case Structureを説明する直前に、selectorの式と評価例を記載する。
+
+```text
+selector = Actual Byte Count >= Expected Byte Count
+20 >= 20 → True
+したがってTrueケース（Raw Buffer十分）へ進む。
+```
+
+### 5.3 ストラクチャを先に配置する
+
+内部処理を説明する前に、入れ物となるCase Structure、ForループまたはWhileループを配置する。
+
+```text
+1. ストラクチャを配置する
+2. selector、N端子または停止条件を配線する
+3. 作業対象のTrue／Falseケースへ切り替える
+4. そのケース内へ関数およびSubVIを配置する
+5. 内側ストラクチャが必要なら、先に内側ストラクチャを配置する
+6. 内部処理を作る
+7. 全ケースの出力トンネルを配線する
+```
+
+各節の冒頭に作業領域を住所形式で記載する。
+
+```text
+作業領域：
+外側error Case Structure
+  → Falseケース（既存エラーなし）
+    → Input Valid? Case Structure
+      → Trueケース（入力値正常）
+        → Raw Buffer Sufficient? Case Structure
+          → Falseケース（Raw Buffer不足）
+```
+
+### 5.4 文字列は全文と入力順を書く
+
+文字列定数、文字列にフォーマット（Format Into String）および文字列連結（Concatenate Strings）を使用する場合、実際に入力する全文を記載する。
+
+次を省略してはならない。
+
+1. Format String全文。
+2. 改行位置。
+3. `%d`、`%s`、`%X`等の個数と順番。
+4. 各プレースホルダへ接続する値と型。
+5. 生成文字列の接続先。
+6. 単体テスト時の期待source。
+
+### 5.5 error cluster生成を端子単位で書く
+
+ローカルエラーを返す場合、`code=-700130を返す`だけで終わらせない。
+
+```text
+基準クラスタ ← 対象Caseへ入ってきた正常なerror cluster
+status       ← Boolean True
+code         ← I32エラーコード
+source       ← Format Into String出力
+```
+
+名前でバンドル（Bundle By Name）の出力先となるCase Structureのerror出力トンネルまで記載する。
+
+### 5.6 機器側ロギングとファイル保存を区別する
+
+次を同じ意味で使用してはならない。
+
+```text
+機器側ロギング設定
+  → 保存用バッファ、ログサイズ、取得条件の設定
+
+機器側保存データ回収
+  → 測定停止後に内部保存バッファからPacketを取得
+
+LabVIEW側ファイル保存
+  → 解析済みPacketをTDMSまたはCSVへ書き込む
+```
+
+ファイル保存VIでは、File Path、Open Mode、重複時の動作、File Referenceの保持方法、Flush条件、Closeおよび異常時Cleanupを記載する。
+'''
+              rules_path.write_text(rules.rstrip() + rules_addition.rstrip() + '\n', encoding='utf-8')
+
+          if supplement_path.exists():
+              supplement_path.unlink()
+          if trigger_path.exists():
+              trigger_path.unlink()
+          if workflow_path.exists():
+              workflow_path.unlink()
+
+          print('RAMScope documentation integration completed.')
           PY
 
-      - name: Commit integrated document
+      - name: Commit integrated documents and remove temporary files
         shell: bash
         run: |
           if git diff --quiet; then
             echo "No changes to commit."
             exit 0
           fi
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/10_RAMScope実装方針.md docs/10A_RAMScope実装ガイド_20260717改訂追補.md
-          git commit -m "第10章の既存本文を維持して確定仕様と実装手順を追記"
+          git add -A
+          git commit -m "第10章の既存本文を維持して確定仕様・Parser修正・ロギング手順を追記"
           git push origin HEAD:claude/labview-teststand-automation-docs-fri3r4
