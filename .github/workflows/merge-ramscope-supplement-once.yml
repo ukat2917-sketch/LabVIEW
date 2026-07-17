@@ -6,6 +6,7 @@ on:
       - claude/labview-teststand-automation-docs-fri3r4
     paths:
       - .github/workflows/merge-ramscope-supplement-once.yml
+      - docs/.trigger-ramscope-doc-merge
   pull_request:
     branches:
       - claude/labview-teststand-automation-docs-fri3r4
