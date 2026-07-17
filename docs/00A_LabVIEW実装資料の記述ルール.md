@@ -1,10 +1,10 @@
 # 00A. LabVIEW実装資料の記述ルール
 
-**最終整理日：2026-07-16**
+**最終整理日：2026-07-17**
 
 本書は、本リポジトリ内のLabVIEW VI、TestStand、機器設定、単体テスト手順を記述する際の共通ルールである。
 
-読者は「LabVIEWを初めて操作する人」を基準とする。作成者には分かる省略表現でも、第三者が画面を見ながら再現できない場合は不十分と判断する。
+読者は「LabVIEWを初めて操作する人」を基準とする。作成者には分かる省略表現でも、第三者が画面を見ながら同じVIを再現できない場合は不十分と判断する。
 
 ---
 
@@ -34,11 +34,46 @@ DLL Wrapper、Builder、Parser、Public APIへ責務を分ける
 - 同じ詳細手順を複数章へ複製しない。
 - 他章には概要と正本へのリンクだけを書く。
 - 旧手順を残す場合は、`旧情報`、`参考`、`不採用`のいずれかを明記する。
-- 未確認値は`実機確認待ち`または`未確定`とする。
+- 未確認値は`実機確認待ち`、`未確定`、`作業仮定`のいずれかを付ける。
 
 ### 1.3 抽象説明と操作手順を分ける
 
-設計方針だけを説明する節では、無理に画面操作を書かない。実際にVIを作る節では、設計概念だけで終わらせず、関数配置、端子、配線、テストまで書く。
+設計方針だけを説明する節では、無理に画面操作を書かない。実際にVIを作る節では、設計概念だけで終わらせず、関数配置、端子、配線、文字列、テストまで書く。
+
+### 1.4 画面上の作業順と同じ順番で書く
+
+手順書は、完成後の論理順ではなく、読者がLabVIEW画面上で作業する順に記載する。
+
+```text
+1. 入れ物となるCase StructureやForループを配置する
+2. selector、N端子、トンネルを配線する
+3. 作業対象のケースへ切り替える
+4. そのケース内へ関数やSubVIを配置する
+5. 内側のストラクチャが必要なら、先にそのストラクチャを配置する
+6. その後で内側処理を作る
+```
+
+後から登場するCase Structureの中身を、Case Structureの配置前に説明してはならない。
+
+悪い例：
+
+```text
+Packet Sizeを計算する。
+Expected Byte Countを計算する。
+Input Valid? Case Structureを配置する。
+```
+
+この順番では、読者が計算処理をCase Structureの外側へ配置してしまう。
+
+良い例：
+
+```text
+1. Input Valid? Case Structureを配置する。
+2. Input Valid?をselectorへ接続する。
+3. Trueケースへ切り替える。
+4. Trueケース内でPacket Sizeを計算する。
+5. 同じTrueケース内でExpected Byte Countを計算する。
+```
 
 ---
 
@@ -62,6 +97,7 @@ DLL Wrapper、Builder、Parser、Public APIへ責務を分ける
 - 入力を何へ変換し、何を出力するかを書く。
 - Forループを使う場合は、何を1反復で処理するかを書く。
 - シフトレジスタを使う場合は、何を反復間で保持するかを書く。
+- エラー時にどの安全値を返すかを書く。
 
 ### 2.2 入出力
 
@@ -108,6 +144,8 @@ Ctrl + Space
 Valueへ接続する。
 比較を作る。
 更新後配列を右へ渡す。
+エラーを返す。
+エラー文字列を作る。
 ```
 
 次のように接続元、接続先、関数名、端子名を明記する。
@@ -125,6 +163,107 @@ Valueへ接続する。
 ```text
 部分配列置換 #1の出力を`LogSize書込後LOGINFO`として扱う。
 ```
+
+### 2.5 作業領域を住所のように明記する
+
+Case Structureやループが入れ子になる場合、各節の冒頭に作業領域を記載する。
+
+```text
+作業領域：
+外側error Case Structure
+  → Falseケース
+    → Input Valid? Case Structure
+      → Trueケース
+        → Raw Buffer Sufficient? Case Structure
+          → Falseケース
+```
+
+見出しにも可能な限り作業領域を含める。
+
+悪い見出し：
+
+```text
+サイズ計算
+FlagとTimestamp
+```
+
+良い見出し：
+
+```text
+Input Valid=Trueケース内：Packet Sizeを計算する
+外側Forループ内・パケット処理Falseケース内・内側Forループ外：FlagとTimestampを解析する
+```
+
+### 2.6 文字列定数とFormat Stringは全文を書く
+
+文字列定数、文字列にフォーマット（Format Into String）、文字列連結（Concatenate Strings）を使用する場合、資料には**実際に入力する文字列を省略せず全文記載する**。
+
+次の記載は禁止する。
+
+```text
+エラーsourceを作る。
+適切なエラー文字列を設定する。
+ExpectedとActualを含む文字列を作る。
+```
+
+次の項目を必ず書く。
+
+1. 配置する文字列関数の日本語名と英語名。
+2. Format Stringまたは文字列定数へ入力する全文。
+3. 改行を含める場合は、改行位置。
+4. `%d`、`%s`、`%X`等のプレースホルダの個数と順序。
+5. 各プレースホルダへ接続する値の名前と型。
+6. 生成文字列を接続する先の関数名と端子名。
+7. 単体テスト時の期待source全文または主要部分。
+
+例：
+
+```text
+Format String：
+RAMScope_Parse_Buffer.vi: ChNum must be >= 1 and DataNum must be >= 0. ChNum=%d, DataNum=%d
+
+1個目の%d ← ChNum I32
+2個目の%d ← DataNum I32
+```
+
+別のエラー条件では、エラー内容に対応した別の文字列を使用する。
+
+```text
+Format String：
+RAMScope_Parse_Buffer.vi: Raw Buffer is too small. Expected=%d, Actual=%d
+
+1個目の%d ← Expected Byte Count I32
+2個目の%d ← Actual Byte Count I32
+```
+
+`-700130`用の入力検証文字列を、`-700131`のRaw Buffer不足ケースへ流用してはならない。
+
+### 2.7 error cluster生成手順を省略しない
+
+ローカル検証エラーを作る場合は、`code=-700130を返す`だけで終わらせない。名前でバンドル（Bundle By Name）を使う場合、次をすべて記載する。
+
+```text
+1. 名前でバンドル（Bundle By Name）を配置する。
+2. 元の正常なerror clusterを基準クラスタ入力へ接続する。
+3. 表示フィールドをstatus、code、sourceへ設定する。
+4. Boolean定数Trueをstatusへ接続する。
+5. I32定数-700130をcodeへ接続する。
+6. Format Into Stringの出力をsourceへ接続する。
+7. Bundle By Name出力を対象Case Structureのerror出力トンネルへ接続する。
+```
+
+資料には、基準クラスタとしてどのerror clusterを使用するかも明記する。
+
+```text
+基準クラスタ = 外側error Case StructureのFalseケースへ入ってきた正常なerror in
+```
+
+エラー条件ごとに、次の対応が一致していることを確認する。
+
+| 条件 | code | sourceに含める値 |
+|---|---:|---|
+| 入力値不正 | `-700130` | ChNum、DataNum |
+| Raw Buffer不足 | `-700131` | Expected Byte Count、Actual Byte Count |
 
 ---
 
@@ -160,15 +299,42 @@ LabVIEW画面上の`x78`は資料中の`0x78`と同じ値である。
 - 要素追加・削除は`データ操作 → 要素を挿入／要素を削除`で行う。
 - 配列サイズ（Array Size）を一時接続し、実要素数を確認する。
 - 表示器に10セルしか見えなくても、配列自体が24要素なら正常である。
+- 配列左上の数字は表示開始indexであり、配列要素数ではない。
 
 ### 3.4 単一クラスタとクラスタ配列を区別する
 
 ```text
-RAMScope_Channel.ctl = 1チャンネル分のクラスタ
+RAMScope_Channel.ctl = 1チャンネル分の単体クラスタ
 Channel List         = RAMScope_Channel.ctlを要素に持つ一次元配列
+
+RAMScope_Packet.ctl  = 1パケット分の単体クラスタ
+Packets              = RAMScope_Packet.ctlを要素に持つ一次元配列
 ```
 
-配列入力を作る場合は、空の配列枠を配置し、その枠内へtypedefを置く操作まで記載する。
+typedefをフロントパネルへ直接ドラッグすると単体クラスタになる。配列入力または配列表示器を作る場合は、次のいずれかを記載する。
+
+```text
+方法1：空の配列枠を配置し、その枠内へtypedefをドラッグする。
+方法2：すでに存在する配列ワイヤを右クリックし、作成 → 制御器／表示器を選ぶ。
+```
+
+### 3.5 配列の型と要素数を区別する
+
+Case Structureの各ケースで一致させる必要があるのはデータ型であり、実行時の要素数ではない。
+
+```text
+Trueケース  = RAMScope_Packet.ctl一次元配列、0要素
+Falseケース = RAMScope_Packet.ctl一次元配列、DataNum要素
+```
+
+上記は同じ型なので接続できる。
+
+次は型が異なるため接続できない。
+
+```text
+Trueケース  = RAMScope_Packet.ctl単体クラスタ
+Falseケース = RAMScope_Packet.ctl一次元配列
+```
 
 ---
 
@@ -188,21 +354,36 @@ Channel List         = RAMScope_Channel.ctlを要素に持つ一次元配列
         └─ 正常 → 本処理
 ```
 
-**既存エラー確認を入力値検証より外側へ置く。** これにより、入力値検証エラーで元のerror inを上書きしない。
+既存エラー確認を入力値検証より外側へ置く。これにより、入力値検証エラーで元のerror inを上書きしない。
 
-### 4.2 各ケースの全出力を書く
+### 4.2 ストラクチャ先行ルール
+
+Case Structure内で実行する処理は、必ず先にCase Structureを配置してから作る。
+
+```text
+1. Case Structureを配置する。
+2. selectorへBoolean、Enum、数値等を接続する。
+3. 対象ケースへ切り替える。
+4. 対象ケース内へ処理を作る。
+5. 各ケースで同じ出力トンネルを使用する。
+```
+
+Caseを切り替えたときに枠上のトンネル位置が同じであることを確認する。各ケースで別の位置へ新しいトンネルを作らない。
+
+### 4.3 各ケースの全出力を書く
 
 各ケースで次を明記する。
 
-- 主要データ出力
-- 件数出力
-- Boolean検出フラグ
-- error out
-- シフトレジスタ右内側へ戻す値
+- 主要データ出力。
+- 件数出力。
+- Boolean検出フラグ。
+- Unused等の補助値。
+- error out。
+- シフトレジスタ右内側へ戻す値。
 
 `Use default if unwired`へ依存しない。
 
-### 4.3 Cleanup VI
+### 4.4 Cleanup VI
 
 Cleanup VIは前段エラーがあっても終了処理を試みる。元エラーとCleanupエラーをどの関数で統合するかを書く。
 
@@ -216,13 +397,21 @@ Cleanup VIは前段エラーがあっても終了処理を試みる。元エラ�
 Channel Listから1チャンネルずつ取り出し、各チャンネルを24バイトへ変換する。
 ```
 
+入れ子のForループでは、LabVIEW画面上の反復端子はどちらも`i`と表示されることを記載する。
+
+```text
+外側Forループのi = Packet Index
+内側Forループのi = Channel Index
+資料中では区別のため内側をjと表記する場合がある
+```
+
 ### 5.2 自動指標付けを使う場合
 
 ```text
 1. 配列をForループ左枠へ接続する。
 2. 入力トンネルを右クリックする。
-3. `指標付けを有効（Enable Indexing）`を選ぶ。
-4. トンネルに`[]`が表示されたことを確認する。
+3. 指標付けを有効（Enable Indexing）を選ぶ。
+4. トンネルに[]が表示されたことを確認する。
 5. ループ外の配列型と、ループ内の単一要素型を記載する。
 ```
 
@@ -238,6 +427,33 @@ Forループ入力トンネルを右クリック
 ```
 
 自動指標付けが有効だと、ループ内ではU8単体になり、部分配列（Array Subset）の`array`端子へ接続できない。
+
+### 5.4 出力の自動指標付け
+
+単体クラスタを各反復で1個作り、ループ終了後に配列へまとめる場合は、右側出力トンネルの指標付けを有効にする。
+
+```text
+ループ内  = RAMScope_Packet.ctl単体
+ループ外  = RAMScope_Packet.ctl一次元配列
+```
+
+### 5.5 条件付き指標付け
+
+解析成功時だけ要素を配列へ追加する場合は、条件付き指標付けを使用する。
+
+```text
+Packet単体クラスタ → 条件付き出力トンネル
+Append Packet?      → 条件端子
+```
+
+`Append Packet?`はLabVIEW標準端子名ではなく、資料中で定義する内部Boolean信号であることを書く。
+
+```text
+最終error.status=False
+  → NOT=True
+  → Append Packet?=True
+  → Packetを配列へ追加
+```
 
 ---
 
@@ -297,13 +513,15 @@ module_type != 0x0Fを作る。
 
 ```text
 1. 等しくない?（Not Equal?）を配置する。
-2. `U8x4_To_I32.vi`で変換済みの`module_type` I32を一方の入力へ接続する。
-3. I32定数`x0F`をもう一方の入力へ接続する。
-4. 緑色のBoolean出力を`Connected?`へ接続する。
-5. `module_type=x0F`ならFalse、それ以外ならTrueとなる。
+2. U8x4_To_I32.viで変換済みのmodule_type I32を一方の入力へ接続する。
+3. I32定数x0Fをもう一方の入力へ接続する。
+4. 緑色のBoolean出力をConnected?へ接続する。
+5. module_type=x0FならFalse、それ以外ならTrueとなる。
 ```
 
 比較に使用する値が、部分配列のU8[4]なのか、変換SubVI後のI32なのかを明記する。
+
+比較関数では、上側入力と下側入力へ何を接続するかを書く。特に`>=`、`>`、`-`では接続順によって意味が変わるため省略しない。
 
 ---
 
@@ -316,10 +534,19 @@ module_type != 0x0Fを作る。
 ```text
 LogSize
   → 1個目のI32_To_LE_U8x4.vi / Value
-  → Bytes出力を`Log Bytes`として扱う
+  → Bytes出力をLog Bytesとして扱う
 ```
 
 error clusterの直列接続も省略しない。
+
+```text
+内側Forループerror右外側
+  → Flag変換VI error in
+  → Flag変換VI error out
+  → Timestamp変換VI error in
+  → Timestamp変換VI error out
+  → 外側Forループerror右内側
+```
 
 ---
 
@@ -340,6 +567,7 @@ Record 0: module=0、name="RAM0"
 - 書込index。
 - 書き込む値の型と要素数。
 - 表示形式。
+- 実配列サイズ。
 
 ### 9.2 テスト配列生成
 
@@ -356,6 +584,8 @@ array                = 直前の更新済みU8配列
 index                = I32書込開始位置
 new element/subarray = U8配列
 ```
+
+Raw Bufferを直接入力する場合は、全要素をindex順の表または連続したバイト列で記載する。
 
 ### 9.3 異なる値を使用する
 
@@ -374,12 +604,12 @@ Speed   = 2
 
 可能な範囲で次を含める。
 
-- 正常値
-- 0要素・不足サイズ
-- 最大値・範囲外
-- 重複
-- 既存error in
-- 配線順を確認できる識別値
+- 正常値。
+- 0要素・不足サイズ。
+- 最大値・範囲外。
+- 重複。
+- 既存error in。
+- 配線順を確認できる識別値。
 
 ### 9.5 期待結果の位置を書く
 
@@ -389,7 +619,7 @@ index 4～7   = Core
 index 8～11  = Address
 ```
 
-配列サイズ、error code、source、検出フラグも記載する。
+配列サイズ、error code、error source、検出フラグも記載する。
 
 ### 9.6 プローブによる切り分け
 
@@ -400,6 +630,10 @@ index 8～11  = Address
 書込index
 最後のReplace Array Subset出力
 シフトレジスタ右外側
+ChNum
+Actual Byte Count
+Expected Byte Count
+Packet Size
 ```
 
 ---
@@ -434,15 +668,26 @@ index 8～11  = Address
 - [ ] 接続元と接続先の双方を記載した
 - [ ] `Value`等がどのVIの端子か明記した
 - [ ] 一時値を作った関数の出力を明記した
+- [ ] ストラクチャを先に配置してから内部処理を説明した
+- [ ] 各処理の作業領域をCase名とTrue／Falseまで記載した
 - [ ] 既存エラー確認を入力検証より外側へ置いた
 - [ ] Caseの条件と全ケースの出力を記載した
+- [ ] 各Caseで同じ出力トンネルを使用している
+- [ ] Format Stringまたは文字列定数の全文を記載した
+- [ ] プレースホルダの順序と接続元を記載した
+- [ ] Bundle By Nameの基準クラスタ、status、code、sourceを記載した
+- [ ] error codeとsourceの内容が一致している
 - [ ] Forループの反復対象とN端子を記載した
+- [ ] 外側と内側の反復端子を区別した
 - [ ] 自動指標付けの有効・無効を記載した
+- [ ] 条件付き指標付けの条件Booleanを定義した
 - [ ] シフトレジスタの目的、初期値、4端子を記載した
 - [ ] Falseケースで保持すべき現在値を初期値へ戻していない
 - [ ] 配列と単一クラスタを区別した
-- [ ] 表示数と実要素数を区別した
+- [ ] 配列型と実行時要素数を区別した
+- [ ] 表示数、表示index、実要素数を区別した
 - [ ] 単体テストの入力方法まで記載した
-- [ ] 期待バイト位置、配列サイズ、errorを記載した
+- [ ] 期待バイト位置、配列サイズ、error code、error sourceを記載した
+- [ ] 推奨プローブ位置を記載した
 - [ ] 未確定事項を断定していない
 - [ ] 他章とVI名、フォルダ名、責務が一致している
