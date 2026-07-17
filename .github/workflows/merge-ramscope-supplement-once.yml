@@ -95,3 +95,5 @@ jobs:
           git add docs/10_RAMScope実装方針.md docs/10A_RAMScope実装ガイド_20260717改訂追補.md
           git commit -m "第10章の既存本文を維持して確定仕様と実装手順を追記"
           git push
+
+# trigger: 2026-07-17
