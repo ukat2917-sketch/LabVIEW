@@ -96,4 +96,4 @@ jobs:
           git commit -m "第10章の既存本文を維持して確定仕様と実装手順を追記"
           git push
 
-# trigger: 2026-07-17
+# trigger: 2026-07-17-2
