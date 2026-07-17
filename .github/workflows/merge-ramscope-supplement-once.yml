@@ -1,0 +1,97 @@
+name: Merge RAMScope supplement once
+
+on:
+  push:
+    branches:
+      - claude/labview-teststand-automation-docs-fri3r4
+    paths:
+      - .github/workflows/merge-ramscope-supplement-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  merge-supplement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Append supplement without replacing original text
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          main_path = Path('docs/10_RAMScope実装方針.md')
+          supplement_path = Path('docs/10A_RAMScope実装ガイド_20260717改訂追補.md')
+          marker = '<!-- RAMSCOPE_20260717_APPEND_START -->'
+
+          if not main_path.exists():
+              raise SystemExit(f'Main document not found: {main_path}')
+          if not supplement_path.exists():
+              raise SystemExit(f'Supplement not found: {supplement_path}')
+
+          main = main_path.read_text(encoding='utf-8')
+          if marker in main:
+              print('Supplement is already appended. No document change required.')
+              supplement_path.unlink()
+          else:
+              supplement = supplement_path.read_text(encoding='utf-8')
+              start = re.search(r'^# 1\.\s+', supplement, flags=re.MULTILINE)
+              if start is None:
+                  raise SystemExit('Could not find the first numbered section in supplement.')
+
+              body = supplement[start.start():]
+              transformed = []
+              numbered_heading = re.compile(r'^(#{1,5})\s+(\d+(?:\.\d+)*)\.\s+(.*)$')
+              plain_heading = re.compile(r'^(#{1,5})\s+(.*)$')
+
+              for line in body.splitlines():
+                  m = numbered_heading.match(line)
+                  if m:
+                      hashes, number, title = m.groups()
+                      transformed.append('#' * min(len(hashes) + 1, 6) + f' 10.19.{number} {title}')
+                      continue
+                  m = plain_heading.match(line)
+                  if m:
+                      hashes, title = m.groups()
+                      transformed.append('#' * min(len(hashes) + 1, 6) + ' ' + title)
+                      continue
+                  transformed.append(line)
+
+              appendix = '''
+
+---
+
+<!-- RAMSCOPE_20260717_APPEND_START -->
+# 10.19 2026-07-17 確定仕様・実装手順追記
+
+> 本節は、既存の第10章本文を削除・置換せず、2026-07-17までの実装確認、単体試験結果およびベンダー資料で確定した内容を追記するものである。
+>
+> 本節と10.1～10.18の既存記述が競合する場合は、本節を優先する。既存記述は変更履歴として維持する。
+>
+> 手順の表記は[00A_LabVIEW実装資料の記述ルール.md](./00A_LabVIEW実装資料の記述ルール.md)に従う。
+
+'''
+              main_path.write_text(main.rstrip() + appendix + '\n'.join(transformed).rstrip() + '\n', encoding='utf-8')
+              supplement_path.unlink()
+
+          print('RAMScope supplement integration completed.')
+          PY
+
+      - name: Commit integrated document
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/10_RAMScope実装方針.md docs/10A_RAMScope実装ガイド_20260717改訂追補.md
+          git commit -m "第10章の既存本文を維持して確定仕様と実装手順を追記"
+          git push
