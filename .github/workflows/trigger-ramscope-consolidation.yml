@@ -25,19 +25,22 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import textwrap
           import traceback
 
           workflow = Path('.github/workflows/consolidate-ramscope-docs-once.yml')
+          error_log = Path('docs/RAMScope統合エラー一時ログ.txt')
+          if error_log.exists():
+              error_log.unlink()
+
           try:
-              text = workflow.read_text(encoding='utf-8')
-              marker = "          python3 - <<'PY'\n"
-              start = text.index(marker) + len(marker)
-              end = text.index("\n          PY\n\n      - name: Commit consolidated chapter", start)
-              code = textwrap.dedent(text[start:end])
+              lines = workflow.read_text(encoding='utf-8').splitlines()
+              start = next(i for i, line in enumerate(lines) if line.strip() == "python3 - <<'PY'")
+              end = next(i for i in range(start + 1, len(lines)) if lines[i].strip() == 'PY')
+              code_lines = lines[start + 1:end]
+              code = '\n'.join(line[10:] if line.startswith('          ') else line for line in code_lines)
               exec(compile(code, str(workflow), 'exec'))
           except BaseException:
-              Path('docs/RAMScope統合エラー一時ログ.txt').write_text(traceback.format_exc(), encoding='utf-8')
+              error_log.write_text(traceback.format_exc(), encoding='utf-8')
               raise
           PY
 
