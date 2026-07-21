@@ -6,7 +6,7 @@
 >
 > 監査前の文章は[99_監査前_第10章全文.md](./10_RAMScope/99_監査前_第10章全文.md)へ内容を変えず保存した。元文章を失わず、現在使用する手順だけを以下の一本道へ整理する。
 
-**最終整理日：2026-07-18**
+**最終整理日：2026-07-21**
 
 ---
 
@@ -38,10 +38,11 @@ RAMScopeのVIを作成するときは、次の順番で読む。
 | 03 | [03_構造体Builder_VI作成手順.md](./10_RAMScope/03_構造体Builder_VI作成手順.md) | MEASINFO、CHINFO、LOGINFO Builderと数値変換 |
 | 04 | [04_Parser_VI作成手順.md](./10_RAMScope/04_Parser_VI作成手順.md) | SYSINFO Parser、Buffer Parser、データモデルとループ構造 |
 | 05 | [05_Public_API_8個_監査済み作成手順.md](./10_RAMScope/05_Public_API_8個_監査済み作成手順.md) | Connect、Init、Set Cond、Start、Read、Release、Stop、Close |
+| 05A | [05A_RAMScope_Close_VI詳細作成手順.md](./10_RAMScope/05A_RAMScope_Close_VI詳細作成手順.md) | CloseのDeviceExit実行とOriginal Error保持をMerge Errorsで端子単位に説明。本節を旧Close節より優先する |
 | 06 | [06_PoC_ロギング_TestStand.md](./10_RAMScope/06_PoC_ロギング_TestStand.md) | 最小PoC、TDMS保存、Cleanup、TestStand引渡し |
 | 99 | [99_監査前_第10章全文.md](./10_RAMScope/99_監査前_第10章全文.md) | 監査前の第10章全文。実装時は参照しない |
 
-詳細ページ間で記述が競合する場合は、`00`の現行補正、次に`05`の公開API、次に各個別手順の順で優先する。ベンダー一次資料と実測結果が最優先である。
+詳細ページ間で記述が競合する場合は、`00`の現行補正、`05A`のClose詳細、次に`05`の公開API、次に各個別手順の順で優先する。ベンダー一次資料と実測結果が最優先である。
 
 ---
 
@@ -103,6 +104,8 @@ STEP 10 TestStand組込み
 - `RAMScope_Code_To_Error.vi`までのerror cluster配線。
 - True／False両Caseの全出力。
 - 正常、既存エラー、境界または実機確認待ちの単体テスト。
+
+新しいLabVIEW関数を資料内で初めて使用する場合は、関数名だけを書かず、目的、配置場所、入力端子、出力端子、採用理由、既存の配線との接続位置を記載する。
 
 ---
 
@@ -180,4 +183,5 @@ BuilderとParserはDLLを呼ばない純粋処理VIとする。実機なしの�
 - [ ] Shift Registerの保持対象、初期値、現在値引継ぎ、右外側出力が書かれている。
 - [ ] DLL Wrapperは各VI個別にプロトタイプ、Parameters、左右端子、事前確保、Function Nameを持つ。
 - [ ] 共通説明を理由に個別VIの作成手順を削除していない。
+- [ ] 新しく登場する関数は、目的、配置場所、全端子、接続先、採用理由が説明されている。
 - [ ] 正常、境界、異常、既存error inの単体テストが書かれている。
