@@ -1,0 +1,50 @@
+name: Trigger RAMScope consolidation
+
+on:
+  pull_request:
+    paths:
+      - 'docs/.trigger-ramscope-consolidation'
+
+permissions:
+  contents: write
+
+jobs:
+  run-consolidation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          ref: claude/labview-teststand-automation-docs-fri3r4
+          fetch-depth: 0
+
+      - name: Execute embedded consolidation script
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/consolidate-ramscope-docs-once.yml')
+          text = workflow.read_text(encoding='utf-8')
+          marker = "          python3 - <<'PY'\n"
+          start = text.index(marker) + len(marker)
+          end = text.index("\n          PY\n\n      - name: Commit consolidated chapter", start)
+          code = textwrap.dedent(text[start:end])
+          exec(compile(code, str(workflow), 'exec'))
+          PY
+
+          rm -f .github/workflows/trigger-ramscope-consolidation.yml
+
+      - name: Commit consolidated documentation
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'RAMScope資料を第10章の単一学習型ガイドへ再統合'
+          git push origin HEAD:claude/labview-teststand-automation-docs-fri3r4
