@@ -1,107 +1,29 @@
 # 10-06. PoC・ロギング・TestStand引渡し
 
-**監査日：2026-07-18**
+**最終整理日：2026-07-21**
 
 ---
 
 ## 1. `PoC_RAMScope_Main.vi`
 
-### 0. 実現したい機能と責務
+`PoC_RAMScope_Main.vi`の正式な作成手順は、次を参照する。
 
-TestStandを使用せず、RAMScope公開APIの呼出順、状態遷移、Parser結果、CleanupをLabVIEW単体で確認する。TestStand設定の問題とRAMScope実装の問題を混ぜない。
+- [06A_PoC_RAMScope_Main_VI詳細作成手順.md](./06A_PoC_RAMScope_Main_VI詳細作成手順.md)
 
-### 1～5. データ、アルゴリズム、構造選定
+旧版の「Connected?、Measurement Started?、Stopped?、Released?をBoolean Falseで初期化する」という記述だけでは、Booleanの配置方法、各Public VIとの接続、成功判定、Cleanupで参照する値が不足していた。
 
-PoCは次の順序を保証する。
-
-```text
-Connect
-  → Init
-  → Set_Cond
-  → Log_Start
-  → Wait
-  → Read
-  → Log_Stop
-  → Release
-  → Close
-```
-
-途中でエラーが発生した場合でも、実行済み状態に応じてCleanupへ進む必要がある。このため次のBooleanをShift Registerまたは状態クラスタで保持する。
+現行手順では次の方式へ一本化する。
 
 ```text
-Connected?
-Measurement Started?
-Stopped?
-Released?
-File Open?
+RAMScope_PoC_State.ctlをFalseで初期化
+  → Connect error out.statusからConnected?を更新
+  → Log Start error out.statusからMeasurement Started?を更新
+  → Log Stop error out.statusからStopped?を更新
+  → Release error out.statusからReleased?を更新
+  → 更新済みStateでCleanup Stop / Release / Closeを判定
 ```
 
-通常処理とCleanupを同じerror wireだけで直列接続すると、前段エラー時にCleanup Wrapperがスキップされる。Cleanupは元エラーを保持しながら、状態BooleanをselectorとするCase Structureで個別に試す。
-
-### 6. 主な入出力
-
-```text
-入力 : Byte Order、Meas Config、Channel List、Module Log Configs、
-       MaxDataNum、Wait Time、保存設定、error in
-出力 : UnitNum、kind、Module List、MdlNo_RAM、MdlNo_CAN、Endian_RAM、
-       Raw Buffer、Packets、LostDataNum、保存パス、Status、TestError、error out
-```
-
-### 7. 配置するSubVI
-
-- `RAMScope_Connect.vi`
-- `RAMScope_Init.vi`
-- `RAMScope_Set_Cond.vi`
-- `RAMScope_Log_Start.vi`
-- 待機（Wait (ms)）
-- `RAMScope_Read.vi`
-- `RAMScope_Log_Stop.vi`
-- `RAMScope_Release.vi`
-- `RAMScope_Close.vi`
-- 必要なCase Structure、Shift Register、Merge Errors相当処理
-
-### 8. 配線順
-
-1. `Connected?`、`Measurement Started?`、`Stopped?`、`Released?`をBoolean Falseで初期化する。
-2. `RAMScope_Connect.vi`成功時だけConnected?をTrueへ更新する。
-3. Connect errorを`RAMScope_Init.vi`へ接続する。
-4. Init出力のMdlNo_RAMとEndian_RAMをSet CondおよびReadへ分岐する。
-5. Set Cond成功後にLog Startを呼ぶ。
-6. Log Start成功時だけMeasurement Started?をTrueへ更新する。
-7. Wait後にReadを呼び、Raw Buffer、DataNum、LostDataNum、Packetsを記録する。
-8. 通常経路でLog Stopを呼び、成功時にStopped?をTrueへ更新する。
-9. Stopped?=Trueの場合だけReleaseを呼び、成功時にReleased?をTrueへ更新する。
-10. Connected?=Trueの場合は最後にCloseを呼ぶ。
-11. 途中エラー時はCleanup経路へ移り、Measurement Started?=TrueかつStopped?=FalseならCleanup専用Stopを試す。
-12. Stop成功を確認できた場合だけReleaseを試す。
-13. 最後にConnected?=TrueならCloseを試す。
-14. 元エラーがある場合はCleanupエラーで上書きせず、最初のエラーを最終errorとする。
-
-### 9. 記録する値と合格条件
-
-```text
-UnitNum / kind
-各API ReturnCode
-MdlNo_RAM / MdlNo_CAN / Endian_RAM
-Module List / SlotErr[16]
-MEASINFO=72byte
-CHINFO=24×ChNum byte
-LOGINFO=136byte
-Raw Buffer / DataNum / LostDataNum
-Parsed Packet Count / Unused Byte Count
-Packet先頭・末尾Timestamp
-Close結果 / 再Connect結果
-```
-
-合格条件：
-
-- 全WrapperのFunction NameとCプロトタイプが一致する。
-- Builderサイズが72、24×ChNum、136である。
-- SYSINFO Parserが実機構成と一致する。
-- 既知RAM変数とPacket解析値が一致する。
-- Timestampが20ns換算と一致する。
-- 正常・異常の両方でCloseまで到達する。
-- 複数回再接続・再測定できる。
+単独Booleanを別々に引き回さず、`RAMScope_PoC_State.ctl`をBundle By Nameで更新しながら左から右へ流す。PoCは1回実行なので通常ワイヤを使い、将来ReadをWhileループ化するときだけ同じ状態クラスタをShift Registerへ移す。
 
 ---
 
