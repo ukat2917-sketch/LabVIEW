@@ -9,6 +9,9 @@
 `PoC_RAMScope_Main.vi`の正式な作成手順は、次を参照する。
 
 - [06A_PoC_RAMScope_Main_VI詳細作成手順.md](./06A_PoC_RAMScope_Main_VI詳細作成手順.md)
+- [06B_PoC_RAMScope_Main_出力配線対応表.md](./06B_PoC_RAMScope_Main_出力配線対応表.md)
+
+`06A`は状態クラスタ、通常経路およびCleanupの作成手順を示す。`06B`は、UnitNumからerror outまでの各PoC出力について、接続元となるPublic VIの端子と、Close CaseのTrue／False両ケースで接続する出力トンネルを示す。
 
 旧版の「Connected?、Measurement Started?、Stopped?、Released?をBoolean Falseで初期化する」という記述だけでは、Booleanの配置方法、各Public VIとの接続、成功判定、Cleanupで参照する値が不足していた。
 
