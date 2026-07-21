@@ -36,7 +36,7 @@ jobs:
               end = text.index("\n          PY\n\n      - name: Commit consolidated chapter", start)
               code = textwrap.dedent(text[start:end])
               exec(compile(code, str(workflow), 'exec'))
-          except Exception:
+          except BaseException:
               Path('docs/RAMScope統合エラー一時ログ.txt').write_text(traceback.format_exc(), encoding='utf-8')
               raise
           PY
