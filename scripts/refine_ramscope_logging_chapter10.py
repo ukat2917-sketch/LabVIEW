@@ -11,7 +11,7 @@ def replace_once(old: str, new: str) -> None:
     global text
     count = text.count(old)
     if count != 1:
-        raise RuntimeError(f"replacement target count must be 1, got {count}: {old[:100]!r}")
+        raise RuntimeError(f"replacement target count must be 1, got {count}: {old[:120]!r}")
     text = text.replace(old, new, 1)
 
 
@@ -72,18 +72,14 @@ replace_once(
     "| `File Open?` | Boolean | 既存ctlとの互換性維持用予約項目。通信確認用PoCでは常にFalseとし、TDMS VIへ接続しない |",
 )
 replace_once(
-    """3. `RAMScope_PoC_State.ctl`をブロックダイアグラムへドラッグする。
-2. 定数として配置する。""",
-    """3. `RAMScope_PoC_State.ctl`をブロックダイアグラムへドラッグする。
-2. 定数として配置する。""",
-) if False else None
-replace_once(
-    """3. Channel Listを自動インデックスでFor Loopへ入れる。
+    """1. RootへTestName等を設定する。
+2. Channel Listを自動インデックスでFor Loopへ入れる。
 3. Group名テンプレートではなく、Channel Propertyテンプレート用の一時Group名`RAMScope_Metadata`を使用するか、Rootへ`Channel_<index>_<property>`形式で保存する。
 4. 既存error時は書込をスキップしてRefを通す。
 5. Property書込失敗は元のTDMS errorを保持する。""",
-    """3. Channel Listを自動インデックスでFor Loopへ入れる。
-4. 各チャンネルの情報をRoot Propertyへ次の固定キー形式で保存する。
+    """1. RootへTestName等を設定する。
+2. Channel Listを自動インデックスでFor Loopへ入れる。
+3. 各チャンネルの情報をRoot Propertyへ次の固定キー形式で保存する。
 
 ```text
 Channel_000_Name
@@ -95,9 +91,9 @@ Channel_000_Offset
 Channel_000_Unit
 ```
 
-5. `%03d`へChannel Indexを接続し、キー名を一意にする。
-6. 既存error時は書込をスキップしてRefを通す。
-7. Property書込失敗は元のTDMS errorを保持する。""",
+4. `%03d`へChannel Indexを接続し、キー名を一意にする。
+5. 既存error時は書込をスキップしてRefを通す。
+6. Property書込失敗は元のTDMS errorを保持する。""",
 )
 replace_once(
     """#### 5. LabVIEW構造の選定理由
@@ -111,15 +107,13 @@ replace_once(
 )
 replace_once(
     """7. Read Logging BlockのPackets、件数、LostをAppendへ接続する。
-8. Append error outを次反復へShift Registerで渡す。""",
+8. Append error outを次反復へShift Registerで渡す。
+9. 各Block終了後にTotal Packet CountをI64加算する。
+10. 両Loop正常終了時だけLogging Retrieved?をTrue。""",
     """7. Read Logging BlockのPackets、件数、LostをAppendへ接続する。
 8. `GetLoggingData()`後はAPI内部の読出し済みPacketが削除されるため、Append完了前に次Blockへ進まない。
-9. Append error outを次反復へShift Registerで渡す。""",
-)
-replace_once(
-    """9. 各Block終了後にTotal Packet CountをI64加算する。
-10. 両Loop正常終了時だけLogging Retrieved?をTrue。""",
-    """10. 各Block終了後にTotal Packet CountをI64加算する。
+9. Append error outを次反復へShift Registerで渡す。
+10. 各Block終了後にTotal Packet CountをI64加算する。
 11. 両Loop正常終了時だけLogging Retrieved?をTrue。""",
 )
 
