@@ -88,6 +88,8 @@ Time = 測定開始を0とし、20ns周期でカウントアップする64bit値
 Timestamp Seconds = Time Raw U64 × 20e-9
 ```
 
+Flagの各bit意味は別節のフラグ情報表で定義される。ParserではまずU32 Rawを欠落なく保持し、bit別Booleanへの展開はFlag定義表確認後に追加する。
+
 ### 0.4 Parserの正式Offset
 
 既存`RAMScope_Parse_Buffer.vi`が採用する`Channel Data → Flag → Timestamp`の並びはマニュアルと一致する。
@@ -114,7 +116,7 @@ Time Start   = Flag Start + 4
 | `RAMScopeGT150GetLoggingData` | `long (long UnitNo, long MdlNo, long MeasNo, long BlockNo, void *pData, long *pDataNum, long *pLostDataNum)` | 一致 |
 | `RAMScopeGT150MemoryRead` | `long (long UnitNo, long MdlNo, unsigned long Address, long Size, long Count, char *Buffer, long Tmout)` | 一致。ロギング取得とは別機能 |
 
-リポジトリ内の`docs/reference/RAMScopeVP.h`および`docs/reference/samp_simple.cpp`は、上記7引数形式と一致する。
+リポジトリ内の`docs/reference/RAMScopeVP.h`および`docs/reference/samp_simple.cpp`は、上記宣言と一致する。
 
 ---
 
@@ -273,14 +275,14 @@ error out error cluster
 ### Trueケース（error in.status=True：既存エラーあり）
 
 1. CLFNを配置しない。
-2. 件数出力へI32定数`0`を接続する。
-3. `API ReturnCode`へI32定数`0`を接続する。
+2. 件数出力へI32定数0を接続する。
+3. `API ReturnCode`へI32定数0を接続する。
 4. 元の`error in`を`error out`へ接続する。
 
 ### Falseケース（error in.status=False：既存エラーなし）
 
 1. Value引数をCプロトタイプ順にCLFNへ接続する。
-2. 件数Pointerの左端子へI32定数`0`を接続する。
+2. 件数Pointerの左端子へI32定数0を接続する。
 3. Pointer右端子を件数表示器へ接続する。
 4. CLFN戻り値を`API ReturnCode`へ分岐する。
 5. CLFN戻り値を`RAMScope_Code_To_Error.vi / API ReturnCode`へ接続する。
