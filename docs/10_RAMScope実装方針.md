@@ -232,7 +232,18 @@ RAMScope_Release.vi
 RAMScope_Close.vi
 ```
 
-### 10.2.5 PoC・単体操作・TestStand
+### 10.2.5 LabVIEW側ファイル保存VI
+
+```text
+RAMScope_File_Log_Open.vi
+RAMScope_File_Log_Write_Metadata.vi
+RAMScope_File_Log_Append.vi
+RAMScope_File_Log_Close.vi
+```
+
+これらはRAMScopeVP APIのDLL Wrapperではなく、LabVIEW側でTDMSを管理するVIである。機器側の`SetLoggingInfo`および保存用バッファと混同しない。
+
+### 10.2.6 PoC・単体操作・TestStand
 
 ```text
 PoC_RAMScope_Main.vi
@@ -251,11 +262,14 @@ TestStandは公開APIを呼び、MeasNoとBlockNoの反復、試験条件、レ�
 
 ```text
 TestStand、PoC_RAMScope_Main.vi または PoC_RAMScope_Logging_Main.vi
-  → RAMScope_* 公開API
-      → Builder / Parser / Common
-          → RS_DLL_* 薄いラッパ
-              → CLFN
-                  → RAMScopeVP_API_x64.dll
+  ├─→ RAMScope_* 公開API
+  │     → Builder / Parser / Common
+  │         → RS_DLL_* 薄いラッパ
+  │             → CLFN
+  │                 → RAMScopeVP_API_x64.dll
+  └─→ RAMScope_File_Log_* VI
+          → LabVIEW TDMS API
+              → .tdms
 ```
 
 | レイヤ | 説明できるべき責務 |
@@ -5130,7 +5144,9 @@ Final Error.code = -700999
 
 #### 0. 実現したい機能とVIの責務
 
-`PoC_RAMScope_Main.vi`は、TestStandを使用せず、RAMScope公開APIを次の順で1回実行するPoCである。
+`PoC_RAMScope_Main.vi`は、TestStandを使用せず、RAMScope公開APIを次の順で1回実行する通信確認用PoCである。
+
+本VIへTDMS File Ref、MeasNo／BlockNoの二重For Loop、`GetLoggingData()`による停止後保存ログ回収を追加しない。ロギング検証は`PoC_RAMScope_Logging_Main.vi`へ分離する。
 
 ```text
 Connect
@@ -5188,7 +5204,7 @@ Stop成功後にエラー
 | `Measurement Started?` | Boolean | `RAMScope_Log_Start.vi`が正常終了した |
 | `Stopped?` | Boolean | 通常経路またはCleanup経路の`RAMScope_Log_Stop.vi`が正常終了した |
 | `Released?` | Boolean | `RAMScope_Release.vi`が正常終了した |
-| `File Open?` | Boolean | 将来、`RAMScope_File_Log_Open.vi`が正常終了した |
+| `File Open?` | Boolean | 既存ctlとの互換性維持用予約項目。通信確認用PoCでは常にFalseとし、TDMS VIへ接続しない |
 
 `Measurement Started?`はStop後もTrueのままとする。これは「現在測定中」という意味ではなく、「MeasStartが成功した履歴」である。
 
@@ -7113,6 +7129,8 @@ else:
 
 1Blockだけを扱い、MeasNo／BlockNoの反復はLogging PoCまたはTestStandへ任せる。これによりPublic VI内で巨大な全ログ配列を保持しない。
 
+`RAMScopeGT150GetLoggingData()`で読み出したPacketはAPI内部バッファから削除されるため、取得後は同じBlockを再取得できる前提にしない。本VIが返したRaw BufferとPacketsを次Block取得前にTDMSへ保存する。
+
 #### 6. 入出力と接続
 
 Logging PoC内側For LoopからMeasNoとBlockNoを受け、出力Packetsを`RAMScope_File_Log_Append.vi`へ直結する。
@@ -7290,9 +7308,21 @@ TDMS Set Properties、For Loop、Unbundle By Name、Format Into String、Error_T
 
 1. RootへTestName等を設定する。
 2. Channel Listを自動インデックスでFor Loopへ入れる。
-3. Group名テンプレートではなく、Channel Propertyテンプレート用の一時Group名`RAMScope_Metadata`を使用するか、Rootへ`Channel_<index>_<property>`形式で保存する。
-4. 既存error時は書込をスキップしてRefを通す。
-5. Property書込失敗は元のTDMS errorを保持する。
+3. 各チャンネルの情報をRoot Propertyへ次の固定キー形式で保存する。
+
+```text
+Channel_000_Name
+Channel_000_Address
+Channel_000_Size
+Channel_000_Sign
+Channel_000_Scale
+Channel_000_Offset
+Channel_000_Unit
+```
+
+4. `%03d`へChannel Indexを接続し、キー名を一意にする。
+5. 既存error時は書込をスキップしてRefを通す。
+6. Property書込失敗は元のTDMS errorを保持する。
 
 #### 9. テスト
 
@@ -7600,9 +7630,10 @@ Released?              Boolean False
 5. Get Block CountのBlockNumを内側For Loop Nへ接続する。
 6. 内側iをBlockNoへ接続する。
 7. Read Logging BlockのPackets、件数、LostをAppendへ接続する。
-8. Append error outを次反復へShift Registerで渡す。
-9. 各Block終了後にTotal Packet CountをI64加算する。
-10. 両Loop正常終了時だけLogging Retrieved?をTrue。
+8. `GetLoggingData()`後はAPI内部の読出し済みPacketが削除されるため、Append完了前に次Blockへ進まない。
+9. Append error outを次反復へShift Registerで渡す。
+10. 各Block終了後にTotal Packet CountをI64加算する。
+11. 両Loop正常終了時だけLogging Retrieved?をTrue。
 
 #### F. ReleaseとFile Close
 
