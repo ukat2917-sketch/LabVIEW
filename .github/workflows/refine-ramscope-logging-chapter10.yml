@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - chatgpt/integrate-ramscope-logging-chapter10
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - claude/labview-teststand-automation-docs-fri3r4
 
 permissions:
   contents: write
