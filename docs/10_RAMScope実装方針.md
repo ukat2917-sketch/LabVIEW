@@ -1293,8 +1293,6 @@ code=I32 -700114
 
 ---
 
----
-
 ### 10.6.6 `RAMScope_Packet.ctl`の最終作成手順
 
 #### 0. 実現したい機能とctlの責務
@@ -1363,8 +1361,6 @@ ctlはデータ型定義だけを担当し、bit演算を持たない。bit演�
 #### 9. 単体テスト
 
 `Flag Raw=0x10FF1D00`を入力し、各フィールドが独立して保持できることを確認する。ctl単体ではbit演算を行わない。
-
----
 
 ---
 
@@ -2873,13 +2869,11 @@ Function Name ─────────→ "RAMScopeGT150MeasStop"
 
 ---
 
----
-
 ### 10.8.3 ロギング取得用Wrapperの作成手順
 
 全WrapperはC関数1個をCLFNで1回だけ呼ぶ。通常Wrapperは`error in.status=True`でCLFNを呼ばず、安全値と元errorを返す。
 
-### 10.8.3.1 `RS_DLL_GT150GetGapTime.vi`
+#### 10.8.3.1 `RS_DLL_GT150GetGapTime.vi`
 
 #### 0. 責務
 
@@ -2931,7 +2925,7 @@ Start前、Start直後、Stop後、既存errorを確認する。
 
 ---
 
-### 10.8.3.2 `RS_DLL_GT150GetMeasNum.vi`
+#### 10.8.3.2 `RS_DLL_GT150GetMeasNum.vi`
 
 #### 0. 責務
 
@@ -2983,7 +2977,7 @@ I32 0をPointer左端子へ接続し、右端子をMeasNumへ接続する。Retu
 
 ---
 
-### 10.8.3.3 `RS_DLL_GT150GetBlockNum.vi`
+#### 10.8.3.3 `RS_DLL_GT150GetBlockNum.vi`
 
 #### 0. 責務
 
@@ -3036,7 +3030,7 @@ Cプロトタイプ順に接続し、Pointer右端子をBlockNumへ接続する�
 
 ---
 
-### 10.8.3.4 `RS_DLL_GT150GetBufferDataNum.vi`
+#### 10.8.3.4 `RS_DLL_GT150GetBufferDataNum.vi`
 
 #### 0. 責務
 
@@ -3089,7 +3083,7 @@ Pointer左0、右AvailableDataNum。ReturnCodeを共通変換する。
 
 ---
 
-### 10.8.3.5 `RS_DLL_GT150GetLoggingDataNum.vi`
+#### 10.8.3.5 `RS_DLL_GT150GetLoggingDataNum.vi`
 
 #### 0. 責務
 
@@ -3150,7 +3144,7 @@ Block先頭／末尾、DataNum=0、MeasNo不正、BlockNo不正、測定中発�
 
 ---
 
-### 10.8.3.6 `RS_DLL_GT150GetLoggingData.vi`
+#### 10.8.3.6 `RS_DLL_GT150GetLoggingData.vi`
 
 #### 0. 責務
 
@@ -4959,8 +4953,6 @@ Data Lost?  = ((Flag Raw >> 28) AND 1) != 0
 
 ---
 
----
-
 ### 7. 公開APIでの接続
 
 #### 7.1 `RAMScope_Init.vi`
@@ -5843,11 +5835,9 @@ Final Error.code = -700999
 
 ---
 
----
-
 ### 10.11.9 停止後保存ログ取得用の追加公開API
 
-### 10.11.9.1 `RAMScope_Get_Log_Summary.vi`
+#### 10.11.9.1 `RAMScope_Get_Log_Summary.vi`
 
 #### 0. 責務
 
@@ -5901,7 +5891,7 @@ MeasNum 0、1、複数、負数ダミー、GapTime APIエラー。
 
 ---
 
-### 10.11.9.2 `RAMScope_Get_Block_Count.vi`
+#### 10.11.9.2 `RAMScope_Get_Block_Count.vi`
 
 #### 0. 責務
 
@@ -5957,7 +5947,7 @@ MeasNo -1、0、末尾、BlockNum 0、1、複数、負数ダミー。
 
 ---
 
-### 10.11.9.3 `RAMScope_Read_Logging_Block.vi`
+#### 10.11.9.3 `RAMScope_Read_Logging_Block.vi`
 
 #### 0. 責務
 
@@ -7211,17 +7201,15 @@ Cleanup後State/error
 
 ---
 
----
-
 ### 10.13.2 `PoC_RAMScope_Logging_Main.vi`
 
-### 0. 実現したい機能とVIの責務
+#### 0. 実現したい機能とVIの責務
 
 RAMScope機器側ロギングから停止後の全保存Block取得、Packet解析、TDMS保存、CleanupまでをTestStandなしで一度通し、ロギング機能を単独検証する。
 
 既存`PoC_RAMScope_Main.vi`は変更せず、本VIだけにTDMSと保存ログ回収処理を置く。
 
-### 1. 入力データの実体
+#### 1. 入力データの実体
 
 ```text
 UnitNo I32
@@ -7239,7 +7227,7 @@ Flush Every Block?
 error in
 ```
 
-### 2. 出力データモデル
+#### 2. 出力データモデル
 
 ```text
 UnitNum、kind
@@ -7255,7 +7243,7 @@ Status、TestError、error out
 
 `Total LostDataNum`はAPI値の累積／差分仕様が実機で確定するまで参考表示とし、判定にはBlockごとの`LostDataNum`とPacketの`Data Lost?`を使用する。
 
-### 3. 前提条件・異常条件
+#### 3. 前提条件・異常条件
 
 - 既存通信PoCがDeviceInitからReadまで成功していること。
 - TDMS Open成功前にLog Startしない。
@@ -7263,7 +7251,7 @@ Status、TestError、error out
 - 全Block取得前にReleaseしない。
 - 途中errorでもFile Close、Release、DeviceExitを可能な範囲で試行する。
 
-### 4. 処理アルゴリズム
+#### 4. 処理アルゴリズム
 
 ```text
 State = all False
@@ -7321,7 +7309,7 @@ Cleanup:
     Original Errorを最優先でMerge
 ```
 
-### 5. LabVIEW構造の選定理由
+#### 5. LabVIEW構造の選定理由
 
 - MeasNoとBlockNoは2重For Loop。
 - Total Block／Packet数はShift Register。
@@ -7330,7 +7318,7 @@ Cleanup:
 - 測定時間保証はFlat Sequenceまたはerror wire＋Wait。既存通信PoCと同じ正式方式へ合わせる。
 - 1Block取得直後にTDMS Appendし、巨大配列を保持しない。
 
-### 6. フロントパネル入出力と接続元・接続先
+#### 6. フロントパネル入出力と接続元・接続先
 
 | 出力 | 生成元 |
 |---|---|
@@ -7342,7 +7330,7 @@ Cleanup:
 | Final State | Cleanup後State |
 | Status、TestError、error out | 最後のClose Case出力トンネル |
 
-### 7. 配置する関数およびSubVI
+#### 7. 配置する関数およびSubVI
 
 - 既存公開API：Connect、Init、Set Cond、Log Start、Log Stop、Release、Close。
 - 新規公開API：Get Log Summary、Get Block Count、Read Logging Block。
@@ -7351,9 +7339,9 @@ Cleanup:
 - For Loop×2、Shift Register、Case Structure、Bundle By Name、Unbundle By Name、Clear Errors、Merge Errors、Error_To_TestStatus。
 - `RAMScope_Logging_PoC_State.ctl`。
 
-### 8. 配線順
+#### 8. 配線順
 
-#### A. 専用State ctlを作る
+##### A. 専用State ctlを作る
 
 ```text
 Connected?             Boolean False
@@ -7367,11 +7355,11 @@ Released?              Boolean False
 
 `RAMScope_Logging_PoC_State.ctl`としてtypedef保存する。既存`RAMScope_PoC_State.ctl`を変更しない。
 
-#### B. ConnectからSet Cond
+##### B. ConnectからSet Cond
 
 既存通信PoCと同じ公開API、同じerror wire順を使用する。Connect成功時だけConnected?をTrueに更新する。
 
-#### C. TDMS Openと測定開始時刻の保持
+##### C. TDMS Openと測定開始時刻の保持
 
 1. Set Cond error outをFile Log Openへ接続する。
 2. Open成功時にFile Open?をTrueへ更新する。
@@ -7379,14 +7367,14 @@ Released?              Boolean False
 4. File Log Openのerror outをLog Startへ接続する。
 5. File Ref、MeasurementStartTimeおよびStateをSummary後のMetadata書込位置まで通す。
 
-#### D. Start、Wait、Stop
+##### D. Start、Wait、Stop
 
 1. Log Start成功時にMeasurement Started?をTrue。
 2. Measurement DurationをWaitへ接続する。
 3. Wait後にLog Stop。
 4. Stop成功時にStopped?をTrue。
 
-#### E. Summaryと2重For Loop
+##### E. Summaryと2重For Loop
 
 1. Stop error outをGet Log Summaryへ接続する。
 2. 成功時にLog Summary Read?をTrue。
@@ -7402,7 +7390,7 @@ Released?              Boolean False
 12. 各Block終了後にTotal Packet CountをI64加算する。
 13. 両Loop正常終了時だけLogging Retrieved?をTrue。
 
-#### F. ReleaseとFile Close
+##### F. ReleaseとFile Close
 
 1. Logging Retrieved後にRelease。
 2. Release成功時にReleased?をTrue。
@@ -7410,7 +7398,7 @@ Released?              Boolean False
 4. File Open?をFalseへ更新する。
 5. Device Closeへ進む。
 
-#### G. Cleanup
+##### G. Cleanup
 
 Original Errorを別wireで保持する。
 
@@ -7430,7 +7418,7 @@ Cleanup Device Close条件
 
 各Cleanup APIへ渡すwireだけClear Errorsし、戻りerrorをMerge Errorsの後順位入力へ接続する。Original Errorを最上位入力に固定する。
 
-### 9. 単体テスト
+#### 9. 単体テスト
 
 1. 正常1Meas、1Block。
 2. 正常1Meas、複数Block。
@@ -7444,8 +7432,6 @@ Cleanup Device Close条件
 10. LostDataNum非ゼロとData Lost Flag非ゼロ。
 11. 大容量BlockでMax Buffer Bytesガード。
 12. TDMS再読込でGroup数、DataNum、チャンネル長、Time単調増加を照合。
-
----
 
 ---
 
@@ -7482,9 +7468,7 @@ TestStand側はMeasNo、BlockNoのLoop、試験条件、判定、レポートを
 
 ---
 
----
-
-### 10.8.3 2つのPoCの完成条件
+### 10.13.4 2つのPoCの完成条件
 
 ### `PoC_RAMScope_Main.vi`
 
