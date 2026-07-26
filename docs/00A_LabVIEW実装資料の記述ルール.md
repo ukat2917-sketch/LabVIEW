@@ -1,5 +1,9 @@
 # 00A. LabVIEW実装資料の記述ルール
 
+**最終整理日：2026-07-26**
+
+VI名、端子、配置関数およびVersionの根拠は[00C](./00C_一次資料とバージョン基準.md)に従い、各VIへSource／Version／Verified by／Stateを残す。
+
 **最終整理日：2026-07-21**
 
 本書は、本リポジトリ内のLabVIEW VI、TestStand、機器設定、単体テスト手順を記述する際の共通ルールである。
@@ -462,3 +466,26 @@ index 8～11  = Address
 8. 薄いDLL Wrapperは共通テンプレートだけで個別手順を省略しない。
 9. Builder出力をWrapper入力へ渡す方向を明記し、Raw配列をWrapper出力と誤記しない。
 10. 資料整理を理由に、既存資料にないVIまたはctlを追加しない。
+
+<!-- generated-vi-reference-start -->
+
+---
+
+## 章内で参照するVIの入出力イメージ
+
+### `U32ToLEU8x4.vi`
+
+<!-- generated-vi-diagram -->
+![U32ToLEU8x4.vi 入出力イメージ](./assets/vi-diagrams/u32toleu8x4.svg)
+
+### `I32ToLEU8x4.vi`
+
+<!-- generated-vi-diagram -->
+![I32ToLEU8x4.vi 入出力イメージ](./assets/vi-diagrams/i32toleu8x4.svg)
+
+### `U8x4ToI32.vi`
+
+<!-- generated-vi-diagram -->
+![U8x4ToI32.vi 入出力イメージ](./assets/vi-diagrams/u8x4toi32.svg)
+
+<!-- generated-vi-reference-end -->

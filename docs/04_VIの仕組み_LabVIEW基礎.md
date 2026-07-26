@@ -3,6 +3,8 @@
 > **本章の役割**：LabVIEWを初めて触る人が、05章以降の「コネクタペイン」「型定義」「配列」「Case Structure」「シフトレジスタ」「エラー伝搬」を理解できるようにする。
 >
 > 実際のVI作成手順は[00A](./00A_LabVIEW実装資料の記述ルール.md)と[06](./06_VIの作り方_手順.md)に従う。
+>
+> **2026-07-26更新**：VI、データフロー、Case Structure、For Loop、Shift Register、error clusterの一般仕様はNI公式LabVIEW User Manualを根拠とし、参照先は[00C](./00C_一次資料とバージョン基準.md)へ集約した。
 
 ---
 

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="620" viewBox="0 0 1600 620" role="img" aria-labelledby="title desc">
+<title id="title">RAMScopeGetLogSummary.vi 入出力イメージ</title>
+<desc id="desc">中央にVI、左に入力端子、右に出力端子、最下段にerror inとerror outを配置した図。</desc>
+<defs>
+<linearGradient id="panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFDF9"/><stop offset="1" stop-color="#ECE8E1"/></linearGradient>
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#333333" flood-opacity=".18"/></filter>
+</defs>
+<rect width="1600" height="100%" fill="#FFFFFF"/>
+<text x="800" y="46" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="26" font-weight="600" fill="#222">RAMScopeGetLogSummary.vi</text>
+<text x="800" y="76" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" fill="#666">入力値 → VI処理 → 出力値　　出典: 10_RAMScope実装方針.md</text>
+<rect x="620" y="105" width="360" height="430" rx="28" fill="url(#panel)" stroke="#343434" stroke-width="7" filter="url(#shadow)"/>
+<rect x="695" y="175" width="210" height="130" rx="18" fill="#FFFFFF" stroke="#666" stroke-width="3"/>
+<path d="M 725 250 C 765 170, 810 330, 870 230" fill="none" stroke="#444" stroke-width="8" stroke-linecap="round"/>
+<text x="800" y="355" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="20" font-weight="600" fill="#333">VI</text>
+<line x1="530" y1="147" x2="642" y2="147" stroke="#E06B00" stroke-width="5" stroke-linecap="round"/>
+<circle cx="642" cy="147" r="13" fill="#FFF0E1" stroke="#E06B00" stroke-width="5"/>
+<rect x="55" y="121" width="475" height="54" rx="14" fill="#FFF0E1" stroke="#E06B00" stroke-width="2"/>
+<text x="75" y="142" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="600" fill="#242424">入力端子</text>
+<text x="75" y="164" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" fill="#4B4B4B">実VIで確認 · 確認待ち</text>
+<line x1="530" y1="219" x2="642" y2="219" stroke="#A63A3A" stroke-width="5" stroke-linecap="round"/>
+<circle cx="642" cy="219" r="13" fill="#FCE8E8" stroke="#A63A3A" stroke-width="5"/>
+<rect x="55" y="193" width="475" height="54" rx="14" fill="#FCE8E8" stroke="#A63A3A" stroke-width="2"/>
+<text x="75" y="214" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="600" fill="#242424">error in</text>
+<text x="75" y="236" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" fill="#4B4B4B">error cluster · status=False</text>
+<line x1="958" y1="147" x2="1070" y2="147" stroke="#E06B00" stroke-width="5" stroke-linecap="round"/>
+<circle cx="958" cy="147" r="13" fill="#FFF0E1" stroke="#E06B00" stroke-width="5"/>
+<rect x="1070" y="121" width="475" height="54" rx="14" fill="#FFF0E1" stroke="#E06B00" stroke-width="2"/>
+<text x="1090" y="142" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="600" fill="#242424">出力端子</text>
+<text x="1090" y="164" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" fill="#4B4B4B">実VIで確認 · 確認待ち</text>
+<line x1="958" y1="219" x2="1070" y2="219" stroke="#A63A3A" stroke-width="5" stroke-linecap="round"/>
+<circle cx="958" cy="219" r="13" fill="#FCE8E8" stroke="#A63A3A" stroke-width="5"/>
+<rect x="1070" y="193" width="475" height="54" rx="14" fill="#FCE8E8" stroke="#A63A3A" stroke-width="2"/>
+<text x="1090" y="214" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="600" fill="#242424">error out</text>
+<text x="1090" y="236" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" fill="#4B4B4B">error cluster · status=False</text>
+<text x="55" y="592" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" fill="#666">左：制御器／定数から入力</text>
+<text x="1545" y="592" text-anchor="end" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" fill="#666">右：表示器／次段VIへ出力</text>
+</svg>

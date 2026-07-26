@@ -1,12 +1,20 @@
 # 10. RAMScope GT170 実装・学習ガイド
 
-**最終整理日：2026-07-22**
+<!-- generated-vi-diagram -->
+![RAMScope公開API接続](./assets/vi-diagrams/ramscope-public-api-flow.svg)
+
+<!-- generated-vi-diagram -->
+![RAMScopeロギング公開API接続](./assets/vi-diagrams/ramscope-logging-public-api-flow.svg)
+
+**最終整理日：2026-07-26**
 
 > 本章をRAMScope実装資料の唯一の正本とする。
 >
 > 本章は、LabVIEWで初めてVIを組む読者が、画面を再現するだけでなく、各VIの責務、データモデル、アルゴリズム、Case Structure、For Loop、Shift RegisterおよびCLFNを選ぶ理由を説明できる状態を目標とする。
 >
-> 既存の`PoC_RAMScope_Main.vi`は通信確認用PoCとして維持する。測定停止後の保存ログ回収、TDMS保存および欠落検証は、別構成の`PoC_RAMScope_Logging_Main.vi`で検証する。ロギング機能の追加・修正対象は10.13を正本とする。
+> 本章は環境準備からctl、共通VI、薄いDLL Wrapper、公開API、TDMS保存VI、通信確認PoC、ロギングPoCまでを一つの作成順で説明する。既存VIのロギング対応も各VIの既存手順へ統合し、後段の修正付録を正本としない。
+>
+> NI標準関数の一般仕様とVersion基準は[00C](./00C_一次資料とバージョン基準.md)、RAMScope関数のシグネチャは配布DLL同梱`RAMScopeVP.h`とAPI仕様書を根拠とする。ctl 11個、Common／Builder／Parser 11個、Wrapper 18個、公開API 11個、TDMS VI 4個、PoC 2個の既決構成は変更しない。
 
 ---
 
@@ -159,7 +167,7 @@ True／False両Caseの安全出力
 
 ## 10.2 現行ファイル構成
 
-本章では既存ファイルを維持しつつ、10.13で確定したロギング用Wrapper、公開API、TDMS保存VIおよび専用PoCを追加する。通信確認用PoCとロギング用PoCは統合しない。
+本章では既存ファイルとロギング追加ファイルを完成時の構成として同じ作成順へ並べる。通信確認用PoCとロギング用PoCは別VIとするが、作成手順は10.5の一本化フローを正本とする。
 
 ### 10.2.1 ctlファイル
 
@@ -518,6 +526,9 @@ Address           : 名前と序数で一致
 
 ### STEP 2：`RS_DLL_GT150DeviceInit.vi`でCLFN疎通を確認する
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150DeviceInit.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150deviceinit.svg)
+
 #### 10A.8 ヘッダ定義
 
 ```c
@@ -634,7 +645,229 @@ Device kind : 0
 
 ---
 
-## 10.5 確定仕様・エラーコード・監査結果
+## 10.5 一本化した作成順・確定仕様・監査結果
+
+### 10.5.1 一本化方針
+
+本章では「通信確認用の既存手順」と「ロギング対応の修正手順」を分けない。各ファイルは、最初からロギング対応を含む最終形で作成または修正する。
+
+```text
+環境確認
+  → ctlを最終形で作成
+  → 共通変換・Builder・Parserを作成
+  → 薄いDLL WrapperをAPI呼出順で作成
+  → 公開APIを機器操作順で作成
+  → TDMS保存VIを作成
+  → 通信確認PoCを回帰確認
+  → ロギングPoCを作成
+  → 結合試験・TestStand組込み
+```
+
+- `RAMScope_Packet.ctl`は、後からFlag項目を追加するのではなく、10.6の最終フィールドで作成する。
+- `RAMScope_Parse_Buffer.vi`と`RAMScope_Read.vi`は、旧版を作成してからロギング用に直すのではなく、10.10と10.11の最終アルゴリズムで作成する。
+- 追加Wrapperと追加公開APIは別付録へ置かず、既存ファイルと同じレイヤの作成順へ組み込む。
+- `PoC_RAMScope_Main.vi`は通信確認用として残し、`PoC_RAMScope_Logging_Main.vi`は別VIとして作る。
+
+### 10.5.2 完成までの一連の作成順
+
+#### Phase 0：環境とCLFN疎通
+
+1. 10.4に従って64bit環境、DLL配置、依存DLL、DeviceInitのCLFN疎通を確認する。
+2. `RAMScope_Code_To_Error.vi`を作り、以降のWrapperで共通使用する。
+
+#### Phase 1：ctlを最終形で作成
+
+3. `RAMScope_Byte_Order.ctl`
+4. `RAMScope_Meas_Config.ctl`
+5. `RAMScope_Channel.ctl`
+6. `RAMScope_Module_Log_Config.ctl`
+7. `RAMScope_Module_Info.ctl`
+8. `RAMScope_Channel_Value.ctl`
+9. `RAMScope_Packet.ctl`。Flag Raw、Status、Skip、Log Trigger、Dummy、Event Bits、Data Lost、Timestampを最初から含める。
+10. `RAMScope_PoC_State.ctl`
+11. `RAMScope_Logging_PoC_State.ctl`
+
+#### Phase 2：共通変換・Builder・Parser
+
+12. `U8x4_To_U32.vi`、`U8x4_To_I32.vi`、`U8x8_To_U64.vi`
+13. `U32_To_LE_U8x4.vi`、`I32_To_LE_U8x4.vi`
+14. `Build_MEASINFO_170_Raw.vi`、`Build_CHINFO_170_Raw.vi`、`Build_LOGINFO_Raw.vi`
+15. `Parse_SYSINFO_Array.vi`
+16. `RAMScope_Parse_Buffer.vi`を10.10の最終仕様で作成する。Size別復号、Flag分解、I64サイズ検証を含める。
+
+#### Phase 3：薄いDLL WrapperをAPI呼出順で作成
+
+17. 接続・初期化：`DeviceInit`、`AllInit`、`GetSysInfo`、`PGT_SetMdlConfig`
+18. 条件設定：`SetMeasCond`、`SetMeasCh`、`SetLoggingInfo`
+19. 測定開始・オンライン読出し：`MeasStart`、`GetBufferDataNum`、`GetBufferData`
+20. 停止後ログ列挙：`MeasStop`、`GetGapTime`、`GetMeasNum`、`GetBlockNum`
+21. 保存ログ読出し：`GetLoggingDataNum`、`GetLoggingData`
+22. 後処理：`ReleaseBufferData`、`DeviceExit`
+
+全WrapperはC関数1個をCLFNで1回だけ呼ぶ。通常Wrapperは既存error時にDLLを呼ばず、安全値と元errorを返す。
+
+#### Phase 4：公開APIを機器操作順で作成
+
+23. `RAMScope_Connect.vi`
+24. `RAMScope_Init.vi`
+25. `RAMScope_Set_Cond.vi`
+26. `RAMScope_Log_Start.vi`
+27. `RAMScope_Read.vi`
+28. `RAMScope_Log_Stop.vi`
+29. `RAMScope_Get_Log_Summary.vi`
+30. `RAMScope_Get_Block_Count.vi`
+31. `RAMScope_Read_Logging_Block.vi`
+32. `RAMScope_Release.vi`
+33. `RAMScope_Close.vi`
+
+#### Phase 5：TDMSとPoC
+
+34. `RAMScope_File_Log_Open.vi`
+35. `RAMScope_File_Log_Write_Metadata.vi`
+36. `RAMScope_File_Log_Append.vi`
+37. `RAMScope_File_Log_Close.vi`
+38. 既存`PoC_RAMScope_Main.vi`で通信・オンライン読出しの回帰確認を行う。
+39. `PoC_RAMScope_Logging_Main.vi`を作成し、Stop後のMeasNo／BlockNo列挙、1Block単位のRead→Parse→Append、Cleanupを確認する。
+40. TestStand組込み、TDMS再読込、MF4変換前提のメタデータ確認を行う。
+
+### 10.5.3 ロギング対応で確定したAPI・Packet仕様
+
+#### 10.5.3.1 保存ログ取得API
+
+```c
+long RAMScopeGT150GetGapTime(
+    long UnitNo,
+    unsigned long *pGapTime
+);
+
+long RAMScopeGT150GetMeasNum(
+    long UnitNo,
+    long *pMeasNum
+);
+
+long RAMScopeGT150GetBlockNum(
+    long UnitNo,
+    long MeasNo,
+    long *pBlockNum
+);
+
+long RAMScopeGT150GetBufferDataNum(
+    long UnitNo,
+    long MdlNo,
+    long *pDataNum
+);
+
+long RAMScopeGT150GetBufferData(
+    long UnitNo,
+    long MdlNo,
+    void *pData,
+    long *pDataNum,
+    long *pLostDataNum
+);
+
+long RAMScopeGT150GetLoggingDataNum(
+    long UnitNo,
+    long MdlNo,
+    long MeasNo,
+    long BlockNo,
+    long *pDataNum
+);
+
+long RAMScopeGT150GetLoggingData(
+    long UnitNo,
+    long MdlNo,
+    long MeasNo,
+    long BlockNo,
+    void *pData,
+    long *pDataNum,
+    long *pLostDataNum
+);
+```
+
+`GetBufferData()`と`GetLoggingData()`の`pDataNum`は入出力である。
+
+```text
+呼出し前のpDataNum
+  = 要求Packet数
+
+正常終了後のpDataNum
+  = 実際に読み出したPacket数
+```
+
+独立した`MaxDataNum`引数は存在しない。CLFNに存在しない引数を追加しない。
+
+#### 10.5.3.2 RAMモニタPacket
+
+```text
+Packet[k]
+├─ Data[0]      4byte
+├─ Data[1]      4byte
+├─ ...
+├─ Data[N-1]    4byte
+├─ Flag         4byte
+└─ Time         8byte
+```
+
+```text
+Packet Size = N × 4 + 12 byte
+```
+
+- `N`は測定有効チャンネル数。
+- Dataの順番は`RAMScopeGT1x0SetMeasCh()`へ設定した順番。
+- 設定データサイズが1byte、2byte、4byteのいずれでも、Packet内では1チャンネル4byte固定。
+- Timeは測定開始を0とする64bitカウンタで、1countは20ns。
+
+```text
+Timestamp Seconds = Time Raw U64 × 20e-9
+```
+
+#### 10.5.3.3 RAMモニタFlag
+
+| フィールド | bit | 抽出式 |
+|---|---:|---|
+| Status | 0～7 | `Flag Raw AND 0x000000FF` |
+| Skip | 8 | `((Flag Raw >> 8) AND 1) != 0` |
+| Log Trigger | 10～11 | `(Flag Raw >> 10) AND 3` |
+| Dummy | 12 | `((Flag Raw >> 12) AND 1) != 0` |
+| Event Bits | 16～23 | `(Flag Raw >> 16) AND 0xFF` |
+| Data Lost | 28 | `((Flag Raw >> 28) AND 1) != 0` |
+
+Statusコードは次の意味で保存する。
+
+| Status | 意味 |
+|---:|---|
+| `0x00` | 正常動作 |
+| `0xFF` | バスエラー、デバッグIF通信異常 |
+| `0xFE` | オフライン、ターゲットマイコン電源検出NG |
+| `0xFA` | セキュリティIDエラー、デバッグIF通信異常 |
+| `0xF9` | リンクエラー |
+| `0xF8` | パラメータ未設定エラー |
+| その他 | 予約値。意味未定義のためRawコードを保持する |
+
+Log Triggerは次の値を持つ。
+
+| Log Trigger | 意味 |
+|---:|---|
+| `0` | 開始、センター、終了のいずれでもない |
+| `1` | 測定データBlockの開始位置 |
+| `2` | ポイント指定時のセンター位置、基準トリガ成立Packet |
+| `3` | 測定データBlockの終了位置 |
+
+各Boolean／bit fieldの意味は次のとおり。
+
+- `Skip?=True`：このPacketより前に、測定周期、チャンネル数、メモリ操作負荷などの競合で収録タイミングをスキップした周期がある。
+- `Dummy?=True`：通常の測定値Packetではなく、RAMScopeハードウェアが情報通知目的で生成したDummy Packetである。Packet自体は保存するが、Dataを通常測定値として自動判定に使用しない。
+- `Event Bits`：bit0からbit7がイベントe1からe8に対応する。
+- `Data Lost?=True`：このPacket以前にRAMScopeハードウェアとホストPC間でデータ欠落が発生した。
+
+予約bitは値不定のため、0であることを正常条件にしない。
+
+`Skip`、`Data Lost`、`Status != 0`は測定Packet内の状態情報であり、Parser自身の配列エラーとは分ける。該当Packetを捨てず、Raw値と解析結果をTDMSへ保存する。`pLostDataNum`はAPIが返す破棄Packet数として別項目で保存し、Flagの`Data Lost?`と統合しない。
+
+---
+
+
+### 10.5.4 監査結果と既存仕様
 
 本書は、RAMScopeページに掲載されていた全VIについて、本章内の該当節と本章内の該当節への適合状況を監査し、統合時に省略された作成手順と、ベンダー資料で確定した仕様を補正する。
 
@@ -658,7 +891,7 @@ Device kind : 0
 - 既存エラーCaseで返す各出力。
 - 各Wrapper固有の単体テスト。
 
-[02_DLLラッパVI_全12個_CLFN配線手順.md](./02_DLLラッパVI_全12個_CLFN配線手順.md)へ、12個それぞれの手順を復元した。共通節はテンプレートとして利用してよいが、個別節を削除してはならない。
+[10.8 薄いDLLラッパVI 18個](#108-薄いdllラッパvi-18個)へ、18個それぞれの手順を統合した。共通節はテンプレートとして利用してよいが、個別節を削除してはならない。
 
 ##### 1.2 Public APIの配線順が設計メモの粒度だった
 
@@ -670,7 +903,7 @@ TrueケースでPGT設定ラッパを呼ぶ。
 SlotErrを走査し、非ゼロがあればcode=-700141を生成する。
 ```
 
-これではCaseをどこへ配置するか、Bundle By Nameの基準クラスタ、status、source、Format String、出力トンネルが分からない。[05_Public_API_8個_監査済み作成手順.md](./05_Public_API_8個_監査済み作成手順.md)で、8個すべてを端子単位へ補正した。
+これではCaseをどこへ配置するか、Bundle By Nameの基準クラスタ、status、source、Format String、出力トンネルが分からない。[10.11 公開API 11個](#1011-公開api-11個)で、11個すべてを端子単位へ補正した。
 
 ##### 1.3 ParserとBuilderに「なぜその構造か」の説明が不足していた
 
@@ -788,12 +1021,21 @@ source       ← Format Into String出力
 | `-700113` | `Build_LOGINFO_Raw.vi` | MdlNoが0..15外 |
 | `-700114` | `Build_LOGINFO_Raw.vi` | MdlNo重複 |
 | `-700120` | `Parse_SYSINFO_Array.vi` | SYSINFO Rawが960byteではない |
-| `-700130` | `RAMScope_Parse_Buffer.vi` | ChNumまたはDataNum不正 |
-| `-700131` | `RAMScope_Parse_Buffer.vi` | Raw Buffer不足 |
 | `-700140` | `RAMScope_Init.vi` | RAMモジュール未検出 |
 | `-700141` | `RAMScope_Init.vi` | PGT SlotErr非ゼロ |
 | `-700150` | `RAMScope_Set_Cond.vi` | Builder出力サイズ不正 |
-| `-700160` | `RAMScope_Read.vi` | MaxDataNumまたは計算Bufferサイズ不正 |
+| `-700160` | `RAMScope_Parse_Buffer.vi` | Channel Sizeが0、1、2以外 |
+| `-700161` | `RAMScope_Parse_Buffer.vi` | ChNum、DataNumまたはRaw Buffer長が不正 |
+| `-700162` | `RAMScope_Read.vi` | AvailableDataNumが負数 |
+| `-700163` | `RAMScope_Read.vi` | 必要Bufferサイズが不正または上限超過 |
+| `-700164` | `RAMScope_Read.vi` | DataNumが要求範囲外 |
+| `-700165` | `RAMScope_Read.vi` | Parsed Packet CountとDataNumが不一致 |
+| `-700170` | `RAMScope_Get_Log_Summary.vi` | MeasNumが負数 |
+| `-700171` | `RAMScope_Get_Block_Count.vi` | MeasNoが負数 |
+| `-700172` | `RAMScope_Get_Block_Count.vi` | BlockNumが負数 |
+| `-700173`～`-700177` | `RAMScope_Read_Logging_Block.vi` | 入力、件数、Bufferサイズ、Parser整合性が不正 |
+| `-700178` | `RAMScope_File_Log_Open.vi` | 既存ファイル上書き禁止 |
+| `-700180` | `RAMScope_File_Log_Append.vi` | Packet件数とDataNumが不一致 |
 
 ---
 
@@ -913,11 +1155,14 @@ LabVIEW設定クラスタ
 | `Build_CHINFO_170_Raw.vi` | 24byte×ChNumのCHINFO配列を生成 | 入力検証Case、For、配列とerrorのShift Register |
 | `Build_LOGINFO_Raw.vi` | 136byte LOGINFOを生成 | For、更新配列・Seen・errorのShift Register |
 
-Parser側で使用する`U8x4_To_U32.vi`、`U8x4_To_I32.vi`、`U8x8_To_U64.vi`は[Parser詳細](./04_Parser_VI作成手順.md)を参照する。
+Parser側で使用する`U8x4_To_U32.vi`、`U8x4_To_I32.vi`、`U8x8_To_U64.vi`は[10.10 Parser](#1010-parser)を参照する。
 
 ---
 
 #### 3. `Build_CHINFO_170_Raw.vi`の現行補正
+
+<!-- generated-vi-diagram -->
+![BuildCHINFO170Raw.vi 入出力イメージ](./assets/vi-diagrams/buildchinfo170raw.svg)
 
 ##### 3.1 入力データと出力モデル
 
@@ -1004,6 +1249,9 @@ code=I32 -700112
 
 #### 4. `Build_LOGINFO_Raw.vi`の現行補正
 
+<!-- generated-vi-diagram -->
+![BuildLOGINFORaw.vi 入出力イメージ](./assets/vi-diagrams/buildloginforaw.svg)
+
 ##### 4.1 データモデル
 
 ```text
@@ -1062,7 +1310,123 @@ code=I32 -700114
 
 ---
 
+### 10.6.6 `RAMScope_Packet.ctl`の最終作成手順
+
+#### 0. 実現したい機能とctlの責務
+
+1PacketのRaw Flagを保持したまま、RAMモニタ用Flagの各フィールドを上位VIとTDMS保存VIへ渡せるようにする。
+
+#### 1. 入力データの実体
+
+ParserがPacket内のFlag 4byteをU32へ変換した値を使用する。
+
+#### 2. 出力データモデル
+
+既存項目を削除せず、次の順へ整理する。
+
+```text
+Packet Index          I32
+Channel Values        RAMScope_Channel_Value.ctl[]
+Flag Raw              U32
+Status                U8
+Skip?                 Boolean
+Log Trigger           U8
+Dummy?                 Boolean
+Event Bits            U8
+Data Lost?             Boolean
+Timestamp Raw         U64
+Timestamp Seconds     DBL
+```
+
+既存項目名が`Flag`の場合は、型をU32のまま維持して`Flag Raw`へ名称変更する。既存VIの破損を避けるためtypedef更新後に全呼出し元を一括確認する。
+
+#### 3. 前提条件・異常条件
+
+- 予約bit専用Booleanを追加しない。
+- StatusをEnumだけに変換してRawコードを失わない。
+- Dummy Packetもctlへ格納する。
+
+#### 4. 処理アルゴリズム
+
+ctlはデータ型定義だけを担当し、bit演算を持たない。bit演算は`RAMScope_Parse_Buffer.vi`で行う。
+
+#### 5. LabVIEW構造の選定理由
+
+既存ctlを拡張し、新規Packet ctlを並立させない。最新値取得と保存ログ取得で同じPacket構造を共有できるためである。
+
+#### 6. フロントパネル入出力と接続元・接続先
+
+| 項目 | 生成元 | 接続先 |
+|---|---|---|
+| Flag Raw～Data Lost? | `RAMScope_Parse_Buffer.vi` | Read系公開API、TDMS Append、PoC表示 |
+| Timestamp | `RAMScope_Parse_Buffer.vi` | Read系公開API、TDMS Append |
+
+#### 7. 配置する要素
+
+既存clusterへU8、Boolean、U32表示器を追加し、typedefとして保存する。
+
+#### 8. 作成順
+
+1. `RAMScope_Packet.ctl`を開く。
+2. typedef編集モードであることを確認する。
+3. 既存`Flag`を`Flag Raw`へ変更する。
+4. Status、Skip?、Log Trigger、Dummy?、Event Bits、Data Lost?を上記順で追加する。
+5. 既定値を数値0、Boolean Falseに設定する。
+6. typedefを保存し、変更を全インスタンスへ適用する。
+7. 壊れた`Bundle By Name`と`Unbundle By Name`を修正する。
+
+#### 9. 単体テスト
+
+`Flag Raw=0x10FF1D00`を入力し、各フィールドが独立して保持できることを確認する。ctl単体ではbit演算を行わない。
+
+---
+
+### 10.6.7 `RAMScope_Logging_PoC_State.ctl`の作成手順
+
+#### 0. 責務
+
+ロギングPoCで、どのCleanupが必要か、保存ログ取得がどこまで完了したかを1本の状態クラスタで保持する。
+
+#### 1. フィールド
+
+```text
+Connected?             Boolean False
+File Open?             Boolean False
+Measurement Started?   Boolean False
+Stopped?               Boolean False
+Log Summary Read?      Boolean False
+Logging Retrieved?     Boolean False
+Released?              Boolean False
+```
+
+#### 2. 作成順
+
+1. 新規カスタム制御器へClusterを配置する。
+2. 上記Booleanを記載順で配置し、既定値をすべてFalseにする。
+3. typedefへ変更する。
+4. `30_RAMScope\00_Common\RAMScope_Logging_PoC_State.ctl`として保存する。
+5. 通信確認用`RAMScope_PoC_State.ctl`は変更せず、ロギングPoCだけで使用する。
+
+#### 3. 更新元
+
+| フィールド | Trueへ更新する条件 |
+|---|---|
+| Connected? | `RAMScope_Connect.vi`正常終了 |
+| File Open? | `RAMScope_File_Log_Open.vi`正常終了 |
+| Measurement Started? | `RAMScope_Log_Start.vi`正常終了 |
+| Stopped? | 通常またはCleanupのStop成功 |
+| Log Summary Read? | `RAMScope_Get_Log_Summary.vi`正常終了 |
+| Logging Retrieved? | 全MeasNo／BlockNoのReadとAppendが正常終了 |
+| Released? | `RAMScope_Release.vi`正常終了 |
+
+#### 4. 単体確認
+
+Bundle By Nameで1項目だけ更新しても、他項目が入力クラスタの値を維持することを確認する。
+
 ## 10.7 `RAMScope_Code_To_Error.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeCodeToError.vi 入出力イメージ](./assets/vi-diagrams/ramscopecodetoerror.svg)
 
 #### 1. 完成時の動作
 
@@ -1608,13 +1972,31 @@ CLFNは正常でもAPI ReturnCodeが0以外の場合は、RAMScope APIエラー�
 
 ---
 
-## 10.8 薄いDLLラッパVI 12個
+## 10.8 薄いDLLラッパVI 18個
+
+### 10.8.0 全18 Wrapperの機器操作順
+
+```text
+接続・初期化
+  DeviceInit → AllInit → GetSysInfo → PGT_SetMdlConfig
+条件設定
+  SetMeasCond → SetMeasCh → SetLoggingInfo
+開始・オンライン読出し
+  MeasStart → GetBufferDataNum → GetBufferData
+停止後保存ログ
+  MeasStop → GetGapTime → GetMeasNum → GetBlockNum
+  → GetLoggingDataNum → GetLoggingData
+後処理
+  ReleaseBufferData → DeviceExit
+```
+
+この順序はMain VIの呼出順を示す。各Wrapper自体は前後の機器操作を内包しない。
 
 ### 10.8.1 現行補正と一覧
 
-本書は薄いDLL Wrapper 12個の監査済み索引である。各VIのCプロトタイプ、CLFN Parameters、左右端子、事前確保、Function Name、配線は本章内の該当節を参照する。
+本節は既存12個とロギング追加6個、合計18個の薄いDLL Wrapperを同じ規則で作成する。各VIのCプロトタイプ、CLFN Parameters、左右端子、事前確保、Function Name、配線は本章内の該当節を参照する。
 
-復元元の詳細手順と本書または[00_現行補正](./00_00A_00B監査結果と現行補正.md)が競合する場合は、現行補正を優先する。
+過去資料の詳細手順と本書が競合する場合は、本書の[10.5 一本化した作成順・確定仕様・監査結果](#105-一本化した作成順確定仕様監査結果)を優先する。
 
 ---
 
@@ -1649,7 +2031,7 @@ Falseケース（error in.status=False：既存エラーなし）
 
 ---
 
-#### 2. 12個の個別手順
+#### 2. 既存12個と追加6個の作成順
 
 | VI | 詳細位置 | 個別に確認する端子・配列 |
 |---|---|---|
@@ -1672,6 +2054,9 @@ Falseケース（error in.status=False：既存エラーなし）
 
 ##### `RS_DLL_GT170SetMeasCh.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT170SetMeasCh.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt170setmeasch.svg)
+
 GT170 RAM用構造体は`CHINFO_RAM170`で、1チャンネル24byteである。
 
 ```text
@@ -1681,6 +2066,9 @@ enable / core / address / size / sign / speed
 `size`はバイト数そのものではなく、`0=1byte`、`1=2byte`、`2=4byte`のコードである。
 
 ##### `RS_DLL_GT150ReleaseBufferData.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150ReleaseBufferData.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150releasebufferdata.svg)
 
 復元元では呼出位置が未確定と記載されているが、現在は次で確定している。
 
@@ -1698,7 +2086,7 @@ MeasStop成功後のアイドル状態 → 呼ぶ
 - `Function Name`はヘッダの関数名と完全一致させる。
 - 各Caseの全出力トンネルを配線し、`Use default if unwired`へ依存しない。
 
-### 10.8.2 各Wrapperの省略しない作成手順
+### 10.8.2 既存Wrapperの省略しない作成手順
 
 #### 1. 本章で作成するDLLラッパVI
 
@@ -1818,6 +2206,9 @@ DLLが書き込む配列は、呼び出し前に`Initialize Array`で必要要�
 
 ### 3. `RS_DLL_GT150DeviceInit.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150DeviceInit.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150deviceinit.svg)
+
 #### 3.1 Cプロトタイプ
 
 ```c
@@ -1879,6 +2270,9 @@ RAMScopeGT150DeviceInit
 
 ### 4. `RS_DLL_GT150DeviceExit.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150DeviceExit.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150deviceexit.svg)
+
 #### 4.1 Cプロトタイプ
 
 ```c
@@ -1939,6 +2333,9 @@ RAMScopeGT150DeviceExit
 
 ### 5. `RS_DLL_GT150AllInit.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150AllInit.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150allinit.svg)
+
 #### 5.1 Cプロトタイプ
 
 ```c
@@ -1976,6 +2373,9 @@ Function Name ───────→ "RAMScopeGT150AllInit"
 ---
 
 ### 6. `RS_DLL_GT150GetSysInfo.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetSysInfo.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getsysinfo.svg)
 
 #### 6.1 Cプロトタイプ
 
@@ -2048,6 +2448,9 @@ Function Name ───────────────→ "RAMScopeGT150Get
 
 ### 7. `RS_DLL_GT150PGT_SetMdlConfig.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150PGTSetMdlConfig.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150pgtsetmdlconfig.svg)
+
 #### 7.1 Cプロトタイプ
 
 ```c
@@ -2104,6 +2507,9 @@ Function Name ─────────→ "RAMScopeGT150PGT_SetMdlConfig"
 
 ### 8. `RS_DLL_GT170SetMeasCond.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT170SetMeasCond.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt170setmeascond.svg)
+
 #### 8.1 Cプロトタイプ
 
 ```c
@@ -2156,6 +2562,9 @@ Function Name ─────────→ "RAMScopeGT170SetMeasCond"
 ---
 
 ### 9. `RS_DLL_GT170SetMeasCh.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT170SetMeasCh.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt170setmeasch.svg)
 
 #### 9.1 Cプロトタイプ
 
@@ -2218,6 +2627,9 @@ Array Size(CHINFO_170 Raw) == 24 × ChNum
 
 ### 10. `RS_DLL_GT150SetLoggingInfo.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150SetLoggingInfo.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150setlogginginfo.svg)
+
 #### 10.1 Cプロトタイプ
 
 ```c
@@ -2265,6 +2677,9 @@ Function Name ─────────→ "RAMScopeGT150SetLoggingInfo"
 
 ### 11. `RS_DLL_GT150MeasStart.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150MeasStart.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150measstart.svg)
+
 #### 11.1 Cプロトタイプ
 
 ```c
@@ -2299,9 +2714,16 @@ Function Name ─────────→ "RAMScopeGT150MeasStart"
 
 ---
 
-### 12. `RS_DLL_GT150GetBufferData.vi`
+### 12. `RS_DLL_GT150GetBufferData.vi`（最終仕様）
 
-#### 12.1 Cプロトタイプ
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetBufferData.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getbufferdata.svg)
+
+#### 0. 実現したい機能とVIの責務
+
+測定中の表示用バッファから要求Packet数以下を取得する既存Wrapperである。関数引数は変更せず、`pDataNum`の入出力と配列事前確保を正す。
+
+#### 1. 入力データの実体
 
 ```c
 long RAMScopeGT150GetBufferData(
@@ -2313,97 +2735,67 @@ long RAMScopeGT150GetBufferData(
 );
 ```
 
-#### 12.2 推奨フロントパネル端子
-
-| 端子 | 方向 | 型 | 用途 |
-|---|---|---|---|
-| `UnitNo` | 入力 | I32 | 通常0 |
-| `MdlNo` | 入力 | I32 | RAMモジュール番号 |
-| `Buffer Byte Size` | 入力 | I32 | 事前確保するU8配列の要素数 |
-| `Max DataNum` | 入力 | I32 | `pDataNum`へ事前入力する最大パケット数 |
-| `error in` | 入力 | error cluster | 前段エラー |
-| `Raw Buffer` | 出力 | U8一次元配列 | DLLが書き込んだ生データ |
-| `DataNum` | 出力 | I32 | 実際に取得したパケット数 |
-| `LostDataNum` | 出力 | I32 | 取りこぼし数 |
-| `API ReturnCode` | 出力 | I32 | API戻り値 |
-| `error out` | 出力 | error cluster | 変換後エラー |
-
-`RAMScope_Read.vi`で、次の式を使用して`Buffer Byte Size`を計算する。
+#### 2. 出力データモデル
 
 ```text
-Packet Size      = 4 × Channel Count + 12
-Buffer Byte Size = Packet Size × Max DataNum
+Allocated Raw Buffer U8[]
+DataNum I32
+LostDataNum I32
+API ReturnCode I32
+error out
 ```
 
-#### 12.3 CLFNパラメータ
+#### 3. 前提条件・異常条件
 
-| 順番 | 名前 | Type | Data Type | Dimensions | Array Format / Pass |
-|---:|---|---|---|---:|---|
-| Return | 戻り値 | Numeric | Signed 32-bit Integer | - | Value |
-| 1 | `UnitNo` | Numeric | Signed 32-bit Integer | - | Value |
-| 2 | `MdlNo` | Numeric | Signed 32-bit Integer | - | Value |
-| 3 | `pData` | Array | Unsigned 8-bit Integer | 1 | Array Data Pointer |
-| 4 | `pDataNum` | Numeric | Signed 32-bit Integer | - | Pointer to Value |
-| 5 | `pLostDataNum` | Numeric | Signed 32-bit Integer | - | Pointer to Value |
+- RequestedDataNum > 0。
+- Buffer Byte Size > 0。
+- error in.status=TrueならCLFNを呼ばない。
 
-表示プロトタイプ例：
+#### 4. 処理アルゴリズム
 
-```c
-int32_t RAMScopeGT150GetBufferData(
-    int32_t UnitNo,
-    int32_t MdlNo,
-    uint8_t *pData,
-    int32_t *pDataNum,
-    int32_t *pLostDataNum
-);
-```
+RequestedDataNumを`pDataNum`左端子へ渡し、右端子からDataNumを受け取る。
 
-#### 12.4 呼び出し前の初期値
+#### 5. LabVIEW構造の選定理由
 
-```text
-U8定数 0 + Buffer Byte Size
-          ↓
-   Initialize Array
-          ↓
-   Raw Buffer初期配列
+既存エラー時のCLFN実行を防ぐCase Structureと、U8配列確保用Initialize Arrayを使用する。
 
-Max DataNum ─────────→ pDataNum 左端子
-I32定数 0 ───────────→ pLostDataNum 左端子
-```
+#### 6. 入出力
 
-`pDataNum`はPointerなので、左側へ`Max DataNum`を入力し、右側から実際の`DataNum`を受け取る。
+既存端子`MaxDataNum`は意味を明確にするため`RequestedDataNum`へ名称変更する。コネクタ位置と型は維持する。
 
-#### 12.5 全配線
+#### 7. CLFN Parameters
 
-```text
-UnitNo ───────────────────────→ CLFN UnitNo
-MdlNo ────────────────────────→ CLFN MdlNo
-U8初期配列 ───────────────────→ CLFN pData 左端子
-Max DataNum ──────────────────→ CLFN pDataNum 左端子
-I32 0 ────────────────────────→ CLFN pLostDataNum 左端子
-error in ─────────────────────→ CLFN error in
+| 順 | 名前 | Type | Data Type | Pass |
+|---:|---|---|---|---|
+| Return | return | Numeric | Signed 32-bit | Value |
+| 1 | UnitNo | Numeric | Signed 32-bit | Value |
+| 2 | MdlNo | Numeric | Signed 32-bit | Value |
+| 3 | pData | Array | Unsigned 8-bit、1D | Array Data Pointer |
+| 4 | pDataNum | Numeric | Signed 32-bit | Pointer to Value |
+| 5 | pLostDataNum | Numeric | Signed 32-bit | Pointer to Value |
 
-CLFN pData 右端子 ────────────→ Raw Buffer
-CLFN pDataNum 右端子 ─────────→ DataNum
-CLFN pLostDataNum 右端子 ─────→ LostDataNum
-CLFN戻り値 ───────────────────→ API ReturnCode
-CLFN error out ────────────────→ RAMScope_Code_To_Error.vi
-Function Name ─────────────────→ "RAMScopeGT150GetBufferData"
-```
+Function Name：`RAMScopeGT150GetBufferData`
 
-##### 安全確認
+#### 8. 配線順
 
-- `Buffer Byte Size > 0`
-- `Max DataNum > 0`
-- `Raw Buffer`の要素数が`Buffer Byte Size`と一致
-- `DataNum <= Max DataNum`
-- `LostDataNum`を毎回記録
+1. U8 0をBuffer Byte Size個Initialize Arrayする。
+2. 配列をpData左端子へ接続する。
+3. RequestedDataNumをpDataNum左端子へ接続する。
+4. I32 0をpLostDataNum左端子へ接続する。
+5. pData、pDataNum、pLostDataNumの右端子を各出力へ接続する。
+6. ReturnCodeとCLFN errorを`RAMScope_Code_To_Error.vi`へ接続する。
+7. bypassケースは空U8[]、DataNum=0、LostDataNum=0、ReturnCode=0、元errorを返す。
 
-`ReleaseBufferData`はこのラッパへ内包しない。
+#### 9. 単体テスト
+
+1Packet、複数Packet、実取得数が要求数未満、既存error、表示用バッファ空を確認する。
 
 ---
 
 ### 13. `RS_DLL_GT150ReleaseBufferData.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150ReleaseBufferData.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150releasebufferdata.svg)
 
 #### 13.1 Cプロトタイプ
 
@@ -2438,6 +2830,9 @@ Function Name ─────────→ "RAMScopeGT150ReleaseBufferData"
 ---
 
 ### 14. `RS_DLL_GT150MeasStop.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150MeasStop.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150measstop.svg)
 
 #### 14.1 Cプロトタイプ
 
@@ -2536,6 +2931,382 @@ Function Name ─────────→ "RAMScopeGT150MeasStop"
 
 ---
 
+### 10.8.3 ロギング取得用Wrapperの作成手順
+
+全WrapperはC関数1個をCLFNで1回だけ呼ぶ。通常Wrapperは`error in.status=True`でCLFNを呼ばず、安全値と元errorを返す。
+
+#### 10.8.3.1 `RS_DLL_GT150GetGapTime.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetGapTime.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getgaptime.svg)
+
+#### 0. 責務
+
+MeasStart発行直後からハードウェアへの測定開始要求直前までの時間をms単位で取得する。
+
+#### 1. 入力データ
+
+```c
+long RAMScopeGT150GetGapTime(long UnitNo, unsigned long *pGapTime);
+```
+
+#### 2. 出力
+
+GapTimeMs U32、API ReturnCode I32、error out。
+
+#### 3. 条件
+
+UnitNoは現仕様0。既存error時はGapTimeMs=0。
+
+#### 4. アルゴリズム
+
+pGapTime左端子へU32 0を入れ、右端子から値を得る。
+
+#### 5. 構造理由
+
+Case Structureで既存error時のCLFN呼出しを止める。
+
+#### 6. 入出力
+
+UnitNo、error in／GapTimeMs、API ReturnCode、error out。
+
+#### 7. CLFN Parameters
+
+| 順 | 名前 | Type | Data Type | Pass |
+|---:|---|---|---|---|
+| Return | return | Numeric | Signed 32-bit | Value |
+| 1 | UnitNo | Numeric | Signed 32-bit | Value |
+| 2 | pGapTime | Numeric | Unsigned 32-bit | Pointer to Value |
+
+Function Name：`RAMScopeGT150GetGapTime`
+
+#### 8. 配線
+
+UnitNo、U32 0、error inをCLFNへ接続し、pGapTime右端子をGapTimeMsへ接続する。ReturnCodeとCLFN errorを`RAMScope_Code_To_Error.vi`へ接続する。bypass側は0、0、元error。
+
+#### 9. テスト
+
+Start前、Start直後、Stop後、既存errorを確認する。
+
+---
+
+#### 10.8.3.2 `RS_DLL_GT150GetMeasNum.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetMeasNum.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getmeasnum.svg)
+
+#### 0. 責務
+
+MeasStartからMeasStopまでに成立した測定回数を取得する。
+
+#### 1. 入力データ
+
+```c
+long RAMScopeGT150GetMeasNum(long UnitNo, long *pMeasNum);
+```
+
+#### 2. 出力
+
+MeasNum I32、API ReturnCode、error out。
+
+#### 3. 条件
+
+Stop後に使用する。既存error時はMeasNum=0。
+
+#### 4. アルゴリズム
+
+pMeasNum左端子へI32 0、右端子からMeasNum。
+
+#### 5. 構造理由
+
+既存errorバイパス用Case Structure。
+
+#### 6. 入出力
+
+UnitNo、error in／MeasNum、API ReturnCode、error out。
+
+#### 7. CLFN Parameters
+
+| 順 | 名前 | Type | Data Type | Pass |
+|---:|---|---|---|---|
+| Return | return | Numeric | Signed 32-bit | Value |
+| 1 | UnitNo | Numeric | Signed 32-bit | Value |
+| 2 | pMeasNum | Numeric | Signed 32-bit | Pointer to Value |
+
+Function Name：`RAMScopeGT150GetMeasNum`
+
+#### 8. 配線
+
+I32 0をPointer左端子へ接続し、右端子をMeasNumへ接続する。ReturnCodeとerrorを共通変換する。
+
+#### 9. テスト
+
+測定0回、1回、複数回、測定中発行、既存error。
+
+---
+
+#### 10.8.3.3 `RS_DLL_GT150GetBlockNum.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetBlockNum.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getblocknum.svg)
+
+#### 0. 責務
+
+指定MeasNoのロギングBlock数を取得する。
+
+#### 1. 入力データ
+
+```c
+long RAMScopeGT150GetBlockNum(long UnitNo, long MeasNo, long *pBlockNum);
+```
+
+#### 2. 出力
+
+BlockNum I32、API ReturnCode、error out。
+
+#### 3. 条件
+
+`0 <= MeasNo < MeasNum`。既存error時は0。
+
+#### 4. アルゴリズム
+
+pBlockNum左端子0、右端子からBlockNum。
+
+#### 5. 構造理由
+
+通常Wrapper共通Case Structure。
+
+#### 6. 入出力
+
+UnitNo、MeasNo、error in／BlockNum、ReturnCode、error out。
+
+#### 7. CLFN Parameters
+
+| 順 | 名前 | Type | Data Type | Pass |
+|---:|---|---|---|---|
+| Return | return | Numeric | Signed 32-bit | Value |
+| 1 | UnitNo | Numeric | Signed 32-bit | Value |
+| 2 | MeasNo | Numeric | Signed 32-bit | Value |
+| 3 | pBlockNum | Numeric | Signed 32-bit | Pointer to Value |
+
+Function Name：`RAMScopeGT150GetBlockNum`
+
+#### 8. 配線
+
+Cプロトタイプ順に接続し、Pointer右端子をBlockNumへ接続する。bypass側は0、0、元error。
+
+#### 9. テスト
+
+先頭／末尾MeasNo、-1、MeasNum、BlockNum=0。
+
+---
+
+#### 10.8.3.4 `RS_DLL_GT150GetBufferDataNum.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetBufferDataNum.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getbufferdatanum.svg)
+
+#### 0. 責務
+
+測定中の表示用バッファに現在保存されているPacket数を取得する。
+
+#### 1. 入力データ
+
+```c
+long RAMScopeGT150GetBufferDataNum(long UnitNo, long MdlNo, long *pDataNum);
+```
+
+#### 2. 出力
+
+AvailableDataNum I32、API ReturnCode、error out。
+
+#### 3. 条件
+
+RAMモニタMdlNoを指定する。既存error時は0。
+
+#### 4. アルゴリズム
+
+pDataNum左端子0、右端子からAvailableDataNum。
+
+#### 5. 構造理由
+
+通常Wrapper共通Case Structure。
+
+#### 6. 入出力
+
+UnitNo、MdlNo、error in／AvailableDataNum、ReturnCode、error out。
+
+#### 7. CLFN Parameters
+
+| 順 | 名前 | Type | Data Type | Pass |
+|---:|---|---|---|---|
+| Return | return | Numeric | Signed 32-bit | Value |
+| 1 | UnitNo | Numeric | Signed 32-bit | Value |
+| 2 | MdlNo | Numeric | Signed 32-bit | Value |
+| 3 | pDataNum | Numeric | Signed 32-bit | Pointer to Value |
+
+Function Name：`RAMScopeGT150GetBufferDataNum`
+
+#### 8. 配線
+
+Pointer左0、右AvailableDataNum。ReturnCodeを共通変換する。
+
+#### 9. テスト
+
+測定開始直後、Wait後、GetBufferData実行後、既存error。
+
+---
+
+#### 10.8.3.5 `RS_DLL_GT150GetLoggingDataNum.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetLoggingDataNum.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getloggingdatanum.svg)
+
+#### 0. 責務
+
+指定MeasNo、BlockNo、MdlNoの保存Packet数を取得する。
+
+#### 1. 入力データ
+
+```c
+long RAMScopeGT150GetLoggingDataNum(
+    long UnitNo,
+    long MdlNo,
+    long MeasNo,
+    long BlockNo,
+    long *pDataNum
+);
+```
+
+#### 2. 出力
+
+AvailableDataNum I32、API ReturnCode、error out。
+
+#### 3. 条件
+
+Stop後、Release前に使用する。MeasNoとBlockNoは上位APIで検証する。
+
+#### 4. アルゴリズム
+
+pDataNum左端子0、右端子から保存Packet数。
+
+#### 5. 構造理由
+
+通常Wrapper共通Case Structure。
+
+#### 6. 入出力
+
+UnitNo、MdlNo、MeasNo、BlockNo、error in／AvailableDataNum、ReturnCode、error out。
+
+#### 7. CLFN Parameters
+
+| 順 | 名前 | Type | Data Type | Pass |
+|---:|---|---|---|---|
+| Return | return | Numeric | Signed 32-bit | Value |
+| 1 | UnitNo | Numeric | Signed 32-bit | Value |
+| 2 | MdlNo | Numeric | Signed 32-bit | Value |
+| 3 | MeasNo | Numeric | Signed 32-bit | Value |
+| 4 | BlockNo | Numeric | Signed 32-bit | Value |
+| 5 | pDataNum | Numeric | Signed 32-bit | Pointer to Value |
+
+Function Name：`RAMScopeGT150GetLoggingDataNum`
+
+#### 8. 配線
+
+引数順を変更しない。Pointer右端子をAvailableDataNumへ接続する。bypass側は0、0、元error。
+
+#### 9. テスト
+
+Block先頭／末尾、DataNum=0、MeasNo不正、BlockNo不正、測定中発行。
+
+---
+
+#### 10.8.3.6 `RS_DLL_GT150GetLoggingData.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetLoggingData.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getloggingdata.svg)
+
+#### 0. 責務
+
+指定Blockの保存PacketをU8一次元配列へコピーする。Packet解析は行わない。
+
+#### 1. 入力データ
+
+```c
+long RAMScopeGT150GetLoggingData(
+    long UnitNo,
+    long MdlNo,
+    long MeasNo,
+    long BlockNo,
+    void *pData,
+    long *pDataNum,
+    long *pLostDataNum
+);
+```
+
+#### 2. 出力
+
+Allocated Raw Buffer U8[]、DataNum I32、LostDataNum I32、ReturnCode、error out。
+
+#### 3. 条件
+
+RequestedDataNum>0、Buffer Byte Size>0、Stop後、Release前。
+
+#### 4. アルゴリズム
+
+- Buffer Byte Size分のU8配列をInitialize Array。
+- RequestedDataNumをpDataNum左端子へ入力。
+- pLostDataNum左端子はI32 0。
+- CLFN後にpDataNum右端子から実取得数。
+
+#### 5. 構造理由
+
+Case Structure、Initialize Array、Array Data Pointer、Pointer to Valueを使用する。
+
+#### 6. 入出力
+
+| 端子 | 方向 | 型 |
+|---|---|---|
+| UnitNo、MdlNo、MeasNo、BlockNo | 入力 | I32 |
+| RequestedDataNum | 入力 | I32 |
+| Buffer Byte Size | 入力 | I32 |
+| error in | 入力 | error cluster |
+| Allocated Raw Buffer | 出力 | U8[] |
+| DataNum、LostDataNum、ReturnCode | 出力 | I32 |
+| error out | 出力 | error cluster |
+
+#### 7. CLFN Parameters
+
+| 順 | 名前 | Type | Data Type | Pass |
+|---:|---|---|---|---|
+| Return | return | Numeric | Signed 32-bit | Value |
+| 1 | UnitNo | Numeric | Signed 32-bit | Value |
+| 2 | MdlNo | Numeric | Signed 32-bit | Value |
+| 3 | MeasNo | Numeric | Signed 32-bit | Value |
+| 4 | BlockNo | Numeric | Signed 32-bit | Value |
+| 5 | pData | Array | Unsigned 8-bit、1D | Array Data Pointer |
+| 6 | pDataNum | Numeric | Signed 32-bit | Pointer to Value |
+| 7 | pLostDataNum | Numeric | Signed 32-bit | Pointer to Value |
+
+Function Name：`RAMScopeGT150GetLoggingData`
+
+#### 8. 配線
+
+1. Initialize Array出力をpData左端子へ接続する。
+2. RequestedDataNumをpDataNum左端子へ接続する。
+3. I32 0をpLostDataNum左端子へ接続する。
+4. pData右端子をAllocated Raw Bufferへ接続する。
+5. pDataNum右端子をDataNumへ接続する。
+6. pLostDataNum右端子をLostDataNumへ接続する。
+7. ReturnCodeとCLFN errorを共通変換する。
+8. bypass側は空U8[]、DataNum=0、Lost=0、Return=0、元error。
+
+#### 9. テスト
+
+Requested=1、全件要求、実取得数が要求未満、DataNum=0、不正番号、既存error。引数7個であることをCLFN画面で再確認する。
+
+---
+
 ## 10.9 数値変換・構造体Builder
 
 ### 10.9.1 現行仕様とアルゴリズム
@@ -2569,11 +3340,14 @@ LabVIEW設定クラスタ
 | `Build_CHINFO_170_Raw.vi` | 24byte×ChNumのCHINFO配列を生成 | 入力検証Case、For、配列とerrorのShift Register |
 | `Build_LOGINFO_Raw.vi` | 136byte LOGINFOを生成 | For、更新配列・Seen・errorのShift Register |
 
-Parser側で使用する`U8x4_To_U32.vi`、`U8x4_To_I32.vi`、`U8x8_To_U64.vi`は[Parser詳細](./04_Parser_VI作成手順.md)を参照する。
+Parser側で使用する`U8x4_To_U32.vi`、`U8x4_To_I32.vi`、`U8x8_To_U64.vi`は[10.10 Parser](#1010-parser)を参照する。
 
 ---
 
 #### 3. `Build_CHINFO_170_Raw.vi`の現行補正
+
+<!-- generated-vi-diagram -->
+![BuildCHINFO170Raw.vi 入出力イメージ](./assets/vi-diagrams/buildchinfo170raw.svg)
 
 ##### 3.1 入力データと出力モデル
 
@@ -2659,6 +3433,9 @@ code=I32 -700112
 ---
 
 #### 4. `Build_LOGINFO_Raw.vi`の現行補正
+
+<!-- generated-vi-diagram -->
+![BuildLOGINFORaw.vi 入出力イメージ](./assets/vi-diagrams/buildloginforaw.svg)
 
 ##### 4.1 データモデル
 
@@ -2778,6 +3555,9 @@ code=I32 -700114
 
 #### 3.1 `I32_To_LE_U8x4.vi`
 
+<!-- generated-vi-diagram -->
+![I32ToLEU8x4.vi 入出力イメージ](./assets/vi-diagrams/i32toleu8x4.svg)
+
 ##### 3.1.1 フロントパネル端子
 
 | 端子 | 方向 | 型 |
@@ -2843,6 +3623,9 @@ Value = -1
 ---
 
 #### 3.2 `U32_To_LE_U8x4.vi`
+
+<!-- generated-vi-diagram -->
+![U32ToLEU8x4.vi 入出力イメージ](./assets/vi-diagrams/u32toleu8x4.svg)
 
 `I32_To_LE_U8x4.vi`を別名保存し、`Value`の表現形式だけU32へ変更する。
 
@@ -2951,6 +3734,9 @@ RAMScope_Channel.ctl 配列
 ---
 
 ### 5. `Build_MEASINFO_170_Raw.vi`
+
+<!-- generated-vi-diagram -->
+![BuildMEASINFO170Raw.vi 入出力イメージ](./assets/vi-diagrams/buildmeasinfo170raw.svg)
 
 #### 5.1 C構造体
 
@@ -3068,6 +3854,9 @@ MeasUnit      = 2
 ---
 
 ### 6. `Build_CHINFO_170_Raw.vi`
+
+<!-- generated-vi-diagram -->
+![BuildCHINFO170Raw.vi 入出力イメージ](./assets/vi-diagrams/buildchinfo170raw.svg)
 
 #### 6.1 C構造体
 
@@ -3229,6 +4018,9 @@ Array Size = 72
 
 ### 7. `Build_LOGINFO_Raw.vi`
 
+<!-- generated-vi-diagram -->
+![BuildLOGINFORaw.vi 入出力イメージ](./assets/vi-diagrams/buildloginforaw.svg)
+
 #### 7.1 C構造体
 
 ```c
@@ -3334,6 +4126,9 @@ offset 20 = 1  // 12 + 1*8
 ---
 
 ### 8. `RAMScope_Set_Cond.vi`での接続
+
+<!-- generated-vi-diagram -->
+![RAMScopeSetCond.vi 入出力イメージ](./assets/vi-diagrams/ramscopesetcond.svg)
 
 構造体生成とDLLラッパを次の順で接続する。
 
@@ -3473,6 +4268,9 @@ source=Format Into String出力
 
 #### 3. `Parse_SYSINFO_Array.vi`
 
+<!-- generated-vi-diagram -->
+![ParseSYSINFOArray.vi 入出力イメージ](./assets/vi-diagrams/parsesysinfoarray.svg)
+
 ##### 3.1 入力データの実体
 
 SYSINFO Rawは60byteのレコード16個を連結したU8[960]である。
@@ -3571,6 +4369,9 @@ Record 2..15: module_type=0x0F
 ---
 
 #### 4. `RAMScope_Parse_Buffer.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeParseBuffer.vi 入出力イメージ](./assets/vi-diagrams/ramscopeparsebuffer.svg)
 
 ##### 4.1 入力データの実体
 
@@ -3788,6 +4589,9 @@ Big Endian
 
 #### 3.1 `U8x4_To_U32.vi`
 
+<!-- generated-vi-diagram -->
+![U8x4ToU32.vi 入出力イメージ](./assets/vi-diagrams/u8x4tou32.svg)
+
 ##### 3.1.1 フロントパネル端子
 
 | 端子 | 方向 | 型 |
@@ -3838,6 +4642,9 @@ U8x4_To_U32.vi: Input size must be 4. Actual=<size>
 
 #### 3.2 `U8x4_To_I32.vi`
 
+<!-- generated-vi-diagram -->
+![U8x4ToI32.vi 入出力イメージ](./assets/vi-diagrams/u8x4toi32.svg)
+
 `U8x4_To_U32.vi`を別名保存し、`Unflatten From String`のtype入力をI32へ変更する。
 
 単体テスト：
@@ -3850,6 +4657,9 @@ Bytes = FF FF FF FF、Little Endian
 ---
 
 #### 3.3 `U8x8_To_U64.vi`
+
+<!-- generated-vi-diagram -->
+![U8x8ToU64.vi 入出力イメージ](./assets/vi-diagrams/u8x8tou64.svg)
 
 `U8x4_To_U32.vi`を別名保存し、次を変更する。
 
@@ -3867,6 +4677,9 @@ Bytes = 32 00 00 00 00 00 00 00、Little Endian
 ---
 
 ### 4. `Parse_SYSINFO_Array.vi`
+
+<!-- generated-vi-diagram -->
+![ParseSYSINFOArray.vi 入出力イメージ](./assets/vi-diagrams/parsesysinfoarray.svg)
 
 #### 4.1 入出力
 
@@ -4076,269 +4889,201 @@ Module List要素数 = 16
 
 ---
 
-### 5. `RAMScope_Parse_Buffer.vi`
+### 5. `RAMScope_Parse_Buffer.vi`（オンライン・保存ログ共通の最終仕様）
 
-#### 5.1 現時点のパケット定義
+<!-- generated-vi-diagram -->
+![RAMScopeParseBuffer.vi 入出力イメージ](./assets/vi-diagrams/ramscopeparsebuffer.svg)
 
-RAMモニタの1パケットを次として扱う。
+#### 0. 実現したい機能とVIの責務
 
-```text
-Channel Data[0]   4byte
-Channel Data[1]   4byte
-...
-Channel Data[N-1] 4byte
-Flag              4byte
-Timestamp          8byte
-```
+最新値取得と保存ログ取得の両方から渡されるU8配列を、チャンネル値、RAM用Flag、20ns Timeを持つPacket配列へ変換する。
+
+#### 1. 入力データの実体
 
 ```text
-Packet Size = 4 × ChNum + 12
+Raw Buffer U8[]
+DataNum I32
+Channel List RAMScope_Channel.ctl[]
+Byte Order RAMScope_Byte_Order.ctl
 ```
 
-Timestampは現行資料では20ns単位として扱う。実機PoCで純正RAMScopeVPまたは既知値と比較し、最終確定する。
-
-#### 5.2 入出力
-
-| 端子 | 方向 | 型 |
-|---|---|---|
-| `Raw Buffer` | 入力 | U8一次元配列 |
-| `DataNum` | 入力 | I32 |
-| `Channel List` | 入力 | `RAMScope_Channel.ctl`一次元配列 |
-| `Byte Order` | 入力 | `RAMScope_Byte_Order.ctl` |
-| `error in` | 入力 | error cluster |
-| `Packets` | 出力 | `RAMScope_Packet.ctl`一次元配列 |
-| `Parsed Packet Count` | 出力 | I32 |
-| `Unused Byte Count` | 出力 | I32 |
-| `error out` | 出力 | error cluster |
-
-#### 5.3 配置する関数
+Packet内の各Dataスロットは4byte固定だが、有効値幅は`RAMScope_Channel.ctl.Size`で決まる。
 
 ```text
-Array Size
-Multiply
-Add
-Greater Or Equal?
-Case Structure
-For Loop ×2
-Array Subset
-U8x4_To_U32.vi
-U8x4_To_I32.vi
-U8x8_To_U64.vi
-Unbundle By Name
-Bundle By Name
-Type Cast
-To Double Precision Float
-Select
+Size=0 → 1byte有効
+Size=1 → 2byte有効
+Size=2 → 4byte有効
 ```
 
-#### 5.4 サイズを計算する
+#### 2. 出力データモデル
 
 ```text
-ChNum = Array Size(Channel List)
-Packet Size = 4 × ChNum + 12
-Expected Byte Count = Packet Size × DataNum
-Actual Byte Count = Array Size(Raw Buffer)
-Unused Byte Count = Actual Byte Count - Expected Byte Count
+Packets RAMScope_Packet.ctl[]
+Parsed Packet Count I32
+Unused Byte Count I32
+error out error cluster
 ```
 
-入力条件：
+#### 3. 前提条件・異常条件
 
 ```text
 ChNum > 0
 DataNum >= 0
-Actual Byte Count >= Expected Byte Count
+Actual Byte Count >= DataNum × Packet Size
 ```
 
-DataNum=0は正常として空のPacketsを返す。
+- `DataNum=0`は正常な空データ。
+- Buffer不足はParserエラー。
+- Status、Skip、Data LostはPacket状態でありParserエラーにしない。
+- Sizeが0、1、2以外ならローカルエラー`-700160`。
 
-ActualがExpectedより小さい場合は解析を行わずエラーにする。
-
-エラーメッセージ例：
+source全文：
 
 ```text
-RAMScope_Parse_Buffer.vi: Buffer is shorter than expected. Expected=<n>, Actual=<n>
+RAMScope_Parse_Buffer.vi: Unsupported channel Size. ChannelIndex=%d, Size=%d
 ```
 
-#### 5.5 外側For Loopでパケットを処理する
-
-N端子へ`DataNum`を接続する。
+#### 4. 処理アルゴリズム
 
 ```text
-Packet Start = packet index × Packet Size
+ChNum = Array Size(Channel List)
+Packet Size = ChNum × 4 + 12
+Expected Bytes = DataNum × Packet Size
+Actual Bytes = Array Size(Raw Buffer)
+
+for PacketIndex in 0 ... DataNum-1:
+    Packet Start = PacketIndex × Packet Size
+
+    for ChannelIndex in 0 ... ChNum-1:
+        Data Start = Packet Start + ChannelIndex × 4
+        Raw Slot U32 = U8x4_To_U32(Data Start, Byte Order)
+        Value = DecodeBySizeAndSign(Raw Slot U32, Size, Sign)
+        Engineering Value = Value × Scale + Offset
+
+    Flag Start = Packet Start + ChNum × 4
+    Flag Raw = U8x4_To_U32(Flag Start, Byte Order)
+    Flag fields = mask and shift
+
+    Time Start = Flag Start + 4
+    Time Raw = U8x8_To_U64(Time Start, Byte Order)
+    Time Seconds = DBL(Time Raw) × 20e-9
+
+    Bundle RAMScope_Packet.ctl
 ```
 
-各反復で1パケットを解析する。
+#### 5. LabVIEW構造の選定理由
 
-#### 5.6 内側For Loopでチャンネル値を処理する
+- Packet反復は外側For Loop。
+- Channel反復は内側For Loop。
+- Size別の値幅はCase Structure。
+- 4byte、8byte切出しはArray Subset。
+- 符号付き値はType Castでbit列を維持する。
+- FlagはLogical ShiftとANDで抽出する。
 
-`Channel List`を内側For Loopへ自動インデックス入力する。
+#### 6. フロントパネル入出力と接続元・接続先
+
+| 端子 | 方向 | 型 | 接続元・接続先 |
+|---|---|---|---|
+| Raw Buffer | 入力 | U8[] | `RAMScope_Read.vi`または`RAMScope_Read_Logging_Block.vi` |
+| DataNum | 入力 | I32 | 各DLL Wrapperの実取得数 |
+| Channel List | 入力 | `RAMScope_Channel.ctl[]` | SetMeasChへ渡した同一配列 |
+| Byte Order | 入力 | typedef | Init結果を明示変換した値 |
+| Packets | 出力 | `RAMScope_Packet.ctl[]` | PoC、TDMS Append、TestStand |
+| Parsed Packet Count | 出力 | I32 | 件数照合 |
+| Unused Byte Count | 出力 | I32 | デバッグ・品質判定 |
+
+#### 7. 配置する関数およびSubVI
+
+- For Loop ×2。
+- Case Structure：Size 0、1、2、Default。
+- Array Size、Array Subset。
+- U8x4_To_U32.vi、U8x8_To_U64.vi。
+- AND、Logical Shift、Not Equal To 0?。
+- Type Cast、To Double Precision Float。
+- Bundle By Name。
+- Format Into String、Bundle By Nameによるローカルerror生成。
+
+#### 8. 配線順
+
+##### A. サイズ検証
+
+1. Channel ListをArray Sizeへ接続してChNumを得る。
+2. ChNum、DataNumを先にI64へ変換する。
+3. `Packet Size I64 = ChNum I64 × 4 + 12`を作る。
+4. `Expected Bytes I64 = DataNum I64 × Packet Size I64`を作る。
+5. Raw BufferのArray SizeをI64へ変換する。
+6. `ChNum>0 AND DataNum>=0 AND Actual>=Expected`をCase selectorへ接続する。
+7. Falseケースは空Packets、Count 0、Unused 0と`-700161`を返す。
+
+source全文：
 
 ```text
-Value Start = Packet Start + channel index × 4
+RAMScope_Parse_Buffer.vi: Buffer is shorter than expected or input is invalid. ChNum=%d, DataNum=%d, Expected=%lld, Actual=%lld
 ```
 
-1. `Array Subset`で4バイトを取得する。
-2. `U8x4_To_U32.vi`でRaw U32を取得する。
-3. Channel clusterを`Unbundle By Name`し、Name、Address、Sign、Scale、Offset、Unitを取得する。
-4. `Sign == 0`を判定する。
+##### B. Channel DataのSize別解析
 
-##### Signが0
+1. 内側For LoopでChannel clusterからSizeとSignをUnbundleする。
+2. Raw Slot U32をSize Caseへ接続する。
+3. Size=0では`AND 0x000000FF`後にU8へ変換する。
+4. Size=1では`AND 0x0000FFFF`後にU16へ変換する。
+5. Size=2ではU32全体を使う。
+6. 各Case内でSign=0なら符号なし数値をDBL化する。
+7. Sign!=0なら同じbit幅のI8、I16、I32へType CastしてDBL化する。
+8. `Value × Scale + Offset`をEngineering Valueへ接続する。
+9. Defaultケースは`-700160`を生成する。
+
+##### C. Flag解析
+
+1. `Flag Start = Packet Start + ChNum×4`を作る。
+2. 4byteをArray Subsetし、U8x4_To_U32.viへ接続する。
+3. Flag Rawを次へ分岐する。
 
 ```text
-Value = U32をDBLへ変換
+Status      = U8(Flag Raw AND 0x000000FF)
+Skip?       = ((Flag Raw >> 8) AND 1) != 0
+Log Trigger = U8((Flag Raw >> 10) AND 3)
+Dummy?      = ((Flag Raw >> 12) AND 1) != 0
+Event Bits  = U8((Flag Raw >> 16) AND 0xFF)
+Data Lost?  = ((Flag Raw >> 28) AND 1) != 0
 ```
 
-##### Signが0以外
+4. 予約bitは解析しない。
 
-```text
-Raw U32をType CastでI32へ変換
-I32をDBLへ変換
-```
+##### D. Time解析
 
-これはビット列を維持して符号付き値として解釈するためであり、通常の数値変換でU32をI32へ丸めない。
+1. `Time Start = Flag Start + 4`。
+2. 8byteをArray Subsetする。
+3. U8x8_To_U64.viでTime Rawを取得する。
+4. DBLへ変換して`20e-9`を乗算する。
 
-工学値：
+##### E. Packet Bundle
 
-```text
-Engineering Value = Value × Scale + Offset
-```
+1. 既存`RAMScope_Packet.ctl`定数をBundle By Nameの基準クラスタへ接続する。
+2. Packet Index、Channel Values、Flag全項目、Time全項目を接続する。
+3. 外側For Loopを自動インデックス出力にする。
+4. Array Size(Packets)をParsed Packet Countへ接続する。
 
-`Bundle By Name`で`RAMScope_Channel_Value.ctl`を作り、内側For Loopの自動インデックス出力からChannel Values配列を作る。
+#### 9. 単体テスト
 
-> `Sign`コードの正式な意味はベンダー資料で確認する。初期PoCでは`0=符号なし、0以外=符号あり`として既知RAM値と照合し、相違があればマッピングを修正する。
-
-#### 5.7 Flagを解析する
-
-```text
-Flag Start = Packet Start + 4 × ChNum
-```
-
-`Array Subset(length=4)`から`U8x4_To_U32.vi`でFlagを取得する。
-
-#### 5.8 Timestampを解析する
-
-```text
-Timestamp Start = Packet Start + 4 × ChNum + 4
-```
-
-`Array Subset(length=8)`から`U8x8_To_U64.vi`でTimestamp Rawを取得する。
-
-秒換算：
-
-```text
-Timestamp Seconds = Timestamp Raw × 20e-9
-```
-
-#### 5.9 Packetクラスタを作る
-
-`Bundle By Name`で以下を格納する。
-
-```text
-Packet Index = 外側For Loopのi
-Channel Values = 内側For Loop出力
-Flag
-Timestamp Raw
-Timestamp Seconds
-```
-
-外側For Loopの自動インデックス出力を`Packets`へ接続する。
-
-```text
-Parsed Packet Count = Array Size(Packets)
-```
-
-#### 5.10 エラー伝搬
-
-数値変換VIのerror clusterをチャンネル順、Flag、Timestampの順に直列接続する。
-
-For Loop内でエラーが発生した場合も、次反復を無条件に実行しないよう、ループ内のCase Structureで`error status=True`なら変換をスキップしてエラーを伝播する。
-
-最小PoCで複雑になりすぎる場合は、事前のサイズ検証を通したうえで各変換VIを直列接続し、まず1パケットで動作確認してからループ化する。
-
----
-
-### 6. Parser単体テスト
-
-#### 6.1 2チャンネル・1パケット
-
-Channel List：
-
-```text
-Channel 0
-  Name = UnsignedValue
-  Sign = 0
-  Scale = 1
-  Offset = 0
-
-Channel 1
-  Name = SignedValue
-  Sign = 1
-  Scale = 1
-  Offset = 0
-```
-
-Little EndianのダミーRaw Buffer：
-
-```text
-01 00 00 00             // Channel 0 = 1
-FE FF FF FF             // Channel 1 = -2
-A5 00 00 00             // Flag = 0x000000A5
-32 00 00 00 00 00 00 00 // Timestamp = 50
-```
-
-入力：
-
-```text
-DataNum = 1
-ChNum = 2
-Packet Size = 20
-Raw Buffer Size = 20
-```
-
-期待結果：
-
-```text
-Packets[0].Channel Values[0].Value = 1
-Packets[0].Channel Values[1].Value = -2
-Packets[0].Flag = 0xA5
-Packets[0].Timestamp Raw = 50
-Packets[0].Timestamp Seconds = 0.000001
-Parsed Packet Count = 1
-Unused Byte Count = 0
-```
-
-#### 6.2 不完全バッファ
-
-上記Raw Bufferの末尾を1バイト削除する。
-
-期待結果：
-
-```text
-error out.status = True
-Packets = 空配列
-```
-
-#### 6.3 余剰バイト
-
-上記Raw Bufferの末尾へ4バイト追加する。
-
-期待結果：
-
-```text
-Parsed Packet Count = 1
-Unused Byte Count = 4
-error out.status = False
-```
-
-#### 6.4 Big Endian
-
-各数値のバイト順をBig Endianへ並べ替え、`Byte Order=Big Endian`で同じ値になることを確認する。
+- 1byte unsigned `0xFF` → 255。
+- 1byte signed `0xFF` → -1。
+- 2byte unsigned `0xFFFF` → 65535。
+- 2byte signed `0xFFFF` → -1。
+- 4byte signed `0xFFFFFFFE` → -2。
+- Flag各bitを1個ずつ立てて抽出結果を確認。
+- Time Raw=50 → 1us。
+- Buffer末尾1byte不足 → Parserエラー。
+- DataNum=0 → 正常な空配列。
 
 ---
 
 ### 7. 公開APIでの接続
 
 #### 7.1 `RAMScope_Init.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeInit.vi 入出力イメージ](./assets/vi-diagrams/ramscopeinit.svg)
 
 ```text
 RS_DLL_GT150GetSysInfo.vi
@@ -4357,6 +5102,9 @@ Parse_SYSINFO_Array.vi
 RAM Module Found?がFalseの場合のエラー生成は`RAMScope_Init.vi`で行う。
 
 #### 7.2 `RAMScope_Read.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeRead.vi 入出力イメージ](./assets/vi-diagrams/ramscoperead.svg)
 
 ```text
 RS_DLL_GT150GetBufferData.vi
@@ -4422,15 +5170,30 @@ RAMScope_Parse_Buffer.vi
 
 ---
 
-## 10.11 既存公開API 8個
+## 10.11 公開API 11個
 
-本節では、通信確認と基本測定に使用する既存`RAMScope_*`公開API 8個を、00Aの再現可能な配線手順と00Bの設計理由の両方で説明する。停止後保存ログ取得用の追加公開API 3個は10.13.5で説明する。
+本節では通信確認用8個と停止後保存ログ取得用3個、合計11個の`RAMScope_*`公開APIを機器操作順で説明する。
 
-既存8個と追加3個の全公開APIは最後に`Error_To_TestStatus.vi`を1回だけ呼び、`Status.ctl`、`TestError.ctl`、標準`error out`を返す。DLL Wrapper、Builder、Parserから同SubVIを呼ばない。
+全11個の公開APIは最後に`Error_To_TestStatus.vi`を1回だけ呼び、`Status.ctl`、`TestError.ctl`、標準`error out`を返す。DLL Wrapper、Builder、Parserから同SubVIを呼ばない。
+
+---
+
+### 10.11.0 全11公開APIの呼出順
+
+```text
+Connect → Init → Set Cond → Log Start → Read → Log Stop
+→ Get Log Summary → Get Block Count → Read Logging Block
+→ Release → Close
+```
+
+`Read`は測定中の表示Buffer、`Read Logging Block`はStop後の保存Bufferを扱う。両者は同じ`RAMScope_Parse_Buffer.vi`を使用する。
 
 ---
 
 #### 1. `RAMScope_Connect.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeConnect.vi 入出力イメージ](./assets/vi-diagrams/ramscopeconnect.svg)
 
 ##### 0～5. 機能、データ、アルゴリズム、構造選定
 
@@ -4470,6 +5233,9 @@ RAMScope_Parse_Buffer.vi
 ---
 
 #### 2. `RAMScope_Init.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeInit.vi 入出力イメージ](./assets/vi-diagrams/ramscopeinit.svg)
 
 ##### 0. 実現したい機能とVIの責務
 
@@ -4674,6 +5440,12 @@ RAMScope_Init.vi: PGT module configuration reported a slot error. SlotIndex=%d, 
 
 #### 3. `RAMScope_Set_Cond.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeSetCond.vi 入出力イメージ](./assets/vi-diagrams/ramscopesetcond.svg)
+
+> **ロギング対応を含む最終順序**：`SetMeasCond → SetMeasCh → SetLoggingInfo`を固定する。SetMeasCondまたはSetMeasChは内部Bufferを再構成するため、保存用`logSize`と表示用`BuffSize`を設定するSetLoggingInfoを最後に実行する。
+
+
 ##### 0～5. 設計
 
 Meas Config、Channel List、Module Log Configsを各BuilderでDLL用U8配列へ変換し、サイズが正しいことを確認してから、SetMeasCond→SetMeasCh→SetLoggingInfoの順に実行する。Builderエラーやサイズ不正時に後続APIを呼ばないため、error cluster直列接続とサイズ判定Caseを使う。
@@ -4715,6 +5487,9 @@ RAMScope_Set_Cond.vi: Builder output size is invalid. MEASINFO=%d, CHINFO=%d, Ex
 
 #### 4. `RAMScope_Log_Start.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeLogStart.vi 入出力イメージ](./assets/vi-diagrams/ramscopelogstart.svg)
+
 ##### 0～5. 設計
 
 測定開始APIを1回呼ぶ1イベントVI。状態遷移は上位PoC/TestStandが管理する。
@@ -4731,54 +5506,121 @@ Set Cond後の正常開始、Set Cond前、二重開始、既存エラーを記�
 
 ---
 
-#### 5. `RAMScope_Read.vi`
+#### `RAMScope_Read.vi`（GetBufferDataNum対応の最終仕様）
 
-##### 0～5. 設計
+<!-- generated-vi-diagram -->
+![RAMScopeRead.vi 入出力イメージ](./assets/vi-diagrams/ramscoperead.svg)
 
-Channel ListからPacket Sizeを求め、MaxDataNum分のU8配列を確保してGetBufferDataを呼び、実際のDataNumだけParserで解析する。
+#### 0. 実現したい機能とVIの責務
 
-```text
-ChNum           = Array Size(Channel List)
-Packet Size     = 4 × ChNum + 12
-Buffer Byte Size= Packet Size × MaxDataNum
-```
+測定中の表示用バッファから最新Packetを安全に取得し、実取得分だけをParserへ渡す。通信確認PoCとオンライン監視で使用する。停止後保存ログの取得は担当しない。
 
-MaxDataNumまたは計算サイズが不正な場合にCLFNへ不正Pointerを渡さないため、入力検証CaseをWrapperより外側へ置く。
-
-##### 6. 入出力
+#### 1. 入力データの実体
 
 ```text
-入力 : UnitNo、MdlNo_RAM、MaxDataNum、Channel List、Byte Order、error in
-出力 : Raw Buffer、DataNum、LostDataNum、Packets、
-       Parsed Packet Count、Unused Byte Count、Status、TestError、error out
+UnitNo I32
+MdlNo_RAM I32
+RequestedDataNum Limit I32
+Channel List
+Byte Order
+Max Buffer Bytes I64
+error in
 ```
 
-##### 7～8. 配線順
+#### 2. 出力データモデル
 
-1. `Array Size(Channel List)`をChNumとする。
-2. Packet SizeとBuffer Byte SizeをI32で計算する。
-3. `ChNum>=1`、`MaxDataNum>0`、`Buffer Byte Size>0`をANDし、Input Valid? Caseへ接続する。
-4. Falseケース（Input Valid?=False：Read入力不正）では空Raw、DataNum=0、Lost=0、空Packets、各Count=0を接続し、次のsourceを作る。
+既存出力に次を追加する。
 
 ```text
-RAMScope_Read.vi: ChNum and MaxDataNum must be positive. ChNum=%d, MaxDataNum=%d, BufferByteSize=%d
+AvailableDataNum I32
+RequestedDataNum I32
+Raw Buffer U8[]
+DataNum I32
+LostDataNum I32
+Packets[]
+Parsed Packet Count I32
+Unused Byte Count I32
+Status、TestError、error out
 ```
 
-5. `%d`へChNum I32、MaxDataNum I32、Buffer Byte Size I32を順に接続する。
-6. Bundle By Nameへ正常なerror、status=True、code=I32 -700160、sourceを接続する。
-7. Trueケース（Input Valid?=True：Read入力正常）でBuffer Byte SizeとMaxDataNumを`RS_DLL_GT150GetBufferData.vi`へ接続する。
-8. WrapperのRaw Buffer、DataNum、LostDataNumを本VIへ接続する。
-9. Raw Buffer、DataNum、Channel List、Byte Order、Wrapper errorを`RAMScope_Parse_Buffer.vi`へ接続する。
-10. ParserのPackets、Parsed Count、Unused、errorを本VIへ接続する。
-11. Parser errorを`Error_To_TestStatus.vi`へ接続する。
+#### 3. 前提条件・異常条件
 
-##### 9. テスト
+- Channel List非空。
+- RequestedDataNum Limit > 0。
+- Max Buffer Bytes > 0。
+- I64計算後にI32上限以下。
+- `0 <= DataNum <= RequestedDataNum`。
 
-MaxDataNum=1/0/-1、Channel List空、DataNum=0、正常1Packet、LostDataNum非ゼロ、Parserバッファ不足を確認する。
+#### 4. 処理アルゴリズム
+
+```text
+AvailableDataNum = GetBufferDataNum(UnitNo, MdlNo_RAM)
+RequestedDataNum = min(AvailableDataNum, RequestedDataNum Limit)
+
+if RequestedDataNum == 0:
+    空データを正常として返す
+else:
+    Packet Size = ChNum×4+12
+    Required Bytes = RequestedDataNum×Packet Size
+    上限検証
+    GetBufferData
+    Actual Bytes = DataNum×Packet Size
+    RawをActual Bytesへ切詰め
+    Parse
+    Parsed CountとDataNumを照合
+```
+
+#### 5. LabVIEW構造の選定理由
+
+GetBufferDataNumで実在Packet数を先に把握し、必要以上の配列確保を避ける。サイズ演算はI64、DLL配列長へ渡す直前だけI32へ変換する。
+
+#### 6. 入出力と接続元・接続先
+
+`PoC_RAMScope_Main.vi`はこのVIを1回または短時間反復して通信確認する。`PoC_RAMScope_Logging_Main.vi`はオンライン表示が必要な場合だけ呼び、正式保存データは停止後の`RAMScope_Read_Logging_Block.vi`から得る。
+
+#### 7. 配置する関数およびSubVI
+
+- `RS_DLL_GT150GetBufferDataNum.vi`。
+- `RS_DLL_GT150GetBufferData.vi`。
+- `RAMScope_Parse_Buffer.vi`。
+- Min & Max、I64変換、Multiply、Add、Array Subset。
+- Case Structure：Input Valid、No Data、Buffer Size Valid、Returned Count Valid、Parsed Count Match。
+- `Error_To_TestStatus.vi`。
+
+#### 8. 配線順
+
+1. Channel ListのArray Size、Limit、Max Buffer Bytesを検証する。
+2. GetBufferDataNumを呼ぶ。
+3. AvailableDataNum負数なら`-700162`。
+4. Min & Maxで`RequestedDataNum = min(max(AvailableDataNum,0), Limit)`を作る。
+5. RequestedDataNum=0 CaseはDLL本体とParserを呼ばず安全出力。
+6. ChNum、RequestedDataNumをI64化してRequired Bytesを求める。
+7. `Required Bytes<=Max Buffer Bytes AND <=2147483647`を検証する。失敗は`-700163`。
+8. GetBufferDataを呼ぶ。
+9. DataNum範囲違反は`-700164`。
+10. Array Subsetで`DataNum×Packet Size`へ切り詰める。
+11. Parserへ渡す。
+12. Parsed Count不一致は`-700165`。
+13. 最終errorをError_To_TestStatusへ接続する。
+
+#### 9. 単体テスト
+
+- AvailableDataNum=0。
+- LimitよりAvailableが少ない。
+- LimitよりAvailableが多い。
+- Required Bytesが上限超過。
+- DataNumが要求数未満。
+- Parser件数一致／不一致。
 
 ---
 
 #### 6. `RAMScope_Release.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeRelease.vi 入出力イメージ](./assets/vi-diagrams/ramscoperelease.svg)
+
+> **ロギング対応を含む呼出位置**：通信確認PoCではStop後に呼ぶ。ロギングPoCでは`Log Stop → 全MeasNo／BlockNo取得 → TDMS Append完了 → Release`の順とし、保存ログ取得前にBufferを破棄しない。
+
 
 ##### 0～5. 設計
 
@@ -4798,6 +5640,9 @@ MaxDataNum=1/0/-1、Channel List空、DataNum=0、正常1Packet、LostDataNum非
 
 #### 7. `RAMScope_Log_Stop.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeLogStop.vi 入出力イメージ](./assets/vi-diagrams/ramscopelogstop.svg)
+
 ##### 0～5. 設計
 
 測定を停止してアイドル状態へ移す。Releaseと分離し、Stop失敗時にReleaseを呼ばない判断を上位へ残す。
@@ -4815,6 +5660,9 @@ MaxDataNum=1/0/-1、Channel List空、DataNum=0、正常1Packet、LostDataNum非
 ---
 
 #### 8. `RAMScope_Close.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeClose.vi 入出力イメージ](./assets/vi-diagrams/ramscopeclose.svg)
 
 ##### 0～5. 設計
 
@@ -4845,6 +5693,9 @@ Merge Errors出力              → Error_To_TestStatus.vi
 正常Close、既存エラー付きClose、DeviceExitエラー、両方エラー、二重Close、Close後の再Connectを確認する。詳細な配置場所、全端子および期待結果は直後の`10.11.9`を使用する。
 
 ### 10.11.9 `RAMScope_Close.vi`補足詳細
+
+<!-- generated-vi-diagram -->
+![RAMScopeClose.vi 入出力イメージ](./assets/vi-diagrams/ramscopeclose.svg)
 
 #### 0. 実現したい機能とVIの責務
 
@@ -5142,7 +5993,533 @@ Final Error.code = -700999
 
 ---
 
-## 10.12 `PoC_RAMScope_Main.vi`とTestStandなしの単体操作
+### 10.11.9 停止後保存ログ取得用の追加公開API
+
+#### 10.11.9.1 `RAMScope_Get_Log_Summary.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeGetLogSummary.vi 入出力イメージ](./assets/vi-diagrams/ramscopegetlogsummary.svg)
+
+#### 0. 責務
+
+Stop後の保存ログ列挙に必要なGapTimeMsとMeasNumを取得する。
+
+#### 1. 入力データ
+
+UnitNo、error in。
+
+#### 2. 出力
+
+GapTimeMs U32、MeasNum I32、Status、TestError、error out。
+
+#### 3. 条件
+
+Log Stop成功後、Release前。MeasNum<0は`-700170`。
+
+#### 4. アルゴリズム
+
+GetGapTime → GetMeasNum → MeasNum負数検証 → Error_To_TestStatus。
+
+#### 5. 構造理由
+
+error wireでAPI順序を固定し、負数だけCase Structureで止める。
+
+#### 6. 入出力と接続
+
+Logging PoCのStop直後に呼び、MeasNumを外側For LoopのNへ接続する。
+
+#### 7. 配置するSubVI
+
+`RS_DLL_GT150GetGapTime.vi`、`RS_DLL_GT150GetMeasNum.vi`、Less Than 0?、Case Structure、Format Into String、Bundle By Name、Error_To_TestStatus.vi。
+
+#### 8. 配線順
+
+1. GetGapTimeのerror outをGetMeasNumへ接続する。
+2. MeasNum<0をCase selectorへ接続する。
+3. Trueケース（MeasNum<0=True）でsource全文を作る。
+
+```text
+RAMScope_Get_Log_Summary.vi: MeasNum must not be negative. MeasNum=%d
+```
+
+4. status=True、code=-700170、sourceをBundle By Nameする。
+5. FalseケースはWrapper errorを通す。
+6. 最終errorをError_To_TestStatusへ接続する。
+
+#### 9. テスト
+
+MeasNum 0、1、複数、負数ダミー、GapTime APIエラー。
+
+---
+
+#### 10.11.9.2 `RAMScope_Get_Block_Count.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeGetBlockCount.vi 入出力イメージ](./assets/vi-diagrams/ramscopegetblockcount.svg)
+
+#### 0. 責務
+
+指定MeasNoのBlockNumを取得し、番号と戻り件数を検証する。
+
+#### 1. 入力
+
+UnitNo、MeasNo、error in。
+
+#### 2. 出力
+
+BlockNum、Status、TestError、error out。
+
+#### 3. 条件
+
+MeasNo>=0。BlockNum>=0。
+
+#### 4. アルゴリズム
+
+入力検証 → GetBlockNum → 戻り値検証 → Error_To_TestStatus。
+
+#### 5. 構造理由
+
+DLLへ不正番号を渡す前のCaseと、戻り値検証Caseを分ける。
+
+#### 6. 接続
+
+Logging PoC外側For LoopのiをMeasNoへ接続し、BlockNumを内側For LoopのNへ接続する。
+
+#### 7. 配置
+
+Greater Or Equal 0?、Case Structure×2、Wrapper、Format Into String、Bundle By Name、Error_To_TestStatus。
+
+#### 8. 配線順
+
+- MeasNo<0：Wrapper未実行、code=-700171。
+
+```text
+RAMScope_Get_Block_Count.vi: MeasNo must not be negative. MeasNo=%d
+```
+
+- Wrapper正常後BlockNum<0：code=-700172。
+
+```text
+RAMScope_Get_Block_Count.vi: BlockNum must not be negative. MeasNo=%d, BlockNum=%d
+```
+
+- 正常時はBlockNumとerrorを通す。
+
+#### 9. テスト
+
+MeasNo -1、0、末尾、BlockNum 0、1、複数、負数ダミー。
+
+---
+
+#### 10.11.9.3 `RAMScope_Read_Logging_Block.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeReadLoggingBlock.vi 入出力イメージ](./assets/vi-diagrams/ramscopereadloggingblock.svg)
+
+#### 0. 責務
+
+指定MeasNo、BlockNoの保存Packet数を取得し、必要領域を確保してデータ本体を読み、実取得分へ切り詰め、既存Parserで1Blockを解析する。
+
+#### 1. 入力データ
+
+UnitNo、MdlNo_RAM、MeasNo、BlockNo、Channel List、Byte Order、Max Buffer Bytes I64、error in。
+
+#### 2. 出力データモデル
+
+```text
+AvailableDataNum I32
+RequestedDataNum I32
+DataNum I32
+LostDataNum I32
+Raw Buffer U8[]
+Packets RAMScope_Packet.ctl[]
+Parsed Packet Count I32
+Unused Byte Count I32
+Status、TestError、error out
+```
+
+#### 3. 前提条件・異常条件
+
+```text
+ChNum>=1
+MeasNo>=0
+BlockNo>=0
+Max Buffer Bytes>0
+AvailableDataNum>=0
+0<=DataNum<=RequestedDataNum
+Required Bytes<=Max Buffer Bytes
+Required Bytes<=2147483647
+Parsed Packet Count==DataNum
+```
+
+#### 4. 処理アルゴリズム
+
+```text
+AvailableDataNum = GetLoggingDataNum
+if AvailableDataNum == 0:
+    空データを正常返却
+else:
+    RequestedDataNum = AvailableDataNum
+    Packet Size = ChNum×4+12
+    Required Bytes = RequestedDataNum×Packet Size  // I64
+    上限検証
+    GetLoggingData
+    DataNum範囲検証
+    Actual Bytes = DataNum×Packet Size
+    Array SubsetでRaw切詰め
+    Parse Buffer
+    Parsed Count照合
+```
+
+#### 5. LabVIEW構造の選定理由
+
+1Blockだけを扱い、MeasNo／BlockNoの反復はLogging PoCまたはTestStandへ任せる。これによりPublic VI内で巨大な全ログ配列を保持しない。
+
+`RAMScopeGT150GetLoggingData()`で読み出したPacketはAPI内部バッファから削除されるため、取得後は同じBlockを再取得できる前提にしない。本VIが返したRaw BufferとPacketsを次Block取得前にTDMSへ保存する。
+
+#### 6. 入出力と接続
+
+Logging PoC内側For LoopからMeasNoとBlockNoを受け、出力Packetsを`RAMScope_File_Log_Append.vi`へ直結する。
+
+#### 7. 配置する関数およびSubVI
+
+- `RS_DLL_GT150GetLoggingDataNum.vi`。
+- `RS_DLL_GT150GetLoggingData.vi`。
+- `RAMScope_Parse_Buffer.vi`。
+- Array Size、I64変換、Multiply、Add、Array Subset。
+- Case Structure 5個以上。
+- Format Into String、Bundle By Name、Error_To_TestStatus.vi。
+
+#### 8. 配線順
+
+1. 入力検証Case。失敗は`-700173`。
+
+```text
+RAMScope_Read_Logging_Block.vi: Input is invalid. ChNum=%d, MeasNo=%d, BlockNo=%d, MaxBufferBytes=%lld
+```
+
+2. GetLoggingDataNumを呼ぶ。
+3. AvailableDataNum<0は`-700174`。
+4. AvailableDataNum=0は本体DLLとParserを呼ばず空配列。
+5. I64でRequired Bytesを計算する。
+6. 上限違反は`-700175`。
+
+```text
+RAMScope_Read_Logging_Block.vi: Required buffer size is invalid or exceeds the limit. RequiredBytes=%lld, MaxBufferBytes=%lld, AvailableDataNum=%d, PacketSize=%lld
+```
+
+7. RequestedDataNum=AvailableDataNumをGetLoggingDataのpDataNum左端子へ渡す。
+8. `0<=DataNum<=RequestedDataNum`を検証する。違反は`-700176`。
+9. Raw BufferをActual Bytesへ切り詰める。
+10. Parserへ渡す。
+11. Parsed Count不一致は`-700177`。
+12. 各Caseの全出力トンネルを配線し、Use default if unwiredを使わない。
+13. 最終errorをError_To_TestStatusへ接続する。
+
+#### 9. 単体テスト
+
+Channel List空、番号負数、DataNum=0、上限超過、DataNum要求未満、DataNum範囲外、Parser不一致、LostDataNum非ゼロ。
+
+---
+
+## 10.12 LabVIEW側TDMS保存VI
+
+### 10.12.1 TDMS構造
+
+```text
+Root Properties
+  TestName
+  MeasurementStartTime
+  A2LFileName
+  UnitNo
+  MdlNo_RAM
+  ByteOrder
+  ChannelCount
+  PacketSize
+  GapTimeMs
+
+Group: RAMScope_Meas0000_Block0000
+  Properties
+    MeasNo
+    BlockNo
+    RequestedDataNum
+    DataNum
+    LostDataNum
+    PacketSize
+
+  Channels
+    Time_s
+    Time_Raw
+    Flag_Raw
+    Status
+    Skip
+    LogTrigger
+    Dummy
+    EventBits
+    DataLost
+    <Channel Name 0>          Engineering Value DBL
+    <Channel Name 0>__Raw     Raw Slot U32
+    <Channel Name 1>          Engineering Value DBL
+    <Channel Name 1>__Raw     Raw Slot U32
+    ...
+```
+
+Boolean状態は解析ツール互換性を優先し、TDMS上ではU8の0／1として保存する。測定値はEngineering Value DBLとRaw Slot U32を別チャンネルで保存し、Address、Size、Sign、Scale、Offset、UnitはChannel Propertyへ保存する。
+
+---
+
+### 10.12.2 `RAMScope_File_Log_Open.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeFileLogOpen.vi 入出力イメージ](./assets/vi-diagrams/ramscopefilelogopen.svg)
+
+#### 0. 責務
+
+出力先TDMSを開き、後続VIへFile Referenceを返す。
+
+#### 1. 入力
+
+File Path、Overwrite?、error in。
+
+#### 2. 出力
+
+TDMS File Ref、File Open?、Status、TestError、error out。
+
+#### 3. 条件
+
+空Path不可。既存ファイルかつOverwrite?=Falseは`-700178`。
+
+#### 4. アルゴリズム
+
+Path検証 → Exists? → Overwrite Case → TDMS Open → File Open?更新。
+
+#### 5. 構造理由
+
+既存ファイル動作をCaseで明示し、暗黙上書きをしない。
+
+#### 6. 入出力と接続
+
+Logging PoCのSet Cond成功後、Log Start前に呼ぶ。File RefはPoCの通常ワイヤとCleanup Caseへ通す。
+
+#### 7. 配置
+
+Empty String/Path?、Check if File or Folder Exists、Case Structure、TDMS Open、Error_To_TestStatus。
+
+#### 8. 配線順
+
+- Path不正または上書き拒否時：TDMS Open未実行、Not A Refnum相当、安全なFile Open? False。
+- 正常時：Operation=`create or replace`、File Open?=`NOT(error.status)`。
+- source全文：
+
+```text
+RAMScope_File_Log_Open.vi: Output file already exists and overwrite is disabled. Path=%s
+```
+
+#### 9. テスト
+
+新規Path、既存Path上書き有／無、書込権限なし、既存error。
+
+---
+
+### 10.12.3 `RAMScope_File_Log_Write_Metadata.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeFileLogWriteMetadata.vi 入出力イメージ](./assets/vi-diagrams/ramscopefilelogwritemetadata.svg)
+
+#### 0. 責務
+
+TDMS Rootへ試験全体情報とチャンネル定義を記録し、後のMF4変換で信号名、型、単位、換算情報を再構成できるようにする。
+
+#### 1. 入力
+
+TDMS Ref、TestName、Start Time、A2L File Name、UnitNo、MdlNo_RAM、Byte Order、Channel List、GapTimeMs、error in。
+
+#### 2. 出力
+
+同じTDMS Ref、Status、TestError、error out。
+
+#### 3. 条件
+
+File Ref有効、Channel List非空。A2L File Nameは空を許容する。
+
+#### 4. アルゴリズム
+
+Root Properties書込 → Channel List For Loopで`Channel_%03d_*`形式のRoot Propertyを書込 → Flush任意。
+
+#### 5. 構造理由
+
+チャンネルごとに同じProperty処理を行うためFor Loop。
+
+#### 6. 入出力と接続
+
+Log Stop後の`RAMScope_Get_Log_Summary.vi`成功直後、最初のBlockをTDMSへAppendする前に1回だけ呼ぶ。MeasurementStartTimeはLog Start直前に取得した値、GapTimeMsはSummary出力を接続する。
+
+#### 7. 配置
+
+TDMS Set Properties、For Loop、Unbundle By Name、Format Into String、Error_To_TestStatus。
+
+#### 8. 配線順
+
+1. RootへTestName等を設定する。
+2. Channel Listを自動インデックスでFor Loopへ入れる。
+3. 各チャンネルの情報をRoot Propertyへ次の固定キー形式で保存する。
+
+```text
+Channel_000_Name
+Channel_000_Address
+Channel_000_Size
+Channel_000_Sign
+Channel_000_Scale
+Channel_000_Offset
+Channel_000_Unit
+```
+
+4. `%03d`へChannel Indexを接続し、キー名を一意にする。
+5. 既存error時は書込をスキップしてRefを通す。
+6. Property書込失敗は元のTDMS errorを保持する。
+
+#### 9. テスト
+
+日本語TestName、空A2L名、複数Channel、書込失敗、既存error。
+
+---
+
+### 10.12.4 `RAMScope_File_Log_Append.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeFileLogAppend.vi 入出力イメージ](./assets/vi-diagrams/ramscopefilelogappend.svg)
+
+#### 0. 責務
+
+1Block分の解析済みPacketsと取得状態を、Block固有Groupへ追記する。
+
+#### 1. 入力
+
+TDMS Ref、MeasNo、BlockNo、RequestedDataNum、DataNum、LostDataNum、PacketSize、Packets、Channel List、Flush After Write?、error in。
+
+#### 2. 出力
+
+TDMS Ref、Written Packet Count、Status、TestError、error out。
+
+#### 3. 条件
+
+`Array Size(Packets)==DataNum`。Channel Listの順番がPackets内Channel Valuesと一致する。
+
+#### 4. アルゴリズム
+
+```text
+Group Name = Format("RAMScope_Meas%04d_Block%04d")
+Group Propertiesを書込
+Packet共通配列を書込
+for ChannelIndex:
+    for PacketIndex:
+        Packets[PacketIndex].Channel Values[ChannelIndex].Engineering Valueを抽出
+    Channel NameでEngineering Value DBLをTDMS Write
+    Channel Name + "__Raw"でRaw Slot U32をTDMS Write
+    Address/Size/Sign/Scale/Offset/UnitをEngineering Value Channel Propertyへ保存
+if Flush After Write?: TDMS Flush
+```
+
+#### 5. 構造理由
+
+Block単位で即時保存し、全Blockをメモリへ蓄積しない。Channel×Packetの2重For Loopで列方向配列を作る。
+
+#### 6. 入出力と接続
+
+`RAMScope_Read_Logging_Block.vi`の直後に配置し、次Block取得前に完了させる。
+
+#### 7. 配置
+
+Format Into String、TDMS Set Properties、TDMS Write、For Loop×2、Index Array、Bundle/Unbundle、Select、TDMS Flush、Error_To_TestStatus。
+
+#### 8. 配線順
+
+1. `Array Size(Packets)==DataNum`を検証する。不一致は`-700180`。
+2. Group Nameを`RAMScope_Meas%04d_Block%04d`で作る。
+3. Group PropertyへMeasNo、BlockNo、RequestedDataNum、DataNum、LostDataNum、PacketSizeを設定する。
+4. PacketsからTime、Flag各fieldの一次元配列を作り、それぞれTDMS Writeする。
+5. BooleanはSelectでU8 1／0へ変換する。
+6. Channel外側For LoopでEngineering Value DBL配列とRaw Slot U32配列を作る。
+7. Engineering ValueはChannel名、Raw Slotは`<Channel名>__Raw`でTDMS Writeする。
+8. Channel名が空の場合は`Channel_%03d`を使用する。
+9. 同名Channelがある場合はIndexを付加して一意化する。
+10. Address、Size、Sign、Scale、Offset、UnitをEngineering Value Channel Propertyへ設定する。
+11. Flush入力がTrueならTDMS Flushする。
+12. Written Packet Count=DataNumを返す。
+
+source全文：
+
+```text
+RAMScope_File_Log_Append.vi: Packet count does not match DataNum. PacketCount=%d, DataNum=%d, MeasNo=%d, BlockNo=%d
+```
+
+#### 9. テスト
+
+DataNum=0、1、複数、同名Channel、空Channel名、日本語名、Lost非ゼロ、Flush有／無、件数不一致。
+
+---
+
+### 10.12.5 `RAMScope_File_Log_Close.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeFileLogClose.vi 入出力イメージ](./assets/vi-diagrams/ramscopefilelogclose.svg)
+
+#### 0. 責務
+
+前段errorの有無にかかわらずTDMS FlushとCloseを試行し、最初のerrorを保持するCleanup VI。
+
+#### 1. 入力
+
+TDMS Ref、File Open?、Original error。
+
+#### 2. 出力
+
+File Open? False、Status、TestError、Final error。
+
+#### 3. 条件
+
+File Open?=FalseならTDMS関数を呼ばない。Trueなら前段errorをClearしたCleanup用wireでFlush、Closeする。
+
+#### 4. アルゴリズム
+
+```text
+if File Open?:
+    Cleanup Error = Clear Errors(Original Error)
+    TDMS Flush
+    TDMS Close
+    Final Error = Merge Errors(Original Error, Cleanup Error)
+else:
+    Final Error = Original Error
+```
+
+#### 5. 構造理由
+
+File Open?をselectorとするCase Structure。Original Errorを優先するMerge Errors。
+
+#### 6. 入出力と接続
+
+Logging PoCの通常終了とCleanupの両方から呼ぶ。
+
+#### 7. 配置
+
+Case Structure、Clear Errors、TDMS Flush、TDMS Close、Merge Errors、Error_To_TestStatus。
+
+#### 8. 配線順
+
+TrueケースでOriginal Errorを保持用とCleanup用へ分岐する。Cleanup用だけClear Errorsし、Flush→Close。Merge Errorsの上側へOriginal、下側へClose Error。FalseケースはRefを使用せずOriginalを通す。両CaseでFile Open? Falseを出力する。
+
+#### 9. テスト
+
+正常Close、前段error付きClose、無効Ref、二重Close、Flush error、Close error。
+
+---
+
+## 10.13 通信確認PoC・ロギングPoC・TestStand
+
+### 10.13.1 `PoC_RAMScope_Main.vi`
+
+<!-- generated-vi-diagram -->
+![PoCRAMScopeMain.vi 入出力イメージ](./assets/vi-diagrams/pocramscopemain.svg)
 
 #### 0. 実現したい機能とVIの責務
 
@@ -6006,1495 +7383,18 @@ Cleanup後State/error
 
 ---
 
-## 10.13 ロギング機能の修正・追加VI・専用PoC
+### 10.13.2 `PoC_RAMScope_Logging_Main.vi`
 
-### 10.13.1 この節の適用範囲
-
-本節は、次の2系統を明確に分離して実装する。
-
-```text
-通信確認系
-  PoC_RAMScope_Main.vi
-    → 接続、初期化、条件設定、短時間の最新値取得、停止、解放、終了
-    → 既存VI構成を維持する
-    → TDMS長時間保存と停止後保存ログ回収は担当しない
-
-ロギング検証系
-  PoC_RAMScope_Logging_Main.vi
-    → 接続、初期化、条件設定、TDMS Open、測定、停止
-    → MeasNo／BlockNo列挙
-    → 保存ログ全Block取得
-    → Packet解析、TDMS追記、欠落情報保存
-    → Release、TDMS Close、DeviceExit
-```
-
-既存`PoC_RAMScope_Main.vi`へロギング用の二重For Loop、TDMS参照、保存ログ回収処理を追加しない。通信確認PoCの役割を膨らませると、DLL疎通不良とファイル保存不良の切り分けが困難になるためである。
-
----
-
-### 10.13.2 公式APIとPacket仕様の確定事項
-
-#### 10.13.2.1 保存ログ取得API
-
-```c
-long RAMScopeGT150GetGapTime(
-    long UnitNo,
-    unsigned long *pGapTime
-);
-
-long RAMScopeGT150GetMeasNum(
-    long UnitNo,
-    long *pMeasNum
-);
-
-long RAMScopeGT150GetBlockNum(
-    long UnitNo,
-    long MeasNo,
-    long *pBlockNum
-);
-
-long RAMScopeGT150GetBufferDataNum(
-    long UnitNo,
-    long MdlNo,
-    long *pDataNum
-);
-
-long RAMScopeGT150GetBufferData(
-    long UnitNo,
-    long MdlNo,
-    void *pData,
-    long *pDataNum,
-    long *pLostDataNum
-);
-
-long RAMScopeGT150GetLoggingDataNum(
-    long UnitNo,
-    long MdlNo,
-    long MeasNo,
-    long BlockNo,
-    long *pDataNum
-);
-
-long RAMScopeGT150GetLoggingData(
-    long UnitNo,
-    long MdlNo,
-    long MeasNo,
-    long BlockNo,
-    void *pData,
-    long *pDataNum,
-    long *pLostDataNum
-);
-```
-
-`GetBufferData()`と`GetLoggingData()`の`pDataNum`は入出力である。
-
-```text
-呼出し前のpDataNum
-  = 要求Packet数
-
-正常終了後のpDataNum
-  = 実際に読み出したPacket数
-```
-
-独立した`MaxDataNum`引数は存在しない。CLFNに存在しない引数を追加しない。
-
-#### 10.13.2.2 RAMモニタPacket
-
-```text
-Packet[k]
-├─ Data[0]      4byte
-├─ Data[1]      4byte
-├─ ...
-├─ Data[N-1]    4byte
-├─ Flag         4byte
-└─ Time         8byte
-```
-
-```text
-Packet Size = N × 4 + 12 byte
-```
-
-- `N`は測定有効チャンネル数。
-- Dataの順番は`RAMScopeGT1x0SetMeasCh()`へ設定した順番。
-- 設定データサイズが1byte、2byte、4byteのいずれでも、Packet内では1チャンネル4byte固定。
-- Timeは測定開始を0とする64bitカウンタで、1countは20ns。
-
-```text
-Timestamp Seconds = Time Raw U64 × 20e-9
-```
-
-#### 10.13.2.3 RAMモニタFlag
-
-| フィールド | bit | 抽出式 |
-|---|---:|---|
-| Status | 0～7 | `Flag Raw AND 0x000000FF` |
-| Skip | 8 | `((Flag Raw >> 8) AND 1) != 0` |
-| Log Trigger | 10～11 | `(Flag Raw >> 10) AND 3` |
-| Dummy | 12 | `((Flag Raw >> 12) AND 1) != 0` |
-| Event Bits | 16～23 | `(Flag Raw >> 16) AND 0xFF` |
-| Data Lost | 28 | `((Flag Raw >> 28) AND 1) != 0` |
-
-Statusコードは次の意味で保存する。
-
-| Status | 意味 |
-|---:|---|
-| `0x00` | 正常動作 |
-| `0xFF` | バスエラー、デバッグIF通信異常 |
-| `0xFE` | オフライン、ターゲットマイコン電源検出NG |
-| `0xFA` | セキュリティIDエラー、デバッグIF通信異常 |
-| `0xF9` | リンクエラー |
-| `0xF8` | パラメータ未設定エラー |
-| その他 | 予約値。意味未定義のためRawコードを保持する |
-
-Log Triggerは次の値を持つ。
-
-| Log Trigger | 意味 |
-|---:|---|
-| `0` | 開始、センター、終了のいずれでもない |
-| `1` | 測定データBlockの開始位置 |
-| `2` | ポイント指定時のセンター位置、基準トリガ成立Packet |
-| `3` | 測定データBlockの終了位置 |
-
-各Boolean／bit fieldの意味は次のとおり。
-
-- `Skip?=True`：このPacketより前に、測定周期、チャンネル数、メモリ操作負荷などの競合で収録タイミングをスキップした周期がある。
-- `Dummy?=True`：通常の測定値Packetではなく、RAMScopeハードウェアが情報通知目的で生成したDummy Packetである。Packet自体は保存するが、Dataを通常測定値として自動判定に使用しない。
-- `Event Bits`：bit0からbit7がイベントe1からe8に対応する。
-- `Data Lost?=True`：このPacket以前にRAMScopeハードウェアとホストPC間でデータ欠落が発生した。
-
-予約bitは値不定のため、0であることを正常条件にしない。
-
-`Skip`、`Data Lost`、`Status != 0`は測定Packet内の状態情報であり、Parser自身の配列エラーとは分ける。該当Packetを捨てず、Raw値と解析結果をTDMSへ保存する。`pLostDataNum`はAPIが返す破棄Packet数として別項目で保存し、Flagの`Data Lost?`と統合しない。
-
----
-
-## 10.13.3 既存ctlと既存VIの修正
-
-### 10.13.3.1 `RAMScope_Packet.ctl`修正
-
-#### 0. 実現したい機能とctlの責務
-
-1PacketのRaw Flagを保持したまま、RAMモニタ用Flagの各フィールドを上位VIとTDMS保存VIへ渡せるようにする。
-
-#### 1. 入力データの実体
-
-ParserがPacket内のFlag 4byteをU32へ変換した値を使用する。
-
-#### 2. 出力データモデル
-
-既存項目を削除せず、次の順へ整理する。
-
-```text
-Packet Index          I32
-Channel Values        RAMScope_Channel_Value.ctl[]
-Flag Raw              U32
-Status                U8
-Skip?                 Boolean
-Log Trigger           U8
-Dummy?                 Boolean
-Event Bits            U8
-Data Lost?             Boolean
-Timestamp Raw         U64
-Timestamp Seconds     DBL
-```
-
-既存項目名が`Flag`の場合は、型をU32のまま維持して`Flag Raw`へ名称変更する。既存VIの破損を避けるためtypedef更新後に全呼出し元を一括確認する。
-
-#### 3. 前提条件・異常条件
-
-- 予約bit専用Booleanを追加しない。
-- StatusをEnumだけに変換してRawコードを失わない。
-- Dummy Packetもctlへ格納する。
-
-#### 4. 処理アルゴリズム
-
-ctlはデータ型定義だけを担当し、bit演算を持たない。bit演算は`RAMScope_Parse_Buffer.vi`で行う。
-
-#### 5. LabVIEW構造の選定理由
-
-既存ctlを拡張し、新規Packet ctlを並立させない。最新値取得と保存ログ取得で同じPacket構造を共有できるためである。
-
-#### 6. フロントパネル入出力と接続元・接続先
-
-| 項目 | 生成元 | 接続先 |
-|---|---|---|
-| Flag Raw～Data Lost? | `RAMScope_Parse_Buffer.vi` | Read系公開API、TDMS Append、PoC表示 |
-| Timestamp | `RAMScope_Parse_Buffer.vi` | Read系公開API、TDMS Append |
-
-#### 7. 配置する要素
-
-既存clusterへU8、Boolean、U32表示器を追加し、typedefとして保存する。
-
-#### 8. 作成順
-
-1. `RAMScope_Packet.ctl`を開く。
-2. typedef編集モードであることを確認する。
-3. 既存`Flag`を`Flag Raw`へ変更する。
-4. Status、Skip?、Log Trigger、Dummy?、Event Bits、Data Lost?を上記順で追加する。
-5. 既定値を数値0、Boolean Falseに設定する。
-6. typedefを保存し、変更を全インスタンスへ適用する。
-7. 壊れた`Bundle By Name`と`Unbundle By Name`を修正する。
-
-#### 9. 単体テスト
-
-`Flag Raw=0x10FF1D00`を入力し、各フィールドが独立して保持できることを確認する。ctl単体ではbit演算を行わない。
-
----
-
-### 10.13.3.2 `RAMScope_Parse_Buffer.vi`修正
+<!-- generated-vi-diagram -->
+![PoCRAMScopeLoggingMain.vi 入出力イメージ](./assets/vi-diagrams/pocramscopeloggingmain.svg)
 
 #### 0. 実現したい機能とVIの責務
-
-最新値取得と保存ログ取得の両方から渡されるU8配列を、チャンネル値、RAM用Flag、20ns Timeを持つPacket配列へ変換する。
-
-#### 1. 入力データの実体
-
-```text
-Raw Buffer U8[]
-DataNum I32
-Channel List RAMScope_Channel.ctl[]
-Byte Order RAMScope_Byte_Order.ctl
-```
-
-Packet内の各Dataスロットは4byte固定だが、有効値幅は`RAMScope_Channel.ctl.Size`で決まる。
-
-```text
-Size=0 → 1byte有効
-Size=1 → 2byte有効
-Size=2 → 4byte有効
-```
-
-#### 2. 出力データモデル
-
-```text
-Packets RAMScope_Packet.ctl[]
-Parsed Packet Count I32
-Unused Byte Count I32
-error out error cluster
-```
-
-#### 3. 前提条件・異常条件
-
-```text
-ChNum > 0
-DataNum >= 0
-Actual Byte Count >= DataNum × Packet Size
-```
-
-- `DataNum=0`は正常な空データ。
-- Buffer不足はParserエラー。
-- Status、Skip、Data LostはPacket状態でありParserエラーにしない。
-- Sizeが0、1、2以外ならローカルエラー`-700160`。
-
-source全文：
-
-```text
-RAMScope_Parse_Buffer.vi: Unsupported channel Size. ChannelIndex=%d, Size=%d
-```
-
-#### 4. 処理アルゴリズム
-
-```text
-ChNum = Array Size(Channel List)
-Packet Size = ChNum × 4 + 12
-Expected Bytes = DataNum × Packet Size
-Actual Bytes = Array Size(Raw Buffer)
-
-for PacketIndex in 0 ... DataNum-1:
-    Packet Start = PacketIndex × Packet Size
-
-    for ChannelIndex in 0 ... ChNum-1:
-        Data Start = Packet Start + ChannelIndex × 4
-        Raw Slot U32 = U8x4_To_U32(Data Start, Byte Order)
-        Value = DecodeBySizeAndSign(Raw Slot U32, Size, Sign)
-        Engineering Value = Value × Scale + Offset
-
-    Flag Start = Packet Start + ChNum × 4
-    Flag Raw = U8x4_To_U32(Flag Start, Byte Order)
-    Flag fields = mask and shift
-
-    Time Start = Flag Start + 4
-    Time Raw = U8x8_To_U64(Time Start, Byte Order)
-    Time Seconds = DBL(Time Raw) × 20e-9
-
-    Bundle RAMScope_Packet.ctl
-```
-
-#### 5. LabVIEW構造の選定理由
-
-- Packet反復は外側For Loop。
-- Channel反復は内側For Loop。
-- Size別の値幅はCase Structure。
-- 4byte、8byte切出しはArray Subset。
-- 符号付き値はType Castでbit列を維持する。
-- FlagはLogical ShiftとANDで抽出する。
-
-#### 6. フロントパネル入出力と接続元・接続先
-
-| 端子 | 方向 | 型 | 接続元・接続先 |
-|---|---|---|---|
-| Raw Buffer | 入力 | U8[] | `RAMScope_Read.vi`または`RAMScope_Read_Logging_Block.vi` |
-| DataNum | 入力 | I32 | 各DLL Wrapperの実取得数 |
-| Channel List | 入力 | `RAMScope_Channel.ctl[]` | SetMeasChへ渡した同一配列 |
-| Byte Order | 入力 | typedef | Init結果を明示変換した値 |
-| Packets | 出力 | `RAMScope_Packet.ctl[]` | PoC、TDMS Append、TestStand |
-| Parsed Packet Count | 出力 | I32 | 件数照合 |
-| Unused Byte Count | 出力 | I32 | デバッグ・品質判定 |
-
-#### 7. 配置する関数およびSubVI
-
-- For Loop ×2。
-- Case Structure：Size 0、1、2、Default。
-- Array Size、Array Subset。
-- U8x4_To_U32.vi、U8x8_To_U64.vi。
-- AND、Logical Shift、Not Equal To 0?。
-- Type Cast、To Double Precision Float。
-- Bundle By Name。
-- Format Into String、Bundle By Nameによるローカルerror生成。
-
-#### 8. 配線順
-
-##### A. サイズ検証
-
-1. Channel ListをArray Sizeへ接続してChNumを得る。
-2. ChNum、DataNumを先にI64へ変換する。
-3. `Packet Size I64 = ChNum I64 × 4 + 12`を作る。
-4. `Expected Bytes I64 = DataNum I64 × Packet Size I64`を作る。
-5. Raw BufferのArray SizeをI64へ変換する。
-6. `ChNum>0 AND DataNum>=0 AND Actual>=Expected`をCase selectorへ接続する。
-7. Falseケースは空Packets、Count 0、Unused 0と`-700161`を返す。
-
-source全文：
-
-```text
-RAMScope_Parse_Buffer.vi: Buffer is shorter than expected or input is invalid. ChNum=%d, DataNum=%d, Expected=%lld, Actual=%lld
-```
-
-##### B. Channel DataのSize別解析
-
-1. 内側For LoopでChannel clusterからSizeとSignをUnbundleする。
-2. Raw Slot U32をSize Caseへ接続する。
-3. Size=0では`AND 0x000000FF`後にU8へ変換する。
-4. Size=1では`AND 0x0000FFFF`後にU16へ変換する。
-5. Size=2ではU32全体を使う。
-6. 各Case内でSign=0なら符号なし数値をDBL化する。
-7. Sign!=0なら同じbit幅のI8、I16、I32へType CastしてDBL化する。
-8. `Value × Scale + Offset`をEngineering Valueへ接続する。
-9. Defaultケースは`-700160`を生成する。
-
-##### C. Flag解析
-
-1. `Flag Start = Packet Start + ChNum×4`を作る。
-2. 4byteをArray Subsetし、U8x4_To_U32.viへ接続する。
-3. Flag Rawを次へ分岐する。
-
-```text
-Status      = U8(Flag Raw AND 0x000000FF)
-Skip?       = ((Flag Raw >> 8) AND 1) != 0
-Log Trigger = U8((Flag Raw >> 10) AND 3)
-Dummy?      = ((Flag Raw >> 12) AND 1) != 0
-Event Bits  = U8((Flag Raw >> 16) AND 0xFF)
-Data Lost?  = ((Flag Raw >> 28) AND 1) != 0
-```
-
-4. 予約bitは解析しない。
-
-##### D. Time解析
-
-1. `Time Start = Flag Start + 4`。
-2. 8byteをArray Subsetする。
-3. U8x8_To_U64.viでTime Rawを取得する。
-4. DBLへ変換して`20e-9`を乗算する。
-
-##### E. Packet Bundle
-
-1. 既存`RAMScope_Packet.ctl`定数をBundle By Nameの基準クラスタへ接続する。
-2. Packet Index、Channel Values、Flag全項目、Time全項目を接続する。
-3. 外側For Loopを自動インデックス出力にする。
-4. Array Size(Packets)をParsed Packet Countへ接続する。
-
-#### 9. 単体テスト
-
-- 1byte unsigned `0xFF` → 255。
-- 1byte signed `0xFF` → -1。
-- 2byte unsigned `0xFFFF` → 65535。
-- 2byte signed `0xFFFF` → -1。
-- 4byte signed `0xFFFFFFFE` → -2。
-- Flag各bitを1個ずつ立てて抽出結果を確認。
-- Time Raw=50 → 1us。
-- Buffer末尾1byte不足 → Parserエラー。
-- DataNum=0 → 正常な空配列。
-
----
-
-### 10.13.3.3 `RS_DLL_GT150GetBufferData.vi`修正確認
-
-#### 0. 実現したい機能とVIの責務
-
-測定中の表示用バッファから要求Packet数以下を取得する既存Wrapperである。関数引数は変更せず、`pDataNum`の入出力と配列事前確保を正す。
-
-#### 1. 入力データの実体
-
-```c
-long RAMScopeGT150GetBufferData(
-    long UnitNo,
-    long MdlNo,
-    void *pData,
-    long *pDataNum,
-    long *pLostDataNum
-);
-```
-
-#### 2. 出力データモデル
-
-```text
-Allocated Raw Buffer U8[]
-DataNum I32
-LostDataNum I32
-API ReturnCode I32
-error out
-```
-
-#### 3. 前提条件・異常条件
-
-- RequestedDataNum > 0。
-- Buffer Byte Size > 0。
-- error in.status=TrueならCLFNを呼ばない。
-
-#### 4. 処理アルゴリズム
-
-RequestedDataNumを`pDataNum`左端子へ渡し、右端子からDataNumを受け取る。
-
-#### 5. LabVIEW構造の選定理由
-
-既存エラー時のCLFN実行を防ぐCase Structureと、U8配列確保用Initialize Arrayを使用する。
-
-#### 6. 入出力
-
-既存端子`MaxDataNum`は意味を明確にするため`RequestedDataNum`へ名称変更する。コネクタ位置と型は維持する。
-
-#### 7. CLFN Parameters
-
-| 順 | 名前 | Type | Data Type | Pass |
-|---:|---|---|---|---|
-| Return | return | Numeric | Signed 32-bit | Value |
-| 1 | UnitNo | Numeric | Signed 32-bit | Value |
-| 2 | MdlNo | Numeric | Signed 32-bit | Value |
-| 3 | pData | Array | Unsigned 8-bit、1D | Array Data Pointer |
-| 4 | pDataNum | Numeric | Signed 32-bit | Pointer to Value |
-| 5 | pLostDataNum | Numeric | Signed 32-bit | Pointer to Value |
-
-Function Name：`RAMScopeGT150GetBufferData`
-
-#### 8. 配線順
-
-1. U8 0をBuffer Byte Size個Initialize Arrayする。
-2. 配列をpData左端子へ接続する。
-3. RequestedDataNumをpDataNum左端子へ接続する。
-4. I32 0をpLostDataNum左端子へ接続する。
-5. pData、pDataNum、pLostDataNumの右端子を各出力へ接続する。
-6. ReturnCodeとCLFN errorを`RAMScope_Code_To_Error.vi`へ接続する。
-7. bypassケースは空U8[]、DataNum=0、LostDataNum=0、ReturnCode=0、元errorを返す。
-
-#### 9. 単体テスト
-
-1Packet、複数Packet、実取得数が要求数未満、既存error、表示用バッファ空を確認する。
-
----
-
-### 10.13.3.4 `RAMScope_Read.vi`修正
-
-#### 0. 実現したい機能とVIの責務
-
-測定中の表示用バッファから最新Packetを安全に取得し、実取得分だけをParserへ渡す。通信確認PoCとオンライン監視で使用する。停止後保存ログの取得は担当しない。
-
-#### 1. 入力データの実体
-
-```text
-UnitNo I32
-MdlNo_RAM I32
-RequestedDataNum Limit I32
-Channel List
-Byte Order
-Max Buffer Bytes I64
-error in
-```
-
-#### 2. 出力データモデル
-
-既存出力に次を追加する。
-
-```text
-AvailableDataNum I32
-RequestedDataNum I32
-Raw Buffer U8[]
-DataNum I32
-LostDataNum I32
-Packets[]
-Parsed Packet Count I32
-Unused Byte Count I32
-Status、TestError、error out
-```
-
-#### 3. 前提条件・異常条件
-
-- Channel List非空。
-- RequestedDataNum Limit > 0。
-- Max Buffer Bytes > 0。
-- I64計算後にI32上限以下。
-- `0 <= DataNum <= RequestedDataNum`。
-
-#### 4. 処理アルゴリズム
-
-```text
-AvailableDataNum = GetBufferDataNum(UnitNo, MdlNo_RAM)
-RequestedDataNum = min(AvailableDataNum, RequestedDataNum Limit)
-
-if RequestedDataNum == 0:
-    空データを正常として返す
-else:
-    Packet Size = ChNum×4+12
-    Required Bytes = RequestedDataNum×Packet Size
-    上限検証
-    GetBufferData
-    Actual Bytes = DataNum×Packet Size
-    RawをActual Bytesへ切詰め
-    Parse
-    Parsed CountとDataNumを照合
-```
-
-#### 5. LabVIEW構造の選定理由
-
-GetBufferDataNumで実在Packet数を先に把握し、必要以上の配列確保を避ける。サイズ演算はI64、DLL配列長へ渡す直前だけI32へ変換する。
-
-#### 6. 入出力と接続元・接続先
-
-`PoC_RAMScope_Main.vi`はこのVIを1回または短時間反復して通信確認する。`PoC_RAMScope_Logging_Main.vi`はオンライン表示が必要な場合だけ呼び、正式保存データは停止後の`RAMScope_Read_Logging_Block.vi`から得る。
-
-#### 7. 配置する関数およびSubVI
-
-- `RS_DLL_GT150GetBufferDataNum.vi`。
-- `RS_DLL_GT150GetBufferData.vi`。
-- `RAMScope_Parse_Buffer.vi`。
-- Min & Max、I64変換、Multiply、Add、Array Subset。
-- Case Structure：Input Valid、No Data、Buffer Size Valid、Returned Count Valid、Parsed Count Match。
-- `Error_To_TestStatus.vi`。
-
-#### 8. 配線順
-
-1. Channel ListのArray Size、Limit、Max Buffer Bytesを検証する。
-2. GetBufferDataNumを呼ぶ。
-3. AvailableDataNum負数なら`-700162`。
-4. Min & Maxで`RequestedDataNum = min(max(AvailableDataNum,0), Limit)`を作る。
-5. RequestedDataNum=0 CaseはDLL本体とParserを呼ばず安全出力。
-6. ChNum、RequestedDataNumをI64化してRequired Bytesを求める。
-7. `Required Bytes<=Max Buffer Bytes AND <=2147483647`を検証する。失敗は`-700163`。
-8. GetBufferDataを呼ぶ。
-9. DataNum範囲違反は`-700164`。
-10. Array Subsetで`DataNum×Packet Size`へ切り詰める。
-11. Parserへ渡す。
-12. Parsed Count不一致は`-700165`。
-13. 最終errorをError_To_TestStatusへ接続する。
-
-#### 9. 単体テスト
-
-- AvailableDataNum=0。
-- LimitよりAvailableが少ない。
-- LimitよりAvailableが多い。
-- Required Bytesが上限超過。
-- DataNumが要求数未満。
-- Parser件数一致／不一致。
-
----
-
-### 10.13.3.5 `RAMScope_Set_Cond.vi`確認事項
-
-`SetMeasCond → SetMeasCh → SetLoggingInfo`の順序を維持する。SetMeasCondまたはSetMeasCh後にSetLoggingInfoを実行し、保存用`logSize`と表示用`BuffSize`の両方を設定する。順序が既存資料どおりならVI内部の変更は不要である。
-
----
-
-### 10.13.3.6 `RAMScope_Release.vi`呼出し位置
-
-`ReleaseBufferData()`は表示用・保存用バッファを破棄する。ロギング専用PoCでは次の順へ固定する。
-
-```text
-Log Stop
-→ 保存ログ全Block取得
-→ TDMS追記完了
-→ Release
-```
-
-`Log Stop → Release → GetLoggingData`の順にしない。
-
----
-
-## 10.13.4 新規DLL Wrapper VI
-
-全WrapperはC関数1個をCLFNで1回だけ呼ぶ。通常Wrapperは`error in.status=True`でCLFNを呼ばず、安全値と元errorを返す。
-
-### 10.13.4.1 `RS_DLL_GT150GetGapTime.vi`
-
-#### 0. 責務
-
-MeasStart発行直後からハードウェアへの測定開始要求直前までの時間をms単位で取得する。
-
-#### 1. 入力データ
-
-```c
-long RAMScopeGT150GetGapTime(long UnitNo, unsigned long *pGapTime);
-```
-
-#### 2. 出力
-
-GapTimeMs U32、API ReturnCode I32、error out。
-
-#### 3. 条件
-
-UnitNoは現仕様0。既存error時はGapTimeMs=0。
-
-#### 4. アルゴリズム
-
-pGapTime左端子へU32 0を入れ、右端子から値を得る。
-
-#### 5. 構造理由
-
-Case Structureで既存error時のCLFN呼出しを止める。
-
-#### 6. 入出力
-
-UnitNo、error in／GapTimeMs、API ReturnCode、error out。
-
-#### 7. CLFN Parameters
-
-| 順 | 名前 | Type | Data Type | Pass |
-|---:|---|---|---|---|
-| Return | return | Numeric | Signed 32-bit | Value |
-| 1 | UnitNo | Numeric | Signed 32-bit | Value |
-| 2 | pGapTime | Numeric | Unsigned 32-bit | Pointer to Value |
-
-Function Name：`RAMScopeGT150GetGapTime`
-
-#### 8. 配線
-
-UnitNo、U32 0、error inをCLFNへ接続し、pGapTime右端子をGapTimeMsへ接続する。ReturnCodeとCLFN errorを`RAMScope_Code_To_Error.vi`へ接続する。bypass側は0、0、元error。
-
-#### 9. テスト
-
-Start前、Start直後、Stop後、既存errorを確認する。
-
----
-
-### 10.13.4.2 `RS_DLL_GT150GetMeasNum.vi`
-
-#### 0. 責務
-
-MeasStartからMeasStopまでに成立した測定回数を取得する。
-
-#### 1. 入力データ
-
-```c
-long RAMScopeGT150GetMeasNum(long UnitNo, long *pMeasNum);
-```
-
-#### 2. 出力
-
-MeasNum I32、API ReturnCode、error out。
-
-#### 3. 条件
-
-Stop後に使用する。既存error時はMeasNum=0。
-
-#### 4. アルゴリズム
-
-pMeasNum左端子へI32 0、右端子からMeasNum。
-
-#### 5. 構造理由
-
-既存errorバイパス用Case Structure。
-
-#### 6. 入出力
-
-UnitNo、error in／MeasNum、API ReturnCode、error out。
-
-#### 7. CLFN Parameters
-
-| 順 | 名前 | Type | Data Type | Pass |
-|---:|---|---|---|---|
-| Return | return | Numeric | Signed 32-bit | Value |
-| 1 | UnitNo | Numeric | Signed 32-bit | Value |
-| 2 | pMeasNum | Numeric | Signed 32-bit | Pointer to Value |
-
-Function Name：`RAMScopeGT150GetMeasNum`
-
-#### 8. 配線
-
-I32 0をPointer左端子へ接続し、右端子をMeasNumへ接続する。ReturnCodeとerrorを共通変換する。
-
-#### 9. テスト
-
-測定0回、1回、複数回、測定中発行、既存error。
-
----
-
-### 10.13.4.3 `RS_DLL_GT150GetBlockNum.vi`
-
-#### 0. 責務
-
-指定MeasNoのロギングBlock数を取得する。
-
-#### 1. 入力データ
-
-```c
-long RAMScopeGT150GetBlockNum(long UnitNo, long MeasNo, long *pBlockNum);
-```
-
-#### 2. 出力
-
-BlockNum I32、API ReturnCode、error out。
-
-#### 3. 条件
-
-`0 <= MeasNo < MeasNum`。既存error時は0。
-
-#### 4. アルゴリズム
-
-pBlockNum左端子0、右端子からBlockNum。
-
-#### 5. 構造理由
-
-通常Wrapper共通Case Structure。
-
-#### 6. 入出力
-
-UnitNo、MeasNo、error in／BlockNum、ReturnCode、error out。
-
-#### 7. CLFN Parameters
-
-| 順 | 名前 | Type | Data Type | Pass |
-|---:|---|---|---|---|
-| Return | return | Numeric | Signed 32-bit | Value |
-| 1 | UnitNo | Numeric | Signed 32-bit | Value |
-| 2 | MeasNo | Numeric | Signed 32-bit | Value |
-| 3 | pBlockNum | Numeric | Signed 32-bit | Pointer to Value |
-
-Function Name：`RAMScopeGT150GetBlockNum`
-
-#### 8. 配線
-
-Cプロトタイプ順に接続し、Pointer右端子をBlockNumへ接続する。bypass側は0、0、元error。
-
-#### 9. テスト
-
-先頭／末尾MeasNo、-1、MeasNum、BlockNum=0。
-
----
-
-### 10.13.4.4 `RS_DLL_GT150GetBufferDataNum.vi`
-
-#### 0. 責務
-
-測定中の表示用バッファに現在保存されているPacket数を取得する。
-
-#### 1. 入力データ
-
-```c
-long RAMScopeGT150GetBufferDataNum(long UnitNo, long MdlNo, long *pDataNum);
-```
-
-#### 2. 出力
-
-AvailableDataNum I32、API ReturnCode、error out。
-
-#### 3. 条件
-
-RAMモニタMdlNoを指定する。既存error時は0。
-
-#### 4. アルゴリズム
-
-pDataNum左端子0、右端子からAvailableDataNum。
-
-#### 5. 構造理由
-
-通常Wrapper共通Case Structure。
-
-#### 6. 入出力
-
-UnitNo、MdlNo、error in／AvailableDataNum、ReturnCode、error out。
-
-#### 7. CLFN Parameters
-
-| 順 | 名前 | Type | Data Type | Pass |
-|---:|---|---|---|---|
-| Return | return | Numeric | Signed 32-bit | Value |
-| 1 | UnitNo | Numeric | Signed 32-bit | Value |
-| 2 | MdlNo | Numeric | Signed 32-bit | Value |
-| 3 | pDataNum | Numeric | Signed 32-bit | Pointer to Value |
-
-Function Name：`RAMScopeGT150GetBufferDataNum`
-
-#### 8. 配線
-
-Pointer左0、右AvailableDataNum。ReturnCodeを共通変換する。
-
-#### 9. テスト
-
-測定開始直後、Wait後、GetBufferData実行後、既存error。
-
----
-
-### 10.13.4.5 `RS_DLL_GT150GetLoggingDataNum.vi`
-
-#### 0. 責務
-
-指定MeasNo、BlockNo、MdlNoの保存Packet数を取得する。
-
-#### 1. 入力データ
-
-```c
-long RAMScopeGT150GetLoggingDataNum(
-    long UnitNo,
-    long MdlNo,
-    long MeasNo,
-    long BlockNo,
-    long *pDataNum
-);
-```
-
-#### 2. 出力
-
-AvailableDataNum I32、API ReturnCode、error out。
-
-#### 3. 条件
-
-Stop後、Release前に使用する。MeasNoとBlockNoは上位APIで検証する。
-
-#### 4. アルゴリズム
-
-pDataNum左端子0、右端子から保存Packet数。
-
-#### 5. 構造理由
-
-通常Wrapper共通Case Structure。
-
-#### 6. 入出力
-
-UnitNo、MdlNo、MeasNo、BlockNo、error in／AvailableDataNum、ReturnCode、error out。
-
-#### 7. CLFN Parameters
-
-| 順 | 名前 | Type | Data Type | Pass |
-|---:|---|---|---|---|
-| Return | return | Numeric | Signed 32-bit | Value |
-| 1 | UnitNo | Numeric | Signed 32-bit | Value |
-| 2 | MdlNo | Numeric | Signed 32-bit | Value |
-| 3 | MeasNo | Numeric | Signed 32-bit | Value |
-| 4 | BlockNo | Numeric | Signed 32-bit | Value |
-| 5 | pDataNum | Numeric | Signed 32-bit | Pointer to Value |
-
-Function Name：`RAMScopeGT150GetLoggingDataNum`
-
-#### 8. 配線
-
-引数順を変更しない。Pointer右端子をAvailableDataNumへ接続する。bypass側は0、0、元error。
-
-#### 9. テスト
-
-Block先頭／末尾、DataNum=0、MeasNo不正、BlockNo不正、測定中発行。
-
----
-
-### 10.13.4.6 `RS_DLL_GT150GetLoggingData.vi`
-
-#### 0. 責務
-
-指定Blockの保存PacketをU8一次元配列へコピーする。Packet解析は行わない。
-
-#### 1. 入力データ
-
-```c
-long RAMScopeGT150GetLoggingData(
-    long UnitNo,
-    long MdlNo,
-    long MeasNo,
-    long BlockNo,
-    void *pData,
-    long *pDataNum,
-    long *pLostDataNum
-);
-```
-
-#### 2. 出力
-
-Allocated Raw Buffer U8[]、DataNum I32、LostDataNum I32、ReturnCode、error out。
-
-#### 3. 条件
-
-RequestedDataNum>0、Buffer Byte Size>0、Stop後、Release前。
-
-#### 4. アルゴリズム
-
-- Buffer Byte Size分のU8配列をInitialize Array。
-- RequestedDataNumをpDataNum左端子へ入力。
-- pLostDataNum左端子はI32 0。
-- CLFN後にpDataNum右端子から実取得数。
-
-#### 5. 構造理由
-
-Case Structure、Initialize Array、Array Data Pointer、Pointer to Valueを使用する。
-
-#### 6. 入出力
-
-| 端子 | 方向 | 型 |
-|---|---|---|
-| UnitNo、MdlNo、MeasNo、BlockNo | 入力 | I32 |
-| RequestedDataNum | 入力 | I32 |
-| Buffer Byte Size | 入力 | I32 |
-| error in | 入力 | error cluster |
-| Allocated Raw Buffer | 出力 | U8[] |
-| DataNum、LostDataNum、ReturnCode | 出力 | I32 |
-| error out | 出力 | error cluster |
-
-#### 7. CLFN Parameters
-
-| 順 | 名前 | Type | Data Type | Pass |
-|---:|---|---|---|---|
-| Return | return | Numeric | Signed 32-bit | Value |
-| 1 | UnitNo | Numeric | Signed 32-bit | Value |
-| 2 | MdlNo | Numeric | Signed 32-bit | Value |
-| 3 | MeasNo | Numeric | Signed 32-bit | Value |
-| 4 | BlockNo | Numeric | Signed 32-bit | Value |
-| 5 | pData | Array | Unsigned 8-bit、1D | Array Data Pointer |
-| 6 | pDataNum | Numeric | Signed 32-bit | Pointer to Value |
-| 7 | pLostDataNum | Numeric | Signed 32-bit | Pointer to Value |
-
-Function Name：`RAMScopeGT150GetLoggingData`
-
-#### 8. 配線
-
-1. Initialize Array出力をpData左端子へ接続する。
-2. RequestedDataNumをpDataNum左端子へ接続する。
-3. I32 0をpLostDataNum左端子へ接続する。
-4. pData右端子をAllocated Raw Bufferへ接続する。
-5. pDataNum右端子をDataNumへ接続する。
-6. pLostDataNum右端子をLostDataNumへ接続する。
-7. ReturnCodeとCLFN errorを共通変換する。
-8. bypass側は空U8[]、DataNum=0、Lost=0、Return=0、元error。
-
-#### 9. テスト
-
-Requested=1、全件要求、実取得数が要求未満、DataNum=0、不正番号、既存error。引数7個であることをCLFN画面で再確認する。
-
----
-
-## 10.13.5 新規公開API VI
-
-### 10.13.5.1 `RAMScope_Get_Log_Summary.vi`
-
-#### 0. 責務
-
-Stop後の保存ログ列挙に必要なGapTimeMsとMeasNumを取得する。
-
-#### 1. 入力データ
-
-UnitNo、error in。
-
-#### 2. 出力
-
-GapTimeMs U32、MeasNum I32、Status、TestError、error out。
-
-#### 3. 条件
-
-Log Stop成功後、Release前。MeasNum<0は`-700170`。
-
-#### 4. アルゴリズム
-
-GetGapTime → GetMeasNum → MeasNum負数検証 → Error_To_TestStatus。
-
-#### 5. 構造理由
-
-error wireでAPI順序を固定し、負数だけCase Structureで止める。
-
-#### 6. 入出力と接続
-
-Logging PoCのStop直後に呼び、MeasNumを外側For LoopのNへ接続する。
-
-#### 7. 配置するSubVI
-
-`RS_DLL_GT150GetGapTime.vi`、`RS_DLL_GT150GetMeasNum.vi`、Less Than 0?、Case Structure、Format Into String、Bundle By Name、Error_To_TestStatus.vi。
-
-#### 8. 配線順
-
-1. GetGapTimeのerror outをGetMeasNumへ接続する。
-2. MeasNum<0をCase selectorへ接続する。
-3. Trueケース（MeasNum<0=True）でsource全文を作る。
-
-```text
-RAMScope_Get_Log_Summary.vi: MeasNum must not be negative. MeasNum=%d
-```
-
-4. status=True、code=-700170、sourceをBundle By Nameする。
-5. FalseケースはWrapper errorを通す。
-6. 最終errorをError_To_TestStatusへ接続する。
-
-#### 9. テスト
-
-MeasNum 0、1、複数、負数ダミー、GapTime APIエラー。
-
----
-
-### 10.13.5.2 `RAMScope_Get_Block_Count.vi`
-
-#### 0. 責務
-
-指定MeasNoのBlockNumを取得し、番号と戻り件数を検証する。
-
-#### 1. 入力
-
-UnitNo、MeasNo、error in。
-
-#### 2. 出力
-
-BlockNum、Status、TestError、error out。
-
-#### 3. 条件
-
-MeasNo>=0。BlockNum>=0。
-
-#### 4. アルゴリズム
-
-入力検証 → GetBlockNum → 戻り値検証 → Error_To_TestStatus。
-
-#### 5. 構造理由
-
-DLLへ不正番号を渡す前のCaseと、戻り値検証Caseを分ける。
-
-#### 6. 接続
-
-Logging PoC外側For LoopのiをMeasNoへ接続し、BlockNumを内側For LoopのNへ接続する。
-
-#### 7. 配置
-
-Greater Or Equal 0?、Case Structure×2、Wrapper、Format Into String、Bundle By Name、Error_To_TestStatus。
-
-#### 8. 配線順
-
-- MeasNo<0：Wrapper未実行、code=-700171。
-
-```text
-RAMScope_Get_Block_Count.vi: MeasNo must not be negative. MeasNo=%d
-```
-
-- Wrapper正常後BlockNum<0：code=-700172。
-
-```text
-RAMScope_Get_Block_Count.vi: BlockNum must not be negative. MeasNo=%d, BlockNum=%d
-```
-
-- 正常時はBlockNumとerrorを通す。
-
-#### 9. テスト
-
-MeasNo -1、0、末尾、BlockNum 0、1、複数、負数ダミー。
-
----
-
-### 10.13.5.3 `RAMScope_Read_Logging_Block.vi`
-
-#### 0. 責務
-
-指定MeasNo、BlockNoの保存Packet数を取得し、必要領域を確保してデータ本体を読み、実取得分へ切り詰め、既存Parserで1Blockを解析する。
-
-#### 1. 入力データ
-
-UnitNo、MdlNo_RAM、MeasNo、BlockNo、Channel List、Byte Order、Max Buffer Bytes I64、error in。
-
-#### 2. 出力データモデル
-
-```text
-AvailableDataNum I32
-RequestedDataNum I32
-DataNum I32
-LostDataNum I32
-Raw Buffer U8[]
-Packets RAMScope_Packet.ctl[]
-Parsed Packet Count I32
-Unused Byte Count I32
-Status、TestError、error out
-```
-
-#### 3. 前提条件・異常条件
-
-```text
-ChNum>=1
-MeasNo>=0
-BlockNo>=0
-Max Buffer Bytes>0
-AvailableDataNum>=0
-0<=DataNum<=RequestedDataNum
-Required Bytes<=Max Buffer Bytes
-Required Bytes<=2147483647
-Parsed Packet Count==DataNum
-```
-
-#### 4. 処理アルゴリズム
-
-```text
-AvailableDataNum = GetLoggingDataNum
-if AvailableDataNum == 0:
-    空データを正常返却
-else:
-    RequestedDataNum = AvailableDataNum
-    Packet Size = ChNum×4+12
-    Required Bytes = RequestedDataNum×Packet Size  // I64
-    上限検証
-    GetLoggingData
-    DataNum範囲検証
-    Actual Bytes = DataNum×Packet Size
-    Array SubsetでRaw切詰め
-    Parse Buffer
-    Parsed Count照合
-```
-
-#### 5. LabVIEW構造の選定理由
-
-1Blockだけを扱い、MeasNo／BlockNoの反復はLogging PoCまたはTestStandへ任せる。これによりPublic VI内で巨大な全ログ配列を保持しない。
-
-`RAMScopeGT150GetLoggingData()`で読み出したPacketはAPI内部バッファから削除されるため、取得後は同じBlockを再取得できる前提にしない。本VIが返したRaw BufferとPacketsを次Block取得前にTDMSへ保存する。
-
-#### 6. 入出力と接続
-
-Logging PoC内側For LoopからMeasNoとBlockNoを受け、出力Packetsを`RAMScope_File_Log_Append.vi`へ直結する。
-
-#### 7. 配置する関数およびSubVI
-
-- `RS_DLL_GT150GetLoggingDataNum.vi`。
-- `RS_DLL_GT150GetLoggingData.vi`。
-- `RAMScope_Parse_Buffer.vi`。
-- Array Size、I64変換、Multiply、Add、Array Subset。
-- Case Structure 5個以上。
-- Format Into String、Bundle By Name、Error_To_TestStatus.vi。
-
-#### 8. 配線順
-
-1. 入力検証Case。失敗は`-700173`。
-
-```text
-RAMScope_Read_Logging_Block.vi: Input is invalid. ChNum=%d, MeasNo=%d, BlockNo=%d, MaxBufferBytes=%lld
-```
-
-2. GetLoggingDataNumを呼ぶ。
-3. AvailableDataNum<0は`-700174`。
-4. AvailableDataNum=0は本体DLLとParserを呼ばず空配列。
-5. I64でRequired Bytesを計算する。
-6. 上限違反は`-700175`。
-
-```text
-RAMScope_Read_Logging_Block.vi: Required buffer size is invalid or exceeds the limit. RequiredBytes=%lld, MaxBufferBytes=%lld, AvailableDataNum=%d, PacketSize=%lld
-```
-
-7. RequestedDataNum=AvailableDataNumをGetLoggingDataのpDataNum左端子へ渡す。
-8. `0<=DataNum<=RequestedDataNum`を検証する。違反は`-700176`。
-9. Raw BufferをActual Bytesへ切り詰める。
-10. Parserへ渡す。
-11. Parsed Count不一致は`-700177`。
-12. 各Caseの全出力トンネルを配線し、Use default if unwiredを使わない。
-13. 最終errorをError_To_TestStatusへ接続する。
-
-#### 9. 単体テスト
-
-Channel List空、番号負数、DataNum=0、上限超過、DataNum要求未満、DataNum範囲外、Parser不一致、LostDataNum非ゼロ。
-
----
-
-## 10.13.6 LabVIEW側TDMS保存VI
-
-### 10.13.6.1 TDMS構造
-
-```text
-Root Properties
-  TestName
-  MeasurementStartTime
-  A2LFileName
-  UnitNo
-  MdlNo_RAM
-  ByteOrder
-  ChannelCount
-  PacketSize
-  GapTimeMs
-
-Group: RAMScope_Meas0000_Block0000
-  Properties
-    MeasNo
-    BlockNo
-    RequestedDataNum
-    DataNum
-    LostDataNum
-    PacketSize
-
-  Channels
-    Time_s
-    Time_Raw
-    Flag_Raw
-    Status
-    Skip
-    LogTrigger
-    Dummy
-    EventBits
-    DataLost
-    <Channel Name 0>          Engineering Value DBL
-    <Channel Name 0>__Raw     Raw Slot U32
-    <Channel Name 1>          Engineering Value DBL
-    <Channel Name 1>__Raw     Raw Slot U32
-    ...
-```
-
-Boolean状態は解析ツール互換性を優先し、TDMS上ではU8の0／1として保存する。測定値はEngineering Value DBLとRaw Slot U32を別チャンネルで保存し、Address、Size、Sign、Scale、Offset、UnitはChannel Propertyへ保存する。
-
----
-
-### 10.13.6.2 `RAMScope_File_Log_Open.vi`
-
-#### 0. 責務
-
-出力先TDMSを開き、後続VIへFile Referenceを返す。
-
-#### 1. 入力
-
-File Path、Overwrite?、error in。
-
-#### 2. 出力
-
-TDMS File Ref、File Open?、Status、TestError、error out。
-
-#### 3. 条件
-
-空Path不可。既存ファイルかつOverwrite?=Falseは`-700178`。
-
-#### 4. アルゴリズム
-
-Path検証 → Exists? → Overwrite Case → TDMS Open → File Open?更新。
-
-#### 5. 構造理由
-
-既存ファイル動作をCaseで明示し、暗黙上書きをしない。
-
-#### 6. 入出力と接続
-
-Logging PoCのSet Cond成功後、Log Start前に呼ぶ。File RefはPoCの通常ワイヤとCleanup Caseへ通す。
-
-#### 7. 配置
-
-Empty String/Path?、Check if File or Folder Exists、Case Structure、TDMS Open、Error_To_TestStatus。
-
-#### 8. 配線順
-
-- Path不正または上書き拒否時：TDMS Open未実行、Not A Refnum相当、安全なFile Open? False。
-- 正常時：Operation=`create or replace`、File Open?=`NOT(error.status)`。
-- source全文：
-
-```text
-RAMScope_File_Log_Open.vi: Output file already exists and overwrite is disabled. Path=%s
-```
-
-#### 9. テスト
-
-新規Path、既存Path上書き有／無、書込権限なし、既存error。
-
----
-
-### 10.13.6.3 `RAMScope_File_Log_Write_Metadata.vi`
-
-#### 0. 責務
-
-TDMS Rootへ試験全体情報とチャンネル定義を記録し、後のMF4変換で信号名、型、単位、換算情報を再構成できるようにする。
-
-#### 1. 入力
-
-TDMS Ref、TestName、Start Time、A2L File Name、UnitNo、MdlNo_RAM、Byte Order、Channel List、GapTimeMs、error in。
-
-#### 2. 出力
-
-同じTDMS Ref、Status、TestError、error out。
-
-#### 3. 条件
-
-File Ref有効、Channel List非空。A2L File Nameは空を許容する。
-
-#### 4. アルゴリズム
-
-Root Properties書込 → Channel List For Loopで`Channel_%03d_*`形式のRoot Propertyを書込 → Flush任意。
-
-#### 5. 構造理由
-
-チャンネルごとに同じProperty処理を行うためFor Loop。
-
-#### 6. 入出力と接続
-
-Log Stop後の`RAMScope_Get_Log_Summary.vi`成功直後、最初のBlockをTDMSへAppendする前に1回だけ呼ぶ。MeasurementStartTimeはLog Start直前に取得した値、GapTimeMsはSummary出力を接続する。
-
-#### 7. 配置
-
-TDMS Set Properties、For Loop、Unbundle By Name、Format Into String、Error_To_TestStatus。
-
-#### 8. 配線順
-
-1. RootへTestName等を設定する。
-2. Channel Listを自動インデックスでFor Loopへ入れる。
-3. 各チャンネルの情報をRoot Propertyへ次の固定キー形式で保存する。
-
-```text
-Channel_000_Name
-Channel_000_Address
-Channel_000_Size
-Channel_000_Sign
-Channel_000_Scale
-Channel_000_Offset
-Channel_000_Unit
-```
-
-4. `%03d`へChannel Indexを接続し、キー名を一意にする。
-5. 既存error時は書込をスキップしてRefを通す。
-6. Property書込失敗は元のTDMS errorを保持する。
-
-#### 9. テスト
-
-日本語TestName、空A2L名、複数Channel、書込失敗、既存error。
-
----
-
-### 10.13.6.4 `RAMScope_File_Log_Append.vi`
-
-#### 0. 責務
-
-1Block分の解析済みPacketsと取得状態を、Block固有Groupへ追記する。
-
-#### 1. 入力
-
-TDMS Ref、MeasNo、BlockNo、RequestedDataNum、DataNum、LostDataNum、PacketSize、Packets、Channel List、Flush After Write?、error in。
-
-#### 2. 出力
-
-TDMS Ref、Written Packet Count、Status、TestError、error out。
-
-#### 3. 条件
-
-`Array Size(Packets)==DataNum`。Channel Listの順番がPackets内Channel Valuesと一致する。
-
-#### 4. アルゴリズム
-
-```text
-Group Name = Format("RAMScope_Meas%04d_Block%04d")
-Group Propertiesを書込
-Packet共通配列を書込
-for ChannelIndex:
-    for PacketIndex:
-        Packets[PacketIndex].Channel Values[ChannelIndex].Engineering Valueを抽出
-    Channel NameでEngineering Value DBLをTDMS Write
-    Channel Name + "__Raw"でRaw Slot U32をTDMS Write
-    Address/Size/Sign/Scale/Offset/UnitをEngineering Value Channel Propertyへ保存
-if Flush After Write?: TDMS Flush
-```
-
-#### 5. 構造理由
-
-Block単位で即時保存し、全Blockをメモリへ蓄積しない。Channel×Packetの2重For Loopで列方向配列を作る。
-
-#### 6. 入出力と接続
-
-`RAMScope_Read_Logging_Block.vi`の直後に配置し、次Block取得前に完了させる。
-
-#### 7. 配置
-
-Format Into String、TDMS Set Properties、TDMS Write、For Loop×2、Index Array、Bundle/Unbundle、Select、TDMS Flush、Error_To_TestStatus。
-
-#### 8. 配線順
-
-1. `Array Size(Packets)==DataNum`を検証する。不一致は`-700180`。
-2. Group Nameを`RAMScope_Meas%04d_Block%04d`で作る。
-3. Group PropertyへMeasNo、BlockNo、RequestedDataNum、DataNum、LostDataNum、PacketSizeを設定する。
-4. PacketsからTime、Flag各fieldの一次元配列を作り、それぞれTDMS Writeする。
-5. BooleanはSelectでU8 1／0へ変換する。
-6. Channel外側For LoopでEngineering Value DBL配列とRaw Slot U32配列を作る。
-7. Engineering ValueはChannel名、Raw Slotは`<Channel名>__Raw`でTDMS Writeする。
-8. Channel名が空の場合は`Channel_%03d`を使用する。
-9. 同名Channelがある場合はIndexを付加して一意化する。
-10. Address、Size、Sign、Scale、Offset、UnitをEngineering Value Channel Propertyへ設定する。
-11. Flush入力がTrueならTDMS Flushする。
-12. Written Packet Count=DataNumを返す。
-
-source全文：
-
-```text
-RAMScope_File_Log_Append.vi: Packet count does not match DataNum. PacketCount=%d, DataNum=%d, MeasNo=%d, BlockNo=%d
-```
-
-#### 9. テスト
-
-DataNum=0、1、複数、同名Channel、空Channel名、日本語名、Lost非ゼロ、Flush有／無、件数不一致。
-
----
-
-### 10.13.6.5 `RAMScope_File_Log_Close.vi`
-
-#### 0. 責務
-
-前段errorの有無にかかわらずTDMS FlushとCloseを試行し、最初のerrorを保持するCleanup VI。
-
-#### 1. 入力
-
-TDMS Ref、File Open?、Original error。
-
-#### 2. 出力
-
-File Open? False、Status、TestError、Final error。
-
-#### 3. 条件
-
-File Open?=FalseならTDMS関数を呼ばない。Trueなら前段errorをClearしたCleanup用wireでFlush、Closeする。
-
-#### 4. アルゴリズム
-
-```text
-if File Open?:
-    Cleanup Error = Clear Errors(Original Error)
-    TDMS Flush
-    TDMS Close
-    Final Error = Merge Errors(Original Error, Cleanup Error)
-else:
-    Final Error = Original Error
-```
-
-#### 5. 構造理由
-
-File Open?をselectorとするCase Structure。Original Errorを優先するMerge Errors。
-
-#### 6. 入出力と接続
-
-Logging PoCの通常終了とCleanupの両方から呼ぶ。
-
-#### 7. 配置
-
-Case Structure、Clear Errors、TDMS Flush、TDMS Close、Merge Errors、Error_To_TestStatus。
-
-#### 8. 配線順
-
-TrueケースでOriginal Errorを保持用とCleanup用へ分岐する。Cleanup用だけClear Errorsし、Flush→Close。Merge Errorsの上側へOriginal、下側へClose Error。FalseケースはRefを使用せずOriginalを通す。両CaseでFile Open? Falseを出力する。
-
-#### 9. テスト
-
-正常Close、前段error付きClose、無効Ref、二重Close、Flush error、Close error。
-
----
-
-## 10.13.7 `PoC_RAMScope_Logging_Main.vi`
-
-### 0. 実現したい機能とVIの責務
 
 RAMScope機器側ロギングから停止後の全保存Block取得、Packet解析、TDMS保存、CleanupまでをTestStandなしで一度通し、ロギング機能を単独検証する。
 
 既存`PoC_RAMScope_Main.vi`は変更せず、本VIだけにTDMSと保存ログ回収処理を置く。
 
-### 1. 入力データの実体
+#### 1. 入力データの実体
 
 ```text
 UnitNo I32
@@ -7512,7 +7412,7 @@ Flush Every Block?
 error in
 ```
 
-### 2. 出力データモデル
+#### 2. 出力データモデル
 
 ```text
 UnitNum、kind
@@ -7528,7 +7428,7 @@ Status、TestError、error out
 
 `Total LostDataNum`はAPI値の累積／差分仕様が実機で確定するまで参考表示とし、判定にはBlockごとの`LostDataNum`とPacketの`Data Lost?`を使用する。
 
-### 3. 前提条件・異常条件
+#### 3. 前提条件・異常条件
 
 - 既存通信PoCがDeviceInitからReadまで成功していること。
 - TDMS Open成功前にLog Startしない。
@@ -7536,7 +7436,7 @@ Status、TestError、error out
 - 全Block取得前にReleaseしない。
 - 途中errorでもFile Close、Release、DeviceExitを可能な範囲で試行する。
 
-### 4. 処理アルゴリズム
+#### 4. 処理アルゴリズム
 
 ```text
 State = all False
@@ -7594,7 +7494,7 @@ Cleanup:
     Original Errorを最優先でMerge
 ```
 
-### 5. LabVIEW構造の選定理由
+#### 5. LabVIEW構造の選定理由
 
 - MeasNoとBlockNoは2重For Loop。
 - Total Block／Packet数はShift Register。
@@ -7603,7 +7503,7 @@ Cleanup:
 - 測定時間保証はFlat Sequenceまたはerror wire＋Wait。既存通信PoCと同じ正式方式へ合わせる。
 - 1Block取得直後にTDMS Appendし、巨大配列を保持しない。
 
-### 6. フロントパネル入出力と接続元・接続先
+#### 6. フロントパネル入出力と接続元・接続先
 
 | 出力 | 生成元 |
 |---|---|
@@ -7615,7 +7515,7 @@ Cleanup:
 | Final State | Cleanup後State |
 | Status、TestError、error out | 最後のClose Case出力トンネル |
 
-### 7. 配置する関数およびSubVI
+#### 7. 配置する関数およびSubVI
 
 - 既存公開API：Connect、Init、Set Cond、Log Start、Log Stop、Release、Close。
 - 新規公開API：Get Log Summary、Get Block Count、Read Logging Block。
@@ -7624,9 +7524,9 @@ Cleanup:
 - For Loop×2、Shift Register、Case Structure、Bundle By Name、Unbundle By Name、Clear Errors、Merge Errors、Error_To_TestStatus。
 - `RAMScope_Logging_PoC_State.ctl`。
 
-### 8. 配線順
+#### 8. 配線順
 
-#### A. 専用State ctlを作る
+##### A. 専用State ctlを作る
 
 ```text
 Connected?             Boolean False
@@ -7640,11 +7540,11 @@ Released?              Boolean False
 
 `RAMScope_Logging_PoC_State.ctl`としてtypedef保存する。既存`RAMScope_PoC_State.ctl`を変更しない。
 
-#### B. ConnectからSet Cond
+##### B. ConnectからSet Cond
 
 既存通信PoCと同じ公開API、同じerror wire順を使用する。Connect成功時だけConnected?をTrueに更新する。
 
-#### C. TDMS Openと測定開始時刻の保持
+##### C. TDMS Openと測定開始時刻の保持
 
 1. Set Cond error outをFile Log Openへ接続する。
 2. Open成功時にFile Open?をTrueへ更新する。
@@ -7652,14 +7552,14 @@ Released?              Boolean False
 4. File Log Openのerror outをLog Startへ接続する。
 5. File Ref、MeasurementStartTimeおよびStateをSummary後のMetadata書込位置まで通す。
 
-#### D. Start、Wait、Stop
+##### D. Start、Wait、Stop
 
 1. Log Start成功時にMeasurement Started?をTrue。
 2. Measurement DurationをWaitへ接続する。
 3. Wait後にLog Stop。
 4. Stop成功時にStopped?をTrue。
 
-#### E. Summaryと2重For Loop
+##### E. Summaryと2重For Loop
 
 1. Stop error outをGet Log Summaryへ接続する。
 2. 成功時にLog Summary Read?をTrue。
@@ -7675,7 +7575,7 @@ Released?              Boolean False
 12. 各Block終了後にTotal Packet CountをI64加算する。
 13. 両Loop正常終了時だけLogging Retrieved?をTrue。
 
-#### F. ReleaseとFile Close
+##### F. ReleaseとFile Close
 
 1. Logging Retrieved後にRelease。
 2. Release成功時にReleased?をTrue。
@@ -7683,7 +7583,7 @@ Released?              Boolean False
 4. File Open?をFalseへ更新する。
 5. Device Closeへ進む。
 
-#### G. Cleanup
+##### G. Cleanup
 
 Original Errorを別wireで保持する。
 
@@ -7703,7 +7603,7 @@ Cleanup Device Close条件
 
 各Cleanup APIへ渡すwireだけClear Errorsし、戻りerrorをMerge Errorsの後順位入力へ接続する。Original Errorを最上位入力に固定する。
 
-### 9. 単体テスト
+#### 9. 単体テスト
 
 1. 正常1Meas、1Block。
 2. 正常1Meas、複数Block。
@@ -7720,32 +7620,7 @@ Cleanup Device Close条件
 
 ---
 
-## 10.13.8 通信確認PoCとロギングPoCの完成条件
-
-### `PoC_RAMScope_Main.vi`
-
-- [ ] 既存VI名と構成を維持。
-- [ ] Connect、Init、Set Cond、Start、短時間Read、Stop、Release、Closeを確認。
-- [ ] TDMS File Refを持たない。
-- [ ] GetMeasNum／GetBlockNum／GetLoggingDataを呼ばない。
-- [ ] 通信・DLL・Packet Parserの最小切り分けに使用。
-
-### `PoC_RAMScope_Logging_Main.vi`
-
-- [ ] TDMS Open後にStart。
-- [ ] Stop後にSummaryを取得。
-- [ ] MeasNoとBlockNoを全列挙。
-- [ ] 1Block取得直後にTDMS Append。
-- [ ] 全Block後にRelease。
-- [ ] File CloseとDevice CloseをCleanupで試行。
-- [ ] Packet CountとDataNumが一致。
-- [ ] Flag Raw、Status、Skip、Log Trigger、Dummy、Event、Data Lostを保存。
-- [ ] Time RawとTime Secondsを保存。
-- [ ] LostDataNumをBlock Propertyへ保存。
-
----
-
-## 10.13.9 TestStand組込み順
+### 10.13.3 TestStand組込み順
 
 ```text
 Setup
@@ -7778,7 +7653,56 @@ TestStand側はMeasNo、BlockNoのLoop、試験条件、判定、レポートを
 
 ---
 
-## 10.13.10 実機PoCで最終確認する項目
+### 10.13.4 2つのPoCの完成条件
+
+### `PoC_RAMScope_Main.vi`
+
+<!-- generated-vi-diagram -->
+![PoCRAMScopeMain.vi 入出力イメージ](./assets/vi-diagrams/pocramscopemain.svg)
+
+- [ ] 既存VI名と構成を維持。
+- [ ] Connect、Init、Set Cond、Start、短時間Read、Stop、Release、Closeを確認。
+- [ ] TDMS File Refを持たない。
+- [ ] GetMeasNum／GetBlockNum／GetLoggingDataを呼ばない。
+- [ ] 通信・DLL・Packet Parserの最小切り分けに使用。
+
+### `PoC_RAMScope_Logging_Main.vi`
+
+<!-- generated-vi-diagram -->
+![PoCRAMScopeLoggingMain.vi 入出力イメージ](./assets/vi-diagrams/pocramscopeloggingmain.svg)
+
+- [ ] TDMS Open後にStart。
+- [ ] Stop後にSummaryを取得。
+- [ ] MeasNoとBlockNoを全列挙。
+- [ ] 1Block取得直後にTDMS Append。
+- [ ] 全Block後にRelease。
+- [ ] File CloseとDevice CloseをCleanupで試行。
+- [ ] Packet CountとDataNumが一致。
+- [ ] Flag Raw、Status、Skip、Log Trigger、Dummy、Event、Data Lostを保存。
+- [ ] Time RawとTime Secondsを保存。
+- [ ] LostDataNumをBlock Propertyへ保存。
+
+---
+
+## 10.14 単体試験・実機PoC・完了判定
+
+### 10.14.1 レイヤ別の合格順
+
+```text
+ctl既定値とtypedef反映
+  → 共通変換・Builder・Parser単体試験
+  → WrapperのCLFN設定と安全値バイパス
+  → 公開APIの入力／戻り値検証
+  → TDMS Open／Metadata／Append／Close
+  → 通信確認PoC回帰
+  → ロギングPoC結合
+  → TDMS再読込
+  → MF4変換前提確認
+```
+
+作成順は10.5.2だけを正本とし、本節では合否判定だけを扱う。
+
+### 10.14.2 実機PoCで最終確認する項目
 
 - [ ] 使用DLL、同梱ヘッダ、APIマニュアルの関数宣言が一致。
 - [ ] `GetLoggingData`は7引数。
@@ -7796,35 +7720,29 @@ TestStand側はMeasNo、BlockNoのLoop、試験条件、判定、レポートを
 
 ---
 
-## 10.13.11 実装順
+### 10.14.3 完了条件
 
-```text
-Phase 1：既存ParserとRead修正
-  1. RAMScope_Packet.ctl
-  2. RAMScope_Parse_Buffer.vi
-  3. RS_DLL_GT150GetBufferData.vi確認
-  4. RS_DLL_GT150GetBufferDataNum.vi
-  5. RAMScope_Read.vi
+- [ ] 10.5.2の全Phaseが順番どおり完了している。
+- [ ] 既存通信PoCがロギング追加後も回帰試験に合格する。
+- [ ] ロギングPoCが全BlockをRead→Parse→Appendし、Release前に保存を完了する。
+- [ ] API ReturnCode、ローカルerror、Packet Status、LostDataNumを別情報として追跡できる。
+- [ ] TDMS再読込で全チャンネル長、Block数、Packet数、メタデータが一致する。
+- [ ] 次フェーズのMF4変換に必要なName、Address、Size、Sign、Scale、Offset、Unit、Time、Flagを保持できる。
 
-Phase 2：停止後保存ログ取得
-  6. RS_DLL_GT150GetGapTime.vi
-  7. RS_DLL_GT150GetMeasNum.vi
-  8. RS_DLL_GT150GetBlockNum.vi
-  9. RS_DLL_GT150GetLoggingDataNum.vi
-  10. RS_DLL_GT150GetLoggingData.vi
-  11. RAMScope_Get_Log_Summary.vi
-  12. RAMScope_Get_Block_Count.vi
-  13. RAMScope_Read_Logging_Block.vi
+<!-- generated-vi-reference-start -->
 
-Phase 3：TDMS
-  14. RAMScope_File_Log_Open.vi
-  15. RAMScope_File_Log_Write_Metadata.vi
-  16. RAMScope_File_Log_Append.vi
-  17. RAMScope_File_Log_Close.vi
+---
 
-Phase 4：専用PoC
-  18. RAMScope_Logging_PoC_State.ctl
-  19. PoC_RAMScope_Logging_Main.vi
-```
+## 章内で参照するVIの入出力イメージ
 
-各Phase終了時に単体テストを完了し、通信確認用`PoC_RAMScope_Main.vi`が従来どおり動くことを回帰確認する。
+### `ErrorToTestStatus.vi`
+
+<!-- generated-vi-diagram -->
+![ErrorToTestStatus.vi 入出力イメージ](./assets/vi-diagrams/errortoteststatus.svg)
+
+### `Clear Errors.vi`
+
+<!-- generated-vi-diagram -->
+![Clear Errors.vi 入出力イメージ](./assets/vi-diagrams/clear-errors.svg)
+
+<!-- generated-vi-reference-end -->

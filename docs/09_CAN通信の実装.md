@@ -1,12 +1,15 @@
 # 09. CANalyzer ActiveX実装ガイド
 
+<!-- generated-vi-diagram -->
+![CANalyzer公開API接続](./assets/vi-diagrams/canalyzer-public-api-flow.svg)
+
 > **本章の役割**：既存のPython COM APIロジックをLabVIEW 2026 Q1 64bitのActiveX機能へ置き換え、CANalyzerの接続・新規起動・Configuration確認・Measurement制御・System Variable読書き・故障注入・最小PoC・LabVIEW単体本番VI・TestStand組み込みまでを、画面操作で再現できる粒度で定義する。
 >
-> VI作成手順は[00A_LabVIEW実装資料の記述ルール.md](./00A_LabVIEW実装資料の記述ルール.md)を正とする。
+> VI作成手順は[00A_LabVIEW実装資料の記述ルール.md](./00A_LabVIEW実装資料の記述ルール.md)を正とし、ActiveXの一般仕様とCANalyzer固有Type Libraryの確認順は[00C](./00C_一次資料とバージョン基準.md)に従う。
 >
 > CANalyzer COM APIのプロパティ名・メソッド名は、対象PCに登録されたCANalyzer Type Libraryを一次情報とする。CANalyzerの版によって表示名や引数が異なる場合は推測で固定せず、`実機確認待ち`として`10_ActiveX_Wrapper`だけを差し替える。
 
-**最終整理日：2026-07-17**
+**最終整理日：2026-07-26**
 
 ---
 
@@ -490,6 +493,9 @@ ActiveX Refを含むためTestStandへ直接渡さない。
 
 # 9.8.1 `CAN_AX_Open_Application.vi`
 
+<!-- generated-vi-diagram -->
+![CANAXOpenApplication.vi 入出力イメージ](./assets/vi-diagrams/canaxopenapplication.svg)
+
 ## 0. 目的と処理概要
 
 CANalyzer ApplicationのActiveX参照を取得する。起動モード判定と所有権判定はServiceへ置き、本VIはAutomation Openだけを担当する。
@@ -537,6 +543,9 @@ CANalyzer ApplicationのActiveX参照を取得する。起動モード判定と�
 
 # 9.8.2 `CAN_AX_Get_System.vi`
 
+<!-- generated-vi-diagram -->
+![CANAXGetSystem.vi 入出力イメージ](./assets/vi-diagrams/canaxgetsystem.svg)
+
 ## 0. 目的
 
 Application RefからSystem Refを取得する。
@@ -565,9 +574,15 @@ Application取得直後に有効System Refが返ることを確認する。
 
 # 9.8.3 `CAN_AX_Get_Measurement.vi`
 
+<!-- generated-vi-diagram -->
+![CANAXGetMeasurement.vi 入出力イメージ](./assets/vi-diagrams/canaxgetmeasurement.svg)
+
 `CAN_AX_Get_System.vi`と同じ構造で、Propertyを`Measurement`へ変更する。
 
 # 9.8.4 `CAN_AX_Get_Measurement_Running.vi`
+
+<!-- generated-vi-diagram -->
+![CANAXGetMeasurementRunning.vi 入出力イメージ](./assets/vi-diagrams/canaxgetmeasurementrunning.svg)
 
 ## 1. 入出力
 
@@ -590,9 +605,15 @@ error out
 
 # 9.8.5 `CAN_AX_Start_Measurement.vi`
 
+<!-- generated-vi-diagram -->
+![CANAXStartMeasurement.vi 入出力イメージ](./assets/vi-diagrams/canaxstartmeasurement.svg)
+
 Measurement RefをInvoke Nodeへ接続し、Type Libraryに表示される`Start` Methodを選択する。Running待ちは本VIへ入れない。
 
 # 9.8.6 `CAN_AX_Stop_Measurement.vi`
+
+<!-- generated-vi-diagram -->
+![CANAXStopMeasurement.vi 入出力イメージ](./assets/vi-diagrams/canaxstopmeasurement.svg)
 
 Startと同じ構成でMethodを`Stop`へ変更する。
 
@@ -607,6 +628,9 @@ System Ref
 
 ## `CAN_AX_Get_Namespace.vi`
 
+<!-- generated-vi-diagram -->
+![CANAXGetNamespace.vi 入出力イメージ](./assets/vi-diagrams/canaxgetnamespace.svg)
+
 1. System RefをProperty NodeまたはInvoke Nodeへ接続する。
 2. `Namespaces`のindexed accessを選択する。
 3. Namespace Stringをindexまたは引数へ接続する。
@@ -614,15 +638,24 @@ System Ref
 
 ## `CAN_AX_Get_Variables.vi`
 
+<!-- generated-vi-diagram -->
+![CANAXGetVariables.vi 入出力イメージ](./assets/vi-diagrams/canaxgetvariables.svg)
+
 Namespace Refの`Variables` Propertyを読み、Variables Refを出力する。
 
 ## `CAN_AX_Get_Variable_Item.vi`
+
+<!-- generated-vi-diagram -->
+![CANAXGetVariableItem.vi 入出力イメージ](./assets/vi-diagrams/canaxgetvariableitem.svg)
 
 Variables Refの`Item`へVariable Nameを渡し、Variable Refを出力する。
 
 Type LibraryでPropertyまたはMethodのどちらとして表示されるかを確認し、表示された正式メンバを使用する。
 
 # 9.8.8 `CAN_AX_Read_Variable_Value.vi`
+
+<!-- generated-vi-diagram -->
+![CANAXReadVariableValue.vi 入出力イメージ](./assets/vi-diagrams/canaxreadvariablevalue.svg)
 
 ## 1. 入出力
 
@@ -643,6 +676,9 @@ error out
 5. error clusterを直列接続する。
 
 # 9.8.9 `CAN_AX_Write_Variable_Value.vi`
+
+<!-- generated-vi-diagram -->
+![CANAXWriteVariableValue.vi 入出力イメージ](./assets/vi-diagrams/canaxwritevariablevalue.svg)
 
 ## 1. 入出力
 
@@ -681,6 +717,9 @@ CAN_AX_Quit_Application.vi
 
 # 9.9.1 `CANalyzer_Detect_Process.vi`
 
+<!-- generated-vi-diagram -->
+![CANalyzerDetectProcess.vi 入出力イメージ](./assets/vi-diagrams/canalyzerdetectprocess.svg)
+
 ## 0. 目的
 
 Automation Open前後のCANalyzerプロセス状態を確認し、`Require Existing`のガードとApplication所有権推定に使用する。
@@ -701,6 +740,9 @@ Automation Open前後のCANalyzerプロセス状態を確認し、`Require Exist
 プロセス検出は所有権の補助情報であり、COM Running Object Tableへの登録を完全に証明するものではない。判定が曖昧ならOwnership=`Unknown`とする。
 
 # 9.9.2 `CANalyzer_Resolve_SysVar.vi`
+
+<!-- generated-vi-diagram -->
+![CANalyzerResolveSysVar.vi 入出力イメージ](./assets/vi-diagrams/canalyzerresolvesysvar.svg)
 
 ## 0. 目的
 
@@ -741,6 +783,9 @@ Variable Refは呼出側が使用後にCloseする。
 
 # 9.9.3 `CANalyzer_Value_To_Variant.vi`
 
+<!-- generated-vi-diagram -->
+![CANalyzerValueToVariant.vi 入出力イメージ](./assets/vi-diagrams/canalyzervaluetovariant.svg)
+
 ## 0. 目的
 
 Publicで使用する通常型ClusterをActiveX書込用Variantへ変換する。
@@ -758,11 +803,17 @@ Publicで使用する通常型ClusterをActiveX書込用Variantへ変換する�
 
 # 9.9.4 `CANalyzer_Variant_To_Value.vi`
 
+<!-- generated-vi-diagram -->
+![CANalyzerVariantToValue.vi 入出力イメージ](./assets/vi-diagrams/canalyzervarianttovalue.svg)
+
 Value Typeに応じた型定数をVariant To Dataの`type`へ接続し、結果を`CANalyzer_SysVar_Value.ctl`へ格納する。
 
 変換不能時はcode=`-710106`と期待型をsourceへ追加する。
 
 # 9.9.5 `CANalyzer_Wait_Measurement_State.vi`
+
+<!-- generated-vi-diagram -->
+![CANalyzerWaitMeasurementState.vi 入出力イメージ](./assets/vi-diagrams/canalyzerwaitmeasurementstate.svg)
 
 ## 0. 目的
 
@@ -807,6 +858,9 @@ CAN_AX_Get_Measurement_Running.vi
 
 # 9.9.6 `CANalyzer_Session_Registry.vi`
 
+<!-- generated-vi-diagram -->
+![CANalyzerSessionRegistry.vi 入出力イメージ](./assets/vi-diagrams/canalyzersessionregistry.svg)
+
 ## 0. 目的
 
 ActiveX参照をLabVIEW内部に保持し、外部へSession IDだけを公開する。
@@ -838,6 +892,9 @@ Create → Get → Update → Get → Remove → Getを実行し、IDとFound?�
 
 # 9.9.7 `CANalyzer_Execute_Command.vi`
 
+<!-- generated-vi-diagram -->
+![CANalyzerExecuteCommand.vi 入出力イメージ](./assets/vi-diagrams/canalyzerexecutecommand.svg)
+
 ## 0. 目的
 
 すべての本番ActiveX操作を1本の非再入VIへ通し、異なるPublic VIが複数Threadから呼ばれても直列化する。
@@ -857,6 +914,9 @@ PoCではWrapper直呼び可。本番前にDispatcher経由へ統一する。
 # 9.10 Public API VI
 
 # 9.10.1 `CANalyzer_Open.vi`
+
+<!-- generated-vi-diagram -->
+![CANalyzerOpen.vi 入出力イメージ](./assets/vi-diagrams/canalyzeropen.svg)
 
 ## 0. 目的
 
@@ -938,6 +998,9 @@ Session ID出力
 
 # 9.10.2 `CANalyzer_Write_SysVar.vi`
 
+<!-- generated-vi-diagram -->
+![CANalyzerWriteSysVar.vi 入出力イメージ](./assets/vi-diagrams/canalyzerwritesysvar.svg)
+
 ## 1. 入出力
 
 ```text
@@ -967,6 +1030,9 @@ error out
 9. error sourceへSession ID、Namespace、Variable Nameを追加する。
 
 # 9.10.3 `CANalyzer_Read_SysVar.vi`
+
+<!-- generated-vi-diagram -->
+![CANalyzerReadSysVar.vi 入出力イメージ](./assets/vi-diagrams/canalyzerreadsysvar.svg)
 
 ## 1. 入出力
 
@@ -1000,6 +1066,9 @@ N端子：未配線
 
 # 9.10.5 `CANalyzer_Set_Message_Fault.vi`
 
+<!-- generated-vi-diagram -->
+![CANalyzerSetMessageFault.vi 入出力イメージ](./assets/vi-diagrams/canalyzersetmessagefault.svg)
+
 ## 1. 入出力
 
 ```text
@@ -1024,13 +1093,22 @@ TIMEOUT       = False→0 / True→1
 
 # 9.10.6 `CANalyzer_Clear_Message_Faults.vi`
 
+<!-- generated-vi-diagram -->
+![CANalyzerClearMessageFaults.vi 入出力イメージ](./assets/vi-diagrams/canalyzerclearmessagefaults.svg)
+
 指定Namespaceの`ALIVE_COUNTER`、`CHECKSUM`、`TIMEOUT`へ0を書き込む。
 
 # 9.10.7 `CANalyzer_Clear_All_Faults.vi`
 
+<!-- generated-vi-diagram -->
+![CANalyzerClearAllFaults.vi 入出力イメージ](./assets/vi-diagrams/canalyzerclearallfaults.svg)
+
 Fault対象Namespace配列を入力し、各Namespaceの3変数を0へ戻す。Namespace一覧をVIへ固定しない。
 
 # 9.10.8 `CANalyzer_Health_Check.vi`
+
+<!-- generated-vi-diagram -->
+![CANalyzerHealthCheck.vi 入出力イメージ](./assets/vi-diagrams/canalyzerhealthcheck.svg)
 
 ```text
 Session Found?
@@ -1044,9 +1122,15 @@ Compatibility Status
 
 # 9.10.9 `CANalyzer_Stop.vi`
 
+<!-- generated-vi-diagram -->
+![CANalyzerStop.vi 入出力イメージ](./assets/vi-diagrams/canalyzerstop.svg)
+
 Measurement Started By LabVIEW?がTrueの場合だけStopする。FalseではRunning状態を読むだけにする。
 
 # 9.10.10 `CANalyzer_Close.vi`
+
+<!-- generated-vi-diagram -->
+![CANalyzerClose.vi 入出力イメージ](./assets/vi-diagrams/canalyzerclose.svg)
 
 ## 3. 処理順
 
@@ -1078,6 +1162,9 @@ Cleanup用VIのため前段エラーがあっても処理する。元エラー�
 
 # 9.11.1 `PoC_CANalyzer_01_Open_Close.vi`
 
+<!-- generated-vi-diagram -->
+![PoCCANalyzer01OpenClose.vi 入出力イメージ](./assets/vi-diagrams/poccanalyzer01openclose.svg)
+
 ## 目的
 
 Automation Open、Property Node、Close Referenceの最小経路を確認する。
@@ -1096,6 +1183,9 @@ CAN_AX_Open_Application.vi
 - Close後に無効参照や異常プロセス残留がない。
 
 # 9.11.2 `PoC_CANalyzer_02_SysVar_Read_Write.vi`
+
+<!-- generated-vi-diagram -->
+![PoCCANalyzer02SysVarReadWrite.vi 入出力イメージ](./assets/vi-diagrams/poccanalyzer02sysvarreadwrite.svg)
 
 ## 入力例
 
@@ -1127,6 +1217,9 @@ Open Application
 
 # 9.11.3 `PoC_CANalyzer_03_Launch_Config_Start.vi`
 
+<!-- generated-vi-diagram -->
+![PoCCANalyzer03LaunchConfigStart.vi 入出力イメージ](./assets/vi-diagrams/poccanalyzer03launchconfigstart.svg)
+
 ```text
 未起動から起動
 指定cfg Open
@@ -1141,6 +1234,9 @@ Version、Configuration、Quitの正式メンバ確定後に作成する。
 
 # 9.11.4 `PoC_CANalyzer_04_Fault_Control.vi`
 
+<!-- generated-vi-diagram -->
+![PoCCANalyzer04FaultControl.vi 入出力イメージ](./assets/vi-diagrams/poccanalyzer04faultcontrol.svg)
+
 ```text
 1. ALIVE_COUNTER=0、CHECKSUM=0、TIMEOUT=0
 2. Alive Fault=True → Alive固定確認
@@ -1153,6 +1249,9 @@ Version、Configuration、Quitの正式メンバ確定後に作成する。
 
 # 9.11.5 `PoC_CANalyzer_05_Compatibility.vi`
 
+<!-- generated-vi-diagram -->
+![PoCCANalyzer05Compatibility.vi 入出力イメージ](./assets/vi-diagrams/poccanalyzer05compatibility.svg)
+
 Version、Capability Probe、Ownership判定を表示し、検証済み版、未知版、必須機能不足を確認する。
 
 ---
@@ -1160,6 +1259,9 @@ Version、Capability Probe、Ownership判定を表示し、検証済み版、未
 # 9.12 TestStandなしの本番VI
 
 # 9.12.1 `CANalyzer_Standalone_Main.vi`
+
+<!-- generated-vi-diagram -->
+![CANalyzerStandaloneMain.vi 入出力イメージ](./assets/vi-diagrams/canalyzerstandalonemain.svg)
 
 ## 0. 目的
 
