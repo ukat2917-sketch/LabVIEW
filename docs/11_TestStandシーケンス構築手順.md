@@ -1,5 +1,8 @@
 # 11. TestStand シーケンス構築手順
 
+<!-- generated-vi-diagram -->
+![TestStandと公開APIの接続](./assets/vi-diagrams/teststand-public-api-flow.svg)
+
 > **本章の役割**：LabVIEW単体で確認済みの公開API VIを、TestStandのSetup / Main / Cleanupへ組み込む。
 >
 > RAMScopeは[10](./10_RAMScope実装方針.md)の`PoC_RAMScope_Main.vi`完了後に組み込む。操作手順は[00A](./00A_LabVIEW実装資料の記述ルール.md)に従い、操作場所、選択項目、変数名、期待結果を省略しない。
@@ -158,6 +161,9 @@ RAMScope_Connect.vi
 
 ### 2. `RAMScope_Connect.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeConnect.vi 入出力イメージ](./assets/vi-diagrams/ramscopeconnect.svg)
+
 1. SetupへActionステップを追加する。
 2. Moduleへ`RAMScope_Connect.vi`を指定する。
 3. UnitNum出力を`FileGlobals.RAMScope.UnitNum`へ割り当てる。
@@ -168,6 +174,9 @@ RAMScope_Connect.vi
 
 ### 3. `RAMScope_Init.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeInit.vi 入出力イメージ](./assets/vi-diagrams/ramscopeinit.svg)
+
 1. UnitNo入力へ`FileGlobals.RAMScope.UnitNo`を割り当てる。
 2. Byte Orderへ初期解析用設定を割り当てる。
 3. MdlNo_RAM、MdlNo_CAN、Endian_RAM出力を各FileGlobalsへ割り当てる。
@@ -175,6 +184,9 @@ RAMScope_Connect.vi
 5. `RAM Module Found?=False`またはStatus=ErrorでSetupを中断する。
 
 ### 4. `RAMScope_Set_Cond.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeSetCond.vi 入出力イメージ](./assets/vi-diagrams/ramscopesetcond.svg)
 
 1. UnitNoとMdlNo_RAMをFileGlobalsから入力する。
 2. Meas Config、Channel List、Module Log Configsを条件ファイルまたはFileGlobalsから入力する。
@@ -439,3 +451,31 @@ LabVIEWで成功したVIがTestStandでだけ失敗する原因を、Adapter、V
 - [ ] Read周期をTestStandから変更できる
 - [ ] CleanupでCloseまで必ず実行できる
 - [ ] 各手順に操作場所、変数名、期待結果が記載されている
+
+<!-- generated-vi-reference-start -->
+
+---
+
+## 章内で参照するVIの入出力イメージ
+
+### `PoCRAMScopeMain.vi`
+
+<!-- generated-vi-diagram -->
+![PoCRAMScopeMain.vi 入出力イメージ](./assets/vi-diagrams/pocramscopemain.svg)
+
+### `RAMScopeRelease.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeRelease.vi 入出力イメージ](./assets/vi-diagrams/ramscoperelease.svg)
+
+### `RAMScopeLogStop.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeLogStop.vi 入出力イメージ](./assets/vi-diagrams/ramscopelogstop.svg)
+
+### `RAMScopeClose.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeClose.vi 入出力イメージ](./assets/vi-diagrams/ramscopeclose.svg)
+
+<!-- generated-vi-reference-end -->

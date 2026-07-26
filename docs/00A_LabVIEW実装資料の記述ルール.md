@@ -466,3 +466,26 @@ index 8～11  = Address
 8. 薄いDLL Wrapperは共通テンプレートだけで個別手順を省略しない。
 9. Builder出力をWrapper入力へ渡す方向を明記し、Raw配列をWrapper出力と誤記しない。
 10. 資料整理を理由に、既存資料にないVIまたはctlを追加しない。
+
+<!-- generated-vi-reference-start -->
+
+---
+
+## 章内で参照するVIの入出力イメージ
+
+### `U32ToLEU8x4.vi`
+
+<!-- generated-vi-diagram -->
+![U32ToLEU8x4.vi 入出力イメージ](./assets/vi-diagrams/u32toleu8x4.svg)
+
+### `I32ToLEU8x4.vi`
+
+<!-- generated-vi-diagram -->
+![I32ToLEU8x4.vi 入出力イメージ](./assets/vi-diagrams/i32toleu8x4.svg)
+
+### `U8x4ToI32.vi`
+
+<!-- generated-vi-diagram -->
+![U8x4ToI32.vi 入出力イメージ](./assets/vi-diagrams/u8x4toi32.svg)
+
+<!-- generated-vi-reference-end -->

@@ -285,3 +285,26 @@ TestStand     → 既存公開APIを1個だけ呼ぶ確認Sequence
 - [ ] `Test-RAMScopeDll.ps1`のHandleが非ゼロ
 - [ ] DeviceInit関数を名前で解決可能
 - [ ] 開発PCと試験PCで同じ疎通結果を再現
+
+<!-- generated-vi-reference-start -->
+
+---
+
+## 章内で参照するVIの入出力イメージ
+
+### `RAMScopeConfig.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeConfig.vi 入出力イメージ](./assets/vi-diagrams/ramscopeconfig.svg)
+
+### `RAMScopeParseBuffer.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeParseBuffer.vi 入出力イメージ](./assets/vi-diagrams/ramscopeparsebuffer.svg)
+
+### `EnvironmentSmokeTest.vi`
+
+<!-- generated-vi-diagram -->
+![EnvironmentSmokeTest.vi 入出力イメージ](./assets/vi-diagrams/environmentsmoketest.svg)
+
+<!-- generated-vi-reference-end -->

@@ -1,5 +1,8 @@
 # 付録 A1A. FG420 複数台・2ch・出力リミット対応 PoC 実装手順
 
+<!-- generated-vi-diagram -->
+![FG420公開API接続](./assets/vi-diagrams/fg420-public-api-flow.svg)
+
 **最終整理日：2026-07-26**
 
 > 横河ドライバVIの端子、Query／Set動作および制限値は`IMFG410-63JA`と対象PCの実VIで照合し、証跡は[00C](./00C_一次資料とバージョン基準.md)に従う。既決のtypedef、Wrapper、Service、PoC構成は変更しない。
@@ -227,6 +230,9 @@ Cluster typedef とする。
 
 ### A1A.4.1 `FG420_Set_ChanMode.vi`
 
+<!-- generated-vi-diagram -->
+![FG420SetChanMode.vi 入出力イメージ](./assets/vi-diagrams/fg420setchanmode.svg)
+
 #### 0. 責務
 
 FG420 を 2ch 独立モードへ設定する。
@@ -263,6 +269,9 @@ VISA reference out、Status、TestError、error out。
 
 ### A1A.4.2 `FG420_Set_Coupling.vi`
 
+<!-- generated-vi-diagram -->
+![FG420SetCoupling.vi 入出力イメージ](./assets/vi-diagrams/fg420setcoupling.svg)
+
 #### 0. 責務
 
 Ch1 設定を Ch2 へ自動反映するかを選択する。
@@ -292,6 +301,9 @@ Ch1 / Ch2 を個別設定する場合、必ず `NONE` を設定する。
 
 ### A1A.4.3 `FG420_Get_ID.vi`
 
+<!-- generated-vi-diagram -->
+![FG420GetID.vi 入出力イメージ](./assets/vi-diagrams/fg420getid.svg)
+
 #### 0. 責務
 
 機器 ID とシリアル番号を取得し、複数台の論理名と実機を対応付ける。
@@ -314,6 +326,9 @@ Ch1 / Ch2 を個別設定する場合、必ず `NONE` を設定する。
 
 ### A1A.4.4 `FG420_Set_PowerOn_Output.vi`
 
+<!-- generated-vi-diagram -->
+![FG420SetPowerOnOutput.vi 入出力イメージ](./assets/vi-diagrams/fg420setpoweronoutput.svg)
+
 #### 0. 責務
 
 電源投入時の出力状態を OFF に固定する。
@@ -334,6 +349,9 @@ Read = False
 電源再投入後に Ch1 / Ch2 が自動で ON にならないことを実機確認する。
 
 ### A1A.4.5 `FG420_Query_Ampl_Bound.vi`
+
+<!-- generated-vi-diagram -->
+![FG420QueryAmplBound.vi 入出力イメージ](./assets/vi-diagrams/fg420queryamplbound.svg)
 
 #### 0. 責務
 
@@ -368,6 +386,9 @@ VISA reference out、Bound Value Vpp、Status、TestError、error out。
 
 ### A1A.4.6 `FG420_Query_Offset_Bound.vi`
 
+<!-- generated-vi-diagram -->
+![FG420QueryOffsetBound.vi 入出力イメージ](./assets/vi-diagrams/fg420queryoffsetbound.svg)
+
 `YKFG400 VOLT Offs.vi` を1回だけ呼び、Minimum または Maximum を問い合わせる。
 
 内部設定は次のとおり。
@@ -382,6 +403,9 @@ Offset     = 0 DBL
 出力は Bound Value V とする。
 
 ### A1A.4.7 `FG420_Read_System_Error.vi`
+
+<!-- generated-vi-diagram -->
+![FG420ReadSystemError.vi 入出力イメージ](./assets/vi-diagrams/fg420readsystemerror.svg)
 
 `YKFG400 SYST Err.vi` を1回呼び、FG420 のエラーキューを取得する。
 
@@ -404,6 +428,9 @@ VISA 経由で各台へ `TRIG.vi` を順番に呼ぶだけでは同時性を保�
 ## A1A.5 出力リミット純粋処理 VI
 
 ### A1A.5.1 `FG420_Apply_Output_Limit.vi`
+
+<!-- generated-vi-diagram -->
+![FG420ApplyOutputLimit.vi 入出力イメージ](./assets/vi-diagrams/fg420applyoutputlimit.svg)
 
 #### 0. 責務
 
@@ -536,6 +563,9 @@ Clamp を行った場合は `Limited?=True` とする。
 
 ### A1A.6.1 `FG420_Configure_Channel_Safe.vi`
 
+<!-- generated-vi-diagram -->
+![FG420ConfigureChannelSafe.vi 入出力イメージ](./assets/vi-diagrams/fg420configurechannelsafe.svg)
+
 #### 0. 責務
 
 1台の FG420 の1チャネルについて、出力 OFF を確認してから負荷、範囲取得、リミット判定、波形、周波数、振幅、オフセットを安全な順序で設定する。
@@ -593,6 +623,9 @@ else:
 ## A1A.7 機器準備 VI
 
 ### A1A.7.1 `FG420_Prepare_Device.vi`
+
+<!-- generated-vi-diagram -->
+![FG420PrepareDevice.vi 入出力イメージ](./assets/vi-diagrams/fg420preparedevice.svg)
 
 #### 0. 責務
 
@@ -860,3 +893,111 @@ STEP 7  必要な場合のみ同期拡張
 - [ ] VISA Resource 重複を開始前に検出する。
 - [ ] ソフトウェア順次ONと厳密同期の違いを試験仕様へ明記する。
 - [ ] 厳密同期が必要な場合、外部基準 / 外部トリガ構成で実機確認する。
+
+<!-- generated-vi-reference-start -->
+
+---
+
+## 章内で参照するVIの入出力イメージ
+
+### `YKFG400 .vi`
+
+<!-- generated-vi-diagram -->
+![YKFG400 .vi 入出力イメージ](./assets/vi-diagrams/ykfg400.svg)
+
+### `YKFG400 CHAN Mode.vi`
+
+<!-- generated-vi-diagram -->
+![YKFG400 CHAN Mode.vi 入出力イメージ](./assets/vi-diagrams/ykfg400-chan-mode.svg)
+
+### `YKFG400 INST Coup.vi`
+
+<!-- generated-vi-diagram -->
+![YKFG400 INST Coup.vi 入出力イメージ](./assets/vi-diagrams/ykfg400-inst-coup.svg)
+
+### `YKFG400 VOLT.vi`
+
+<!-- generated-vi-diagram -->
+![YKFG400 VOLT.vi 入出力イメージ](./assets/vi-diagrams/ykfg400-volt.svg)
+
+### `YKFG400 VOLT Offs.vi`
+
+<!-- generated-vi-diagram -->
+![YKFG400 VOLT Offs.vi 入出力イメージ](./assets/vi-diagrams/ykfg400-volt-offs.svg)
+
+### `YKFG400 OUTP Load.vi`
+
+<!-- generated-vi-diagram -->
+![YKFG400 OUTP Load.vi 入出力イメージ](./assets/vi-diagrams/ykfg400-outp-load.svg)
+
+### `YKFG400 IDN.vi`
+
+<!-- generated-vi-diagram -->
+![YKFG400 IDN.vi 入出力イメージ](./assets/vi-diagrams/ykfg400-idn.svg)
+
+### `ErrorToTestStatus.vi`
+
+<!-- generated-vi-diagram -->
+![ErrorToTestStatus.vi 入出力イメージ](./assets/vi-diagrams/errortoteststatus.svg)
+
+### `YKFG400 OUTP Pon.vi`
+
+<!-- generated-vi-diagram -->
+![YKFG400 OUTP Pon.vi 入出力イメージ](./assets/vi-diagrams/ykfg400-outp-pon.svg)
+
+### `YKFG400 SYST Err.vi`
+
+<!-- generated-vi-diagram -->
+![YKFG400 SYST Err.vi 入出力イメージ](./assets/vi-diagrams/ykfg400-syst-err.svg)
+
+### `FG420SetReferenceSource.vi`
+
+<!-- generated-vi-diagram -->
+![FG420SetReferenceSource.vi 入出力イメージ](./assets/vi-diagrams/fg420setreferencesource.svg)
+
+### `YKFG400 ROSC Sour.vi`
+
+<!-- generated-vi-diagram -->
+![YKFG400 ROSC Sour.vi 入出力イメージ](./assets/vi-diagrams/ykfg400-rosc-sour.svg)
+
+### `FG420Trigger.vi`
+
+<!-- generated-vi-diagram -->
+![FG420Trigger.vi 入出力イメージ](./assets/vi-diagrams/fg420trigger.svg)
+
+### `YKFG400 TRIG.vi`
+
+<!-- generated-vi-diagram -->
+![YKFG400 TRIG.vi 入出力イメージ](./assets/vi-diagrams/ykfg400-trig.svg)
+
+### `FG420SetTriggerSource.vi`
+
+<!-- generated-vi-diagram -->
+![FG420SetTriggerSource.vi 入出力イメージ](./assets/vi-diagrams/fg420settriggersource.svg)
+
+### `YKFG400 TRIG Sour.vi`
+
+<!-- generated-vi-diagram -->
+![YKFG400 TRIG Sour.vi 入出力イメージ](./assets/vi-diagrams/ykfg400-trig-sour.svg)
+
+### `TRIG.vi`
+
+<!-- generated-vi-diagram -->
+![TRIG.vi 入出力イメージ](./assets/vi-diagrams/trig.svg)
+
+### `FG420SetAmpl.vi`
+
+<!-- generated-vi-diagram -->
+![FG420SetAmpl.vi 入出力イメージ](./assets/vi-diagrams/fg420setampl.svg)
+
+### `FG420SetOffset.vi`
+
+<!-- generated-vi-diagram -->
+![FG420SetOffset.vi 入出力イメージ](./assets/vi-diagrams/fg420setoffset.svg)
+
+### `PoCFG420MultiDevice.vi`
+
+<!-- generated-vi-diagram -->
+![PoCFG420MultiDevice.vi 入出力イメージ](./assets/vi-diagrams/pocfg420multidevice.svg)
+
+<!-- generated-vi-reference-end -->

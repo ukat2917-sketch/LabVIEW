@@ -1,5 +1,11 @@
 # 10. RAMScope GT170 実装・学習ガイド
 
+<!-- generated-vi-diagram -->
+![RAMScope公開API接続](./assets/vi-diagrams/ramscope-public-api-flow.svg)
+
+<!-- generated-vi-diagram -->
+![RAMScopeロギング公開API接続](./assets/vi-diagrams/ramscope-logging-public-api-flow.svg)
+
 **最終整理日：2026-07-26**
 
 > 本章をRAMScope実装資料の唯一の正本とする。
@@ -519,6 +525,9 @@ Address           : 名前と序数で一致
 ---
 
 ### STEP 2：`RS_DLL_GT150DeviceInit.vi`でCLFN疎通を確認する
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150DeviceInit.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150deviceinit.svg)
 
 #### 10A.8 ヘッダ定義
 
@@ -1152,6 +1161,9 @@ Parser側で使用する`U8x4_To_U32.vi`、`U8x4_To_I32.vi`、`U8x8_To_U64.vi`�
 
 #### 3. `Build_CHINFO_170_Raw.vi`の現行補正
 
+<!-- generated-vi-diagram -->
+![BuildCHINFO170Raw.vi 入出力イメージ](./assets/vi-diagrams/buildchinfo170raw.svg)
+
 ##### 3.1 入力データと出力モデル
 
 `Channel List`は`RAMScope_Channel.ctl`の一次元配列で、1要素が1チャンネルである。出力は次の24byteレコードをChNum個連結したU8配列である。
@@ -1236,6 +1248,9 @@ code=I32 -700112
 ---
 
 #### 4. `Build_LOGINFO_Raw.vi`の現行補正
+
+<!-- generated-vi-diagram -->
+![BuildLOGINFORaw.vi 入出力イメージ](./assets/vi-diagrams/buildloginforaw.svg)
 
 ##### 4.1 データモデル
 
@@ -1409,6 +1424,9 @@ Released?              Boolean False
 Bundle By Nameで1項目だけ更新しても、他項目が入力クラスタの値を維持することを確認する。
 
 ## 10.7 `RAMScope_Code_To_Error.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeCodeToError.vi 入出力イメージ](./assets/vi-diagrams/ramscopecodetoerror.svg)
 
 #### 1. 完成時の動作
 
@@ -2036,6 +2054,9 @@ Falseケース（error in.status=False：既存エラーなし）
 
 ##### `RS_DLL_GT170SetMeasCh.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT170SetMeasCh.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt170setmeasch.svg)
+
 GT170 RAM用構造体は`CHINFO_RAM170`で、1チャンネル24byteである。
 
 ```text
@@ -2045,6 +2066,9 @@ enable / core / address / size / sign / speed
 `size`はバイト数そのものではなく、`0=1byte`、`1=2byte`、`2=4byte`のコードである。
 
 ##### `RS_DLL_GT150ReleaseBufferData.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150ReleaseBufferData.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150releasebufferdata.svg)
 
 復元元では呼出位置が未確定と記載されているが、現在は次で確定している。
 
@@ -2182,6 +2206,9 @@ DLLが書き込む配列は、呼び出し前に`Initialize Array`で必要要�
 
 ### 3. `RS_DLL_GT150DeviceInit.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150DeviceInit.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150deviceinit.svg)
+
 #### 3.1 Cプロトタイプ
 
 ```c
@@ -2243,6 +2270,9 @@ RAMScopeGT150DeviceInit
 
 ### 4. `RS_DLL_GT150DeviceExit.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150DeviceExit.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150deviceexit.svg)
+
 #### 4.1 Cプロトタイプ
 
 ```c
@@ -2303,6 +2333,9 @@ RAMScopeGT150DeviceExit
 
 ### 5. `RS_DLL_GT150AllInit.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150AllInit.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150allinit.svg)
+
 #### 5.1 Cプロトタイプ
 
 ```c
@@ -2340,6 +2373,9 @@ Function Name ───────→ "RAMScopeGT150AllInit"
 ---
 
 ### 6. `RS_DLL_GT150GetSysInfo.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetSysInfo.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getsysinfo.svg)
 
 #### 6.1 Cプロトタイプ
 
@@ -2412,6 +2448,9 @@ Function Name ───────────────→ "RAMScopeGT150Get
 
 ### 7. `RS_DLL_GT150PGT_SetMdlConfig.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150PGTSetMdlConfig.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150pgtsetmdlconfig.svg)
+
 #### 7.1 Cプロトタイプ
 
 ```c
@@ -2468,6 +2507,9 @@ Function Name ─────────→ "RAMScopeGT150PGT_SetMdlConfig"
 
 ### 8. `RS_DLL_GT170SetMeasCond.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT170SetMeasCond.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt170setmeascond.svg)
+
 #### 8.1 Cプロトタイプ
 
 ```c
@@ -2520,6 +2562,9 @@ Function Name ─────────→ "RAMScopeGT170SetMeasCond"
 ---
 
 ### 9. `RS_DLL_GT170SetMeasCh.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT170SetMeasCh.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt170setmeasch.svg)
 
 #### 9.1 Cプロトタイプ
 
@@ -2582,6 +2627,9 @@ Array Size(CHINFO_170 Raw) == 24 × ChNum
 
 ### 10. `RS_DLL_GT150SetLoggingInfo.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150SetLoggingInfo.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150setlogginginfo.svg)
+
 #### 10.1 Cプロトタイプ
 
 ```c
@@ -2629,6 +2677,9 @@ Function Name ─────────→ "RAMScopeGT150SetLoggingInfo"
 
 ### 11. `RS_DLL_GT150MeasStart.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150MeasStart.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150measstart.svg)
+
 #### 11.1 Cプロトタイプ
 
 ```c
@@ -2664,6 +2715,9 @@ Function Name ─────────→ "RAMScopeGT150MeasStart"
 ---
 
 ### 12. `RS_DLL_GT150GetBufferData.vi`（最終仕様）
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetBufferData.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getbufferdata.svg)
 
 #### 0. 実現したい機能とVIの責務
 
@@ -2740,6 +2794,9 @@ Function Name：`RAMScopeGT150GetBufferData`
 
 ### 13. `RS_DLL_GT150ReleaseBufferData.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150ReleaseBufferData.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150releasebufferdata.svg)
+
 #### 13.1 Cプロトタイプ
 
 ```c
@@ -2773,6 +2830,9 @@ Function Name ─────────→ "RAMScopeGT150ReleaseBufferData"
 ---
 
 ### 14. `RS_DLL_GT150MeasStop.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150MeasStop.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150measstop.svg)
 
 #### 14.1 Cプロトタイプ
 
@@ -2877,6 +2937,9 @@ Function Name ─────────→ "RAMScopeGT150MeasStop"
 
 #### 10.8.3.1 `RS_DLL_GT150GetGapTime.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetGapTime.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getgaptime.svg)
+
 #### 0. 責務
 
 MeasStart発行直後からハードウェアへの測定開始要求直前までの時間をms単位で取得する。
@@ -2929,6 +2992,9 @@ Start前、Start直後、Stop後、既存errorを確認する。
 
 #### 10.8.3.2 `RS_DLL_GT150GetMeasNum.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetMeasNum.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getmeasnum.svg)
+
 #### 0. 責務
 
 MeasStartからMeasStopまでに成立した測定回数を取得する。
@@ -2980,6 +3046,9 @@ I32 0をPointer左端子へ接続し、右端子をMeasNumへ接続する。Retu
 ---
 
 #### 10.8.3.3 `RS_DLL_GT150GetBlockNum.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetBlockNum.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getblocknum.svg)
 
 #### 0. 責務
 
@@ -3034,6 +3103,9 @@ Cプロトタイプ順に接続し、Pointer右端子をBlockNumへ接続する�
 
 #### 10.8.3.4 `RS_DLL_GT150GetBufferDataNum.vi`
 
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetBufferDataNum.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getbufferdatanum.svg)
+
 #### 0. 責務
 
 測定中の表示用バッファに現在保存されているPacket数を取得する。
@@ -3086,6 +3158,9 @@ Pointer左0、右AvailableDataNum。ReturnCodeを共通変換する。
 ---
 
 #### 10.8.3.5 `RS_DLL_GT150GetLoggingDataNum.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetLoggingDataNum.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getloggingdatanum.svg)
 
 #### 0. 責務
 
@@ -3147,6 +3222,9 @@ Block先頭／末尾、DataNum=0、MeasNo不正、BlockNo不正、測定中発�
 ---
 
 #### 10.8.3.6 `RS_DLL_GT150GetLoggingData.vi`
+
+<!-- generated-vi-diagram -->
+![RSDLLGT150GetLoggingData.vi 入出力イメージ](./assets/vi-diagrams/rsdllgt150getloggingdata.svg)
 
 #### 0. 責務
 
@@ -3268,6 +3346,9 @@ Parser側で使用する`U8x4_To_U32.vi`、`U8x4_To_I32.vi`、`U8x8_To_U64.vi`�
 
 #### 3. `Build_CHINFO_170_Raw.vi`の現行補正
 
+<!-- generated-vi-diagram -->
+![BuildCHINFO170Raw.vi 入出力イメージ](./assets/vi-diagrams/buildchinfo170raw.svg)
+
 ##### 3.1 入力データと出力モデル
 
 `Channel List`は`RAMScope_Channel.ctl`の一次元配列で、1要素が1チャンネルである。出力は次の24byteレコードをChNum個連結したU8配列である。
@@ -3352,6 +3433,9 @@ code=I32 -700112
 ---
 
 #### 4. `Build_LOGINFO_Raw.vi`の現行補正
+
+<!-- generated-vi-diagram -->
+![BuildLOGINFORaw.vi 入出力イメージ](./assets/vi-diagrams/buildloginforaw.svg)
 
 ##### 4.1 データモデル
 
@@ -3471,6 +3555,9 @@ code=I32 -700114
 
 #### 3.1 `I32_To_LE_U8x4.vi`
 
+<!-- generated-vi-diagram -->
+![I32ToLEU8x4.vi 入出力イメージ](./assets/vi-diagrams/i32toleu8x4.svg)
+
 ##### 3.1.1 フロントパネル端子
 
 | 端子 | 方向 | 型 |
@@ -3536,6 +3623,9 @@ Value = -1
 ---
 
 #### 3.2 `U32_To_LE_U8x4.vi`
+
+<!-- generated-vi-diagram -->
+![U32ToLEU8x4.vi 入出力イメージ](./assets/vi-diagrams/u32toleu8x4.svg)
 
 `I32_To_LE_U8x4.vi`を別名保存し、`Value`の表現形式だけU32へ変更する。
 
@@ -3644,6 +3734,9 @@ RAMScope_Channel.ctl 配列
 ---
 
 ### 5. `Build_MEASINFO_170_Raw.vi`
+
+<!-- generated-vi-diagram -->
+![BuildMEASINFO170Raw.vi 入出力イメージ](./assets/vi-diagrams/buildmeasinfo170raw.svg)
 
 #### 5.1 C構造体
 
@@ -3761,6 +3854,9 @@ MeasUnit      = 2
 ---
 
 ### 6. `Build_CHINFO_170_Raw.vi`
+
+<!-- generated-vi-diagram -->
+![BuildCHINFO170Raw.vi 入出力イメージ](./assets/vi-diagrams/buildchinfo170raw.svg)
 
 #### 6.1 C構造体
 
@@ -3922,6 +4018,9 @@ Array Size = 72
 
 ### 7. `Build_LOGINFO_Raw.vi`
 
+<!-- generated-vi-diagram -->
+![BuildLOGINFORaw.vi 入出力イメージ](./assets/vi-diagrams/buildloginforaw.svg)
+
 #### 7.1 C構造体
 
 ```c
@@ -4027,6 +4126,9 @@ offset 20 = 1  // 12 + 1*8
 ---
 
 ### 8. `RAMScope_Set_Cond.vi`での接続
+
+<!-- generated-vi-diagram -->
+![RAMScopeSetCond.vi 入出力イメージ](./assets/vi-diagrams/ramscopesetcond.svg)
 
 構造体生成とDLLラッパを次の順で接続する。
 
@@ -4166,6 +4268,9 @@ source=Format Into String出力
 
 #### 3. `Parse_SYSINFO_Array.vi`
 
+<!-- generated-vi-diagram -->
+![ParseSYSINFOArray.vi 入出力イメージ](./assets/vi-diagrams/parsesysinfoarray.svg)
+
 ##### 3.1 入力データの実体
 
 SYSINFO Rawは60byteのレコード16個を連結したU8[960]である。
@@ -4264,6 +4369,9 @@ Record 2..15: module_type=0x0F
 ---
 
 #### 4. `RAMScope_Parse_Buffer.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeParseBuffer.vi 入出力イメージ](./assets/vi-diagrams/ramscopeparsebuffer.svg)
 
 ##### 4.1 入力データの実体
 
@@ -4481,6 +4589,9 @@ Big Endian
 
 #### 3.1 `U8x4_To_U32.vi`
 
+<!-- generated-vi-diagram -->
+![U8x4ToU32.vi 入出力イメージ](./assets/vi-diagrams/u8x4tou32.svg)
+
 ##### 3.1.1 フロントパネル端子
 
 | 端子 | 方向 | 型 |
@@ -4531,6 +4642,9 @@ U8x4_To_U32.vi: Input size must be 4. Actual=<size>
 
 #### 3.2 `U8x4_To_I32.vi`
 
+<!-- generated-vi-diagram -->
+![U8x4ToI32.vi 入出力イメージ](./assets/vi-diagrams/u8x4toi32.svg)
+
 `U8x4_To_U32.vi`を別名保存し、`Unflatten From String`のtype入力をI32へ変更する。
 
 単体テスト：
@@ -4543,6 +4657,9 @@ Bytes = FF FF FF FF、Little Endian
 ---
 
 #### 3.3 `U8x8_To_U64.vi`
+
+<!-- generated-vi-diagram -->
+![U8x8ToU64.vi 入出力イメージ](./assets/vi-diagrams/u8x8tou64.svg)
 
 `U8x4_To_U32.vi`を別名保存し、次を変更する。
 
@@ -4560,6 +4677,9 @@ Bytes = 32 00 00 00 00 00 00 00、Little Endian
 ---
 
 ### 4. `Parse_SYSINFO_Array.vi`
+
+<!-- generated-vi-diagram -->
+![ParseSYSINFOArray.vi 入出力イメージ](./assets/vi-diagrams/parsesysinfoarray.svg)
 
 #### 4.1 入出力
 
@@ -4771,6 +4891,9 @@ Module List要素数 = 16
 
 ### 5. `RAMScope_Parse_Buffer.vi`（オンライン・保存ログ共通の最終仕様）
 
+<!-- generated-vi-diagram -->
+![RAMScopeParseBuffer.vi 入出力イメージ](./assets/vi-diagrams/ramscopeparsebuffer.svg)
+
 #### 0. 実現したい機能とVIの責務
 
 最新値取得と保存ログ取得の両方から渡されるU8配列を、チャンネル値、RAM用Flag、20ns Timeを持つPacket配列へ変換する。
@@ -4959,6 +5082,9 @@ Data Lost?  = ((Flag Raw >> 28) AND 1) != 0
 
 #### 7.1 `RAMScope_Init.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeInit.vi 入出力イメージ](./assets/vi-diagrams/ramscopeinit.svg)
+
 ```text
 RS_DLL_GT150GetSysInfo.vi
   ├─ SYSINFO Raw
@@ -4976,6 +5102,9 @@ Parse_SYSINFO_Array.vi
 RAM Module Found?がFalseの場合のエラー生成は`RAMScope_Init.vi`で行う。
 
 #### 7.2 `RAMScope_Read.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeRead.vi 入出力イメージ](./assets/vi-diagrams/ramscoperead.svg)
 
 ```text
 RS_DLL_GT150GetBufferData.vi
@@ -5063,6 +5192,9 @@ Connect → Init → Set Cond → Log Start → Read → Log Stop
 
 #### 1. `RAMScope_Connect.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeConnect.vi 入出力イメージ](./assets/vi-diagrams/ramscopeconnect.svg)
+
 ##### 0～5. 機能、データ、アルゴリズム、構造選定
 
 `DeviceInit`を1回実行し、接続Unit数と機種コードを上位へ返す。下位処理は1個のWrapperだけなので、Public VI内に追加のForループや状態保持は不要である。既存エラーのスキップはWrapper側が担当する。
@@ -5101,6 +5233,9 @@ Connect → Init → Set Cond → Log Start → Read → Log Stop
 ---
 
 #### 2. `RAMScope_Init.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeInit.vi 入出力イメージ](./assets/vi-diagrams/ramscopeinit.svg)
 
 ##### 0. 実現したい機能とVIの責務
 
@@ -5305,6 +5440,9 @@ RAMScope_Init.vi: PGT module configuration reported a slot error. SlotIndex=%d, 
 
 #### 3. `RAMScope_Set_Cond.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeSetCond.vi 入出力イメージ](./assets/vi-diagrams/ramscopesetcond.svg)
+
 > **ロギング対応を含む最終順序**：`SetMeasCond → SetMeasCh → SetLoggingInfo`を固定する。SetMeasCondまたはSetMeasChは内部Bufferを再構成するため、保存用`logSize`と表示用`BuffSize`を設定するSetLoggingInfoを最後に実行する。
 
 
@@ -5349,6 +5487,9 @@ RAMScope_Set_Cond.vi: Builder output size is invalid. MEASINFO=%d, CHINFO=%d, Ex
 
 #### 4. `RAMScope_Log_Start.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeLogStart.vi 入出力イメージ](./assets/vi-diagrams/ramscopelogstart.svg)
+
 ##### 0～5. 設計
 
 測定開始APIを1回呼ぶ1イベントVI。状態遷移は上位PoC/TestStandが管理する。
@@ -5366,6 +5507,9 @@ Set Cond後の正常開始、Set Cond前、二重開始、既存エラーを記�
 ---
 
 #### `RAMScope_Read.vi`（GetBufferDataNum対応の最終仕様）
+
+<!-- generated-vi-diagram -->
+![RAMScopeRead.vi 入出力イメージ](./assets/vi-diagrams/ramscoperead.svg)
 
 #### 0. 実現したい機能とVIの責務
 
@@ -5472,6 +5616,9 @@ GetBufferDataNumで実在Packet数を先に把握し、必要以上の配列確�
 
 #### 6. `RAMScope_Release.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeRelease.vi 入出力イメージ](./assets/vi-diagrams/ramscoperelease.svg)
+
 > **ロギング対応を含む呼出位置**：通信確認PoCではStop後に呼ぶ。ロギングPoCでは`Log Stop → 全MeasNo／BlockNo取得 → TDMS Append完了 → Release`の順とし、保存ログ取得前にBufferを破棄しない。
 
 
@@ -5493,6 +5640,9 @@ GetBufferDataNumで実在Packet数を先に把握し、必要以上の配列確�
 
 #### 7. `RAMScope_Log_Stop.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeLogStop.vi 入出力イメージ](./assets/vi-diagrams/ramscopelogstop.svg)
+
 ##### 0～5. 設計
 
 測定を停止してアイドル状態へ移す。Releaseと分離し、Stop失敗時にReleaseを呼ばない判断を上位へ残す。
@@ -5510,6 +5660,9 @@ GetBufferDataNumで実在Packet数を先に把握し、必要以上の配列確�
 ---
 
 #### 8. `RAMScope_Close.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeClose.vi 入出力イメージ](./assets/vi-diagrams/ramscopeclose.svg)
 
 ##### 0～5. 設計
 
@@ -5540,6 +5693,9 @@ Merge Errors出力              → Error_To_TestStatus.vi
 正常Close、既存エラー付きClose、DeviceExitエラー、両方エラー、二重Close、Close後の再Connectを確認する。詳細な配置場所、全端子および期待結果は直後の`10.11.9`を使用する。
 
 ### 10.11.9 `RAMScope_Close.vi`補足詳細
+
+<!-- generated-vi-diagram -->
+![RAMScopeClose.vi 入出力イメージ](./assets/vi-diagrams/ramscopeclose.svg)
 
 #### 0. 実現したい機能とVIの責務
 
@@ -5841,6 +5997,9 @@ Final Error.code = -700999
 
 #### 10.11.9.1 `RAMScope_Get_Log_Summary.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeGetLogSummary.vi 入出力イメージ](./assets/vi-diagrams/ramscopegetlogsummary.svg)
+
 #### 0. 責務
 
 Stop後の保存ログ列挙に必要なGapTimeMsとMeasNumを取得する。
@@ -5894,6 +6053,9 @@ MeasNum 0、1、複数、負数ダミー、GapTime APIエラー。
 ---
 
 #### 10.11.9.2 `RAMScope_Get_Block_Count.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeGetBlockCount.vi 入出力イメージ](./assets/vi-diagrams/ramscopegetblockcount.svg)
 
 #### 0. 責務
 
@@ -5950,6 +6112,9 @@ MeasNo -1、0、末尾、BlockNum 0、1、複数、負数ダミー。
 ---
 
 #### 10.11.9.3 `RAMScope_Read_Logging_Block.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeReadLoggingBlock.vi 入出力イメージ](./assets/vi-diagrams/ramscopereadloggingblock.svg)
 
 #### 0. 責務
 
@@ -6105,6 +6270,9 @@ Boolean状態は解析ツール互換性を優先し、TDMS上ではU8の0／1�
 
 ### 10.12.2 `RAMScope_File_Log_Open.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeFileLogOpen.vi 入出力イメージ](./assets/vi-diagrams/ramscopefilelogopen.svg)
+
 #### 0. 責務
 
 出力先TDMSを開き、後続VIへFile Referenceを返す。
@@ -6154,6 +6322,9 @@ RAMScope_File_Log_Open.vi: Output file already exists and overwrite is disabled.
 ---
 
 ### 10.12.3 `RAMScope_File_Log_Write_Metadata.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeFileLogWriteMetadata.vi 入出力イメージ](./assets/vi-diagrams/ramscopefilelogwritemetadata.svg)
 
 #### 0. 責務
 
@@ -6214,6 +6385,9 @@ Channel_000_Unit
 ---
 
 ### 10.12.4 `RAMScope_File_Log_Append.vi`
+
+<!-- generated-vi-diagram -->
+![RAMScopeFileLogAppend.vi 入出力イメージ](./assets/vi-diagrams/ramscopefilelogappend.svg)
 
 #### 0. 責務
 
@@ -6287,6 +6461,9 @@ DataNum=0、1、複数、同名Channel、空Channel名、日本語名、Lost非�
 
 ### 10.12.5 `RAMScope_File_Log_Close.vi`
 
+<!-- generated-vi-diagram -->
+![RAMScopeFileLogClose.vi 入出力イメージ](./assets/vi-diagrams/ramscopefilelogclose.svg)
+
 #### 0. 責務
 
 前段errorの有無にかかわらずTDMS FlushとCloseを試行し、最初のerrorを保持するCleanup VI。
@@ -6340,6 +6517,9 @@ TrueケースでOriginal Errorを保持用とCleanup用へ分岐する。Cleanup
 ## 10.13 通信確認PoC・ロギングPoC・TestStand
 
 ### 10.13.1 `PoC_RAMScope_Main.vi`
+
+<!-- generated-vi-diagram -->
+![PoCRAMScopeMain.vi 入出力イメージ](./assets/vi-diagrams/pocramscopemain.svg)
 
 #### 0. 実現したい機能とVIの責務
 
@@ -7205,6 +7385,9 @@ Cleanup後State/error
 
 ### 10.13.2 `PoC_RAMScope_Logging_Main.vi`
 
+<!-- generated-vi-diagram -->
+![PoCRAMScopeLoggingMain.vi 入出力イメージ](./assets/vi-diagrams/pocramscopeloggingmain.svg)
+
 #### 0. 実現したい機能とVIの責務
 
 RAMScope機器側ロギングから停止後の全保存Block取得、Packet解析、TDMS保存、CleanupまでをTestStandなしで一度通し、ロギング機能を単独検証する。
@@ -7474,6 +7657,9 @@ TestStand側はMeasNo、BlockNoのLoop、試験条件、判定、レポートを
 
 ### `PoC_RAMScope_Main.vi`
 
+<!-- generated-vi-diagram -->
+![PoCRAMScopeMain.vi 入出力イメージ](./assets/vi-diagrams/pocramscopemain.svg)
+
 - [ ] 既存VI名と構成を維持。
 - [ ] Connect、Init、Set Cond、Start、短時間Read、Stop、Release、Closeを確認。
 - [ ] TDMS File Refを持たない。
@@ -7481,6 +7667,9 @@ TestStand側はMeasNo、BlockNoのLoop、試験条件、判定、レポートを
 - [ ] 通信・DLL・Packet Parserの最小切り分けに使用。
 
 ### `PoC_RAMScope_Logging_Main.vi`
+
+<!-- generated-vi-diagram -->
+![PoCRAMScopeLoggingMain.vi 入出力イメージ](./assets/vi-diagrams/pocramscopeloggingmain.svg)
 
 - [ ] TDMS Open後にStart。
 - [ ] Stop後にSummaryを取得。
@@ -7539,3 +7728,21 @@ ctl既定値とtypedef反映
 - [ ] API ReturnCode、ローカルerror、Packet Status、LostDataNumを別情報として追跡できる。
 - [ ] TDMS再読込で全チャンネル長、Block数、Packet数、メタデータが一致する。
 - [ ] 次フェーズのMF4変換に必要なName、Address、Size、Sign、Scale、Offset、Unit、Time、Flagを保持できる。
+
+<!-- generated-vi-reference-start -->
+
+---
+
+## 章内で参照するVIの入出力イメージ
+
+### `ErrorToTestStatus.vi`
+
+<!-- generated-vi-diagram -->
+![ErrorToTestStatus.vi 入出力イメージ](./assets/vi-diagrams/errortoteststatus.svg)
+
+### `Clear Errors.vi`
+
+<!-- generated-vi-diagram -->
+![Clear Errors.vi 入出力イメージ](./assets/vi-diagrams/clear-errors.svg)
+
+<!-- generated-vi-reference-end -->

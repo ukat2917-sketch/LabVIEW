@@ -147,11 +147,13 @@ TestStandは`RS_DLL_*`を直接呼ばない。
 | 11 | [docs/11_TestStandシーケンス構築手順.md](./docs/11_TestStandシーケンス構築手順.md) | TestStandへの組み込み |
 | 12 | [docs/12_異常系処理とシャットダウン設計.md](./docs/12_異常系処理とシャットダウン設計.md) | Cleanup、安全停止、データ退避 |
 | 13 | [docs/13_構築ロードマップ.md](./docs/13_構築ロードマップ.md) | 現在地、残作業、完了条件 |
+| 14 | [docs/14_VI入出力イメージ図.md](./docs/14_VI入出力イメージ図.md) | VI単体の入出力と公開API接続を示すSVG索引 |
 | 付録A1 | [docs/A1_付録_FG420基盤単体試験自動化.md](./docs/A1_付録_FG420基盤単体試験自動化.md) | FG420基盤単体試験 |
 | 参考 | [docs/reference/RAMScopeVP.h](./docs/reference/RAMScopeVP.h) | RAMScope APIヘッダ |
 | 参考 | [docs/reference/GTHard.h](./docs/reference/GTHard.h) | ハードウェア定数 |
 | 参考 | [docs/reference/samp_simple.cpp](./docs/reference/samp_simple.cpp) | ベンダーサンプル |
 | ツール | [scripts/Test-RAMScopeDll.ps1](./scripts/Test-RAMScopeDll.ps1) | x64 DLLとエクスポート関数の疎通確認 |
+| ツール | [scripts/generate-vi-svg-diagrams.py](./scripts/generate-vi-svg-diagrams.py) | VI入出力・公開API接続SVGの再生成 |
 
 ---
 
