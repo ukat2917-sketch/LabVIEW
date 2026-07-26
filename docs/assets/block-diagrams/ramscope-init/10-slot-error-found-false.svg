@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="900" viewBox="0 0 1800 900" role="img" aria-labelledby="title desc">
+<title id="title">RAMScope_Init.vi — 10 Slot Error Found? Case：False</title>
+<desc id="desc">Parser error=False → RAM Found=True → PGT error=False → Slot Error Found?=Falseの実配線を示すLabVIEWブロックダイアグラム。</desc>
+<defs>
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#333" flood-opacity=".14"/></filter>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="context-stroke"/></marker>
+</defs>
+<rect width="1800" height="900" fill="#FFFFFF"/>
+<text x="900" y="48" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="30" font-weight="700" fill="#202124">RAMScope_Init.vi — 10 Slot Error Found? Case：False</text>
+<rect x="70" y="72" width="1660" height="50" rx="12" fill="#F4F1EA" stroke="#B9AD9B"/>
+<text x="95" y="105" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="18" font-weight="600" fill="#51483D">Case階層: Parser error=False → RAM Found=True → PGT error=False → Slot Error Found?=False</text>
+<rect x="150" y="180" width="1500" height="570" rx="8" fill="#FCFBF8" stroke="#8A7C69" stroke-width="5"/>
+<rect x="178" y="158" width="420" height="44" rx="7" fill="#EEE8DD" stroke="#8A7C69" stroke-width="3"/>
+<text x="198" y="187" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="700" fill="#51483D">Slot Error Found?（First Slot Index != -1） Case：False</text>
+<polygon points="150,254 133,271 150,288 167,271" fill="#E8F7EC" stroke="#2F8F46" stroke-width="4"/>
+<text x="172" y="276" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2F8F46">selector</text>
+<circle cx="70" cy="590" r="11" fill="#FFF" stroke="#C53B3B" stroke-width="5"/>
+<text x="88" y="576" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#C53B3B">PGT正常 error</text>
+<rect x="1640" y="580" width="20" height="20" fill="#FFF" stroke="#C53B3B" stroke-width="4"/>
+<text x="1667" y="596" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="600" fill="#C53B3B">error</text>
+<path d="M 70 590 L 1650 590" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1650" y="579" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#C53B3B">全Slot正常：PGT正常errorを出力</text>
+<rect x="560" y="320" width="680" height="64" rx="12" fill="#EEF5FC" stroke="#2B76C4" stroke-width="2"/>
+<text x="900.0" y="354.0" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="550" fill="#333">First Slot Index == -1：非ゼロSlotErrなし</text>
+</svg>

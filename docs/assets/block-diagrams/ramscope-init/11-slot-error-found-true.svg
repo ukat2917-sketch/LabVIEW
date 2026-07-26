@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="900" viewBox="0 0 1800 900" role="img" aria-labelledby="title desc">
+<title id="title">RAMScope_Init.vi — 11 Slot Error Found? Case：True</title>
+<desc id="desc">Parser error=False → RAM Found=True → PGT error=False → Slot Error Found?=Trueの実配線を示すLabVIEWブロックダイアグラム。</desc>
+<defs>
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#333" flood-opacity=".14"/></filter>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="context-stroke"/></marker>
+</defs>
+<rect width="1800" height="900" fill="#FFFFFF"/>
+<text x="900" y="48" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="30" font-weight="700" fill="#202124">RAMScope_Init.vi — 11 Slot Error Found? Case：True</text>
+<rect x="70" y="72" width="1660" height="50" rx="12" fill="#F4F1EA" stroke="#B9AD9B"/>
+<text x="95" y="105" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="18" font-weight="600" fill="#51483D">Case階層: Parser error=False → RAM Found=True → PGT error=False → Slot Error Found?=True</text>
+<rect x="150" y="180" width="1500" height="570" rx="8" fill="#FCFBF8" stroke="#8A7C69" stroke-width="5"/>
+<rect x="178" y="158" width="420" height="44" rx="7" fill="#EEE8DD" stroke="#8A7C69" stroke-width="3"/>
+<text x="198" y="187" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="700" fill="#51483D">Slot Error Found?（First Slot Index != -1） Case：True</text>
+<polygon points="150,254 133,271 150,288 167,271" fill="#E8F7EC" stroke="#2F8F46" stroke-width="4"/>
+<text x="172" y="276" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2F8F46">selector</text>
+<circle cx="70" cy="590" r="11" fill="#FFF" stroke="#C53B3B" stroke-width="5"/>
+<text x="88" y="576" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#C53B3B">PGT正常 error</text>
+<rect x="1640" y="580" width="20" height="20" fill="#FFF" stroke="#C53B3B" stroke-width="4"/>
+<text x="1667" y="596" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="600" fill="#C53B3B">error</text>
+<rect x="430" y="265" width="380" height="145" rx="16" fill="#F3F4F6" stroke="#59636E" stroke-width="4"/>
+<text x="620.0" y="327.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="650" fill="#252525">Format Into String</text>
+<text x="620.0" y="395" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="400" fill="#555">SlotIndex=%d / SlotError=%d</text>
+<rect x="1040" y="260" width="330" height="165" rx="16" fill="#F8EAF8" stroke="#A34AA8" stroke-width="4"/>
+<text x="1205.0" y="332.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="650" fill="#252525">Bundle By Name</text>
+<text x="1205.0" y="410" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="400" fill="#555">status=True / code=-700141 / source</text>
+<circle cx="70" cy="285" r="11" fill="#FFF" stroke="#E06B00" stroke-width="5"/>
+<text x="88" y="271" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#E06B00">First Slot Index</text>
+<circle cx="70" cy="380" r="11" fill="#FFF" stroke="#E06B00" stroke-width="5"/>
+<text x="88" y="366" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#E06B00">First Slot Error</text>
+<circle cx="950" cy="455" r="11" fill="#FFF" stroke="#2F8F46" stroke-width="5"/>
+<text x="968" y="441" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#2F8F46">True</text>
+<circle cx="950" cy="520" r="11" fill="#FFF" stroke="#E06B00" stroke-width="5"/>
+<text x="968" y="506" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#E06B00">I32 -700141</text>
+<path d="M 70 285 L 430 300" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="430" y="289" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">1個目の%d</text>
+<path d="M 70 380 L 430 370" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="430" y="359" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">2個目の%d</text>
+<path d="M 810 335 L 980 335 L 980 380 L 1040 380" fill="none" stroke="#A34AA8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="980" cy="335" r="5" fill="#A34AA8"/>
+<circle cx="980" cy="380" r="5" fill="#A34AA8"/>
+<text x="980" y="369" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#A34AA8">source</text>
+<path d="M 70 590 L 930 590 L 930 300 L 1040 300" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="930" cy="590" r="5" fill="#C53B3B"/>
+<circle cx="930" cy="300" r="5" fill="#C53B3B"/>
+<text x="930" y="289" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#C53B3B">基準クラスタ</text>
+<path d="M 950 455 L 1010 455 L 1010 330 L 1040 330" fill="none" stroke="#2F8F46" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1010" cy="455" r="5" fill="#2F8F46"/>
+<circle cx="1010" cy="330" r="5" fill="#2F8F46"/>
+<text x="1010" y="319" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2F8F46">status</text>
+<path d="M 950 520 L 1025 520 L 1025 355 L 1040 355" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1025" cy="520" r="5" fill="#E06B00"/>
+<circle cx="1025" cy="355" r="5" fill="#E06B00"/>
+<text x="1025" y="344" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">code</text>
+<path d="M 1370 342 L 1510 342 L 1510 590 L 1650 590" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1510" cy="342" r="5" fill="#C53B3B"/>
+<circle cx="1510" cy="590" r="5" fill="#C53B3B"/>
+<text x="1510" y="579" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#C53B3B">Slot error</text>
+<rect x="400" y="645" width="1000" height="64" rx="12" fill="#EEF5FC" stroke="#2B76C4" stroke-width="2"/>
+<text x="900.0" y="667.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="550" fill="#333">source全文：RAMScope_Init.vi: PGT module configuration reported a slot error.</text>
+<text x="900.0" y="690.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="550" fill="#333">SlotIndex=%d, SlotError=%d</text>
+</svg>

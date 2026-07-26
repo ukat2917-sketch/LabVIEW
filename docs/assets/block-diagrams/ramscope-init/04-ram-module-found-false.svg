@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="930" viewBox="0 0 1800 930" role="img" aria-labelledby="title desc">
+<title id="title">RAMScope_Init.vi — 04 RAM Module Found? Case：False</title>
+<desc id="desc">Parser error=False → RAM Module Found?=Falseの実配線を示すLabVIEWブロックダイアグラム。</desc>
+<defs>
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#333" flood-opacity=".14"/></filter>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="context-stroke"/></marker>
+</defs>
+<rect width="1800" height="930" fill="#FFFFFF"/>
+<text x="900" y="48" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="30" font-weight="700" fill="#202124">RAMScope_Init.vi — 04 RAM Module Found? Case：False</text>
+<rect x="70" y="72" width="1660" height="50" rx="12" fill="#F4F1EA" stroke="#B9AD9B"/>
+<text x="95" y="105" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="18" font-weight="600" fill="#51483D">Case階層: Parser error=False → RAM Module Found?=False</text>
+<rect x="130" y="180" width="1540" height="610" rx="8" fill="#FCFBF8" stroke="#8A7C69" stroke-width="5"/>
+<rect x="158" y="158" width="420" height="44" rx="7" fill="#EEE8DD" stroke="#8A7C69" stroke-width="3"/>
+<text x="178" y="187" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="700" fill="#51483D">RAM Module Found? Case：False</text>
+<polygon points="130,254 113,271 130,288 147,271" fill="#E8F7EC" stroke="#2F8F46" stroke-width="4"/>
+<text x="152" y="276" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2F8F46">selector</text>
+<rect x="320" y="255" width="250" height="115" rx="16" fill="#F3F4F6" stroke="#59636E" stroke-width="4"/>
+<text x="445.0" y="302.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="650" fill="#252525">Initialize Array</text>
+<text x="445.0" y="355" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="400" fill="#555">I32 0 × 16</text>
+<rect x="700" y="250" width="340" height="145" rx="16" fill="#F3F4F6" stroke="#59636E" stroke-width="4"/>
+<text x="870.0" y="312.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="650" fill="#252525">Format Into String</text>
+<text x="870.0" y="380" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="400" fill="#555">UnitNo=%d / MdlNo_RAM=%d</text>
+<rect x="1150" y="245" width="300" height="155" rx="16" fill="#F8EAF8" stroke="#A34AA8" stroke-width="4"/>
+<text x="1300.0" y="312.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="650" fill="#252525">Bundle By Name</text>
+<text x="1300.0" y="385" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="400" fill="#555">status / code / source</text>
+<circle cx="70" cy="280" r="11" fill="#FFF" stroke="#E06B00" stroke-width="5"/>
+<text x="88" y="266" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#E06B00">I32 0</text>
+<circle cx="70" cy="345" r="11" fill="#FFF" stroke="#E06B00" stroke-width="5"/>
+<text x="88" y="331" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#E06B00">I32 16</text>
+<circle cx="70" cy="470" r="11" fill="#FFF" stroke="#E06B00" stroke-width="5"/>
+<text x="88" y="456" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#E06B00">UnitNo</text>
+<circle cx="70" cy="540" r="11" fill="#FFF" stroke="#E06B00" stroke-width="5"/>
+<text x="88" y="526" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#E06B00">MdlNo_RAM</text>
+<circle cx="70" cy="690" r="11" fill="#FFF" stroke="#C53B3B" stroke-width="5"/>
+<text x="88" y="676" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#C53B3B">Parser正常 error</text>
+<path d="M 70 280 L 320 280" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="320" y="269" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">element</text>
+<path d="M 70 345 L 320 345" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="320" y="334" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">size</text>
+<path d="M 570 310 L 610 310 L 610 215 L 1580 215 L 1580 430 L 1670 430" fill="none" stroke="#7D5BBE" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="610" cy="310" r="5" fill="#7D5BBE"/>
+<circle cx="610" cy="215" r="5" fill="#7D5BBE"/>
+<circle cx="1580" cy="215" r="5" fill="#7D5BBE"/>
+<circle cx="1580" cy="430" r="5" fill="#7D5BBE"/>
+<text x="1580" y="204" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#7D5BBE">SlotErr[16]=0</text>
+<path d="M 70 470 L 660 470 L 660 305 L 700 305" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="660" cy="470" r="5" fill="#E06B00"/>
+<circle cx="660" cy="305" r="5" fill="#E06B00"/>
+<text x="660" y="294" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">1個目の%d</text>
+<path d="M 70 540 L 680 540 L 680 350 L 700 350" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="680" cy="540" r="5" fill="#E06B00"/>
+<circle cx="680" cy="350" r="5" fill="#E06B00"/>
+<text x="680" y="339" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">2個目の%d</text>
+<path d="M 1040 322 L 1100 322 L 1100 355 L 1150 355" fill="none" stroke="#A34AA8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1100" cy="322" r="5" fill="#A34AA8"/>
+<circle cx="1100" cy="355" r="5" fill="#A34AA8"/>
+<text x="1100" y="344" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#A34AA8">source</text>
+<path d="M 70 690 L 1090 690 L 1090 280 L 1150 280" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1090" cy="690" r="5" fill="#C53B3B"/>
+<circle cx="1090" cy="280" r="5" fill="#C53B3B"/>
+<text x="1090" y="269" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#C53B3B">基準クラスタ</text>
+<circle cx="1090" cy="460" r="11" fill="#FFF" stroke="#2F8F46" stroke-width="5"/>
+<text x="1108" y="446" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#2F8F46">True</text>
+<circle cx="1090" cy="525" r="11" fill="#FFF" stroke="#E06B00" stroke-width="5"/>
+<text x="1108" y="511" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#E06B00">I32 -700140</text>
+<path d="M 1090 460 L 1150 310" fill="none" stroke="#2F8F46" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1150" y="299" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2F8F46">status</text>
+<path d="M 1090 525 L 1120 525 L 1120 335 L 1150 335" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1120" cy="525" r="5" fill="#E06B00"/>
+<circle cx="1120" cy="335" r="5" fill="#E06B00"/>
+<text x="1120" y="324" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">code</text>
+<path d="M 1450 325 L 1670 325" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1670" y="314" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#C53B3B">生成error</text>
+<rect x="1660" y="315" width="20" height="20" fill="#FFF" stroke="#C53B3B" stroke-width="4"/>
+<text x="1687" y="331" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="600" fill="#C53B3B">error</text>
+<rect x="1660" y="420" width="20" height="20" fill="#FFF" stroke="#7D5BBE" stroke-width="4"/>
+<text x="1687" y="436" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="600" fill="#7D5BBE">SlotErr[16]</text>
+<rect x="620" y="610" width="760" height="64" rx="12" fill="#EEF5FC" stroke="#2B76C4" stroke-width="2"/>
+<text x="1000.0" y="621.0" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="550" fill="#333">source全文：RAMScope_Init.vi: RAM monitor module was not</text>
+<text x="1000.0" y="644.0" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="550" fill="#333">found. PGT configuration was not executed. UnitNo=%d,</text>
+<text x="1000.0" y="667.0" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="550" fill="#333">MdlNo_RAM=%d</text>
+<rect x="1210" y="520" width="340" height="64" rx="12" fill="#FFF2F2" stroke="#C53B3B" stroke-width="2"/>
+<text x="1380.0" y="554.0" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="550" fill="#333">このCaseにPGT Wrapperは配置しない</text>
+</svg>

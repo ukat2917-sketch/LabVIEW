@@ -5331,6 +5331,68 @@ else:
 
 ##### 8. 配線順
 
+###### 8.0 ブロックダイアグラム分割図の読み方
+
+以下のSVGは、Case Structureの表示ケースを混在させず、実際にLabVIEWで選択して表示するケースごとに分割している。
+各図上部の「Case階層」は、その図を表示するために外側から選択するケースを示す。
+赤線はerror cluster、橙線はI32、紫線は配列、緑線はBoolean、青線はその他のデータを示す。
+
+1. 共通前段で`AllInit → GetSysInfo → Parse_SYSINFO_Array`を配線する。
+2. Parser error CaseのTrue／Falseを個別に作る。
+3. Parser正常ケース内へRAM Module Found? Caseを作り、そのFalse／Trueを個別に作る。
+4. RAM検出ケース内へPGT error Caseを作り、そのTrue／Falseを個別に作る。
+5. PGT正常ケース内のFor LoopへFirst Nonzero? Caseを作り、そのTrue／Falseを個別に作る。
+6. For Loopの出力からSlot Error Found? Caseを作り、そのFalse／Trueを個別に作る。
+7. 全Caseのerrorトンネルを内側から外側へ接続し、`Error_To_TestStatus.vi`へ渡す。
+
+**図01：共通前段配線**
+
+![RAMScope_Init.vi 共通前段配線](./assets/block-diagrams/ramscope-init/01-common-front.svg)
+
+**図02：Parser error Case — True**
+
+![RAMScope_Init.vi Parser error True](./assets/block-diagrams/ramscope-init/02-parser-error-true.svg)
+
+**図03：Parser error Case — False**
+
+![RAMScope_Init.vi Parser error False](./assets/block-diagrams/ramscope-init/03-parser-error-false.svg)
+
+**図04：RAM Module Found? Case — False**
+
+![RAMScope_Init.vi RAM Module Found False](./assets/block-diagrams/ramscope-init/04-ram-module-found-false.svg)
+
+**図05：RAM Module Found? Case — True**
+
+![RAMScope_Init.vi RAM Module Found True](./assets/block-diagrams/ramscope-init/05-ram-module-found-true.svg)
+
+**図06：PGT error Case — True**
+
+![RAMScope_Init.vi PGT error True](./assets/block-diagrams/ramscope-init/06-pgt-error-true.svg)
+
+**図07：PGT error Case — False／SlotErr走査For Loop**
+
+![RAMScope_Init.vi PGT error FalseとSlotErr走査](./assets/block-diagrams/ramscope-init/07-pgt-error-false-loop.svg)
+
+**図08：First Nonzero? Case — True**
+
+![RAMScope_Init.vi First Nonzero True](./assets/block-diagrams/ramscope-init/08-first-nonzero-true.svg)
+
+**図09：First Nonzero? Case — False**
+
+![RAMScope_Init.vi First Nonzero False](./assets/block-diagrams/ramscope-init/09-first-nonzero-false.svg)
+
+**図10：Slot Error Found? Case — False**
+
+![RAMScope_Init.vi Slot Error Found False](./assets/block-diagrams/ramscope-init/10-slot-error-found-false.svg)
+
+**図11：Slot Error Found? Case — True**
+
+![RAMScope_Init.vi Slot Error Found True](./assets/block-diagrams/ramscope-init/11-slot-error-found-true.svg)
+
+**図12：最終error・Status出力**
+
+![RAMScope_Init.vi 最終出力](./assets/block-diagrams/ramscope-init/12-final-outputs.svg)
+
 ###### A. AllInit、GetSysInfo、Parser
 
 1. `UnitNo`と`error in`を`RS_DLL_GT150AllInit.vi`へ接続する。

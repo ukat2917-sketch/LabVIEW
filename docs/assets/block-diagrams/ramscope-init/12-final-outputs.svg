@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="850" viewBox="0 0 1800 850" role="img" aria-labelledby="title desc">
+<title id="title">RAMScope_Init.vi — 12 最終error・Status出力</title>
+<desc id="desc">各内側Case → RAM Module Found? Case → Parser error Case → Error_To_TestStatusの実配線を示すLabVIEWブロックダイアグラム。</desc>
+<defs>
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#333" flood-opacity=".14"/></filter>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="context-stroke"/></marker>
+</defs>
+<rect width="1800" height="850" fill="#FFFFFF"/>
+<text x="900" y="48" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="30" font-weight="700" fill="#202124">RAMScope_Init.vi — 12 最終error・Status出力</text>
+<rect x="70" y="72" width="1660" height="50" rx="12" fill="#F4F1EA" stroke="#B9AD9B"/>
+<text x="95" y="105" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="18" font-weight="600" fill="#51483D">Case階層: 各内側Case → RAM Module Found? Case → Parser error Case → Error_To_TestStatus</text>
+<rect x="180" y="255" width="300" height="125" rx="16" fill="#F3F4F6" stroke="#59636E" stroke-width="4"/>
+<text x="330.0" y="317.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="650" fill="#252525">Slot Error Found? Case</text>
+<rect x="600" y="255" width="320" height="125" rx="16" fill="#F3F4F6" stroke="#59636E" stroke-width="4"/>
+<text x="760.0" y="317.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="650" fill="#252525">RAM Module Found? Case</text>
+<rect x="1040" y="255" width="300" height="125" rx="16" fill="#F3F4F6" stroke="#59636E" stroke-width="4"/>
+<text x="1190.0" y="317.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="650" fill="#252525">Parser error Case</text>
+<rect x="1090" y="520" width="330" height="145" rx="16" fill="#FFF7D8" stroke="#746122" stroke-width="4"/>
+<text x="1255.0" y="592.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="650" fill="#252525">Error_To_TestStatus.vi</text>
+<circle cx="90" cy="575" r="11" fill="#FFF" stroke="#A34AA8" stroke-width="5"/>
+<text x="108" y="561" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#A34AA8">String &quot;RAMScope&quot;</text>
+<path d="M 480 320 L 600 320" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="600" y="309" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#C53B3B">内側error tunnel</text>
+<path d="M 920 320 L 1040 320" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1040" y="309" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#C53B3B">RAM Case error tunnel</text>
+<path d="M 1340 320 L 1510 320 L 1510 470 L 900 470 L 900 600 L 1090 600" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1510" cy="320" r="5" fill="#C53B3B"/>
+<circle cx="1510" cy="470" r="5" fill="#C53B3B"/>
+<circle cx="900" cy="470" r="5" fill="#C53B3B"/>
+<circle cx="900" cy="600" r="5" fill="#C53B3B"/>
+<text x="900" y="459" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#C53B3B">Parser Case最終error → error in</text>
+<path d="M 90 575 L 1090 575" fill="none" stroke="#A34AA8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1090" y="564" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#A34AA8">Device Name</text>
+<circle cx="1710" cy="510" r="11" fill="#FFF" stroke="#2B76C4" stroke-width="5"/>
+<text x="1692" y="496" text-anchor="end" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#2B76C4">Status</text>
+<path d="M 1420 555 L 1580 555 L 1580 510 L 1710 510" fill="none" stroke="#2B76C4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1580" cy="555" r="5" fill="#2B76C4"/>
+<circle cx="1580" cy="510" r="5" fill="#2B76C4"/>
+<text x="1580" y="499" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2B76C4">Status</text>
+<circle cx="1710" cy="590" r="11" fill="#FFF" stroke="#2B76C4" stroke-width="5"/>
+<text x="1692" y="576" text-anchor="end" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#2B76C4">TestError</text>
+<path d="M 1420 600 L 1580 600 L 1580 590 L 1710 590" fill="none" stroke="#2B76C4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1580" cy="600" r="5" fill="#2B76C4"/>
+<circle cx="1580" cy="590" r="5" fill="#2B76C4"/>
+<text x="1580" y="579" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2B76C4">TestError</text>
+<circle cx="1710" cy="730" r="11" fill="#FFF" stroke="#C53B3B" stroke-width="5"/>
+<text x="1692" y="716" text-anchor="end" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#C53B3B">error out</text>
+<path d="M 1420 635 L 1580 635 L 1580 730 L 1710 730" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1580" cy="635" r="5" fill="#C53B3B"/>
+<circle cx="1580" cy="730" r="5" fill="#C53B3B"/>
+<text x="1580" y="719" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#C53B3B">error out</text>
+<rect x="180" y="420" width="720" height="64" rx="12" fill="#EEF5FC" stroke="#2B76C4" stroke-width="2"/>
+<text x="540.0" y="442.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="550" fill="#333">Module List、MdlNo_RAM、MdlNo_CAN、Endian_RAM、Found</text>
+<text x="540.0" y="465.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="550" fill="#333">BooleanはParserから直接対応出力へ接続済み。</text>
+<rect x="990" y="420" width="520" height="64" rx="12" fill="#FFF2F2" stroke="#C53B3B" stroke-width="2"/>
+<text x="1250.0" y="454.0" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="550" fill="#333">errorトンネルは内側から外側へ順に接続し、元の原因を上書きしない。</text>
+</svg>

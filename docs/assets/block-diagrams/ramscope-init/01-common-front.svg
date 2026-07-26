@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="920" viewBox="0 0 1800 920" role="img" aria-labelledby="title desc">
+<title id="title">RAMScope_Init.vi — 01 共通前段配線</title>
+<desc id="desc">Case Structure外部 → Parser error.status selectorの実配線を示すLabVIEWブロックダイアグラム。</desc>
+<defs>
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#333" flood-opacity=".14"/></filter>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="context-stroke"/></marker>
+</defs>
+<rect width="1800" height="920" fill="#FFFFFF"/>
+<text x="900" y="48" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="30" font-weight="700" fill="#202124">RAMScope_Init.vi — 01 共通前段配線</text>
+<rect x="70" y="72" width="1660" height="50" rx="12" fill="#F4F1EA" stroke="#B9AD9B"/>
+<text x="95" y="105" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="18" font-weight="600" fill="#51483D">Case階層: Case Structure外部 → Parser error.status selector</text>
+<rect x="240" y="245" width="260" height="125" rx="16" fill="#FFF7D8" stroke="#746122" stroke-width="4"/>
+<text x="370.0" y="307.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="650" fill="#252525">RS_DLL_GT150AllInit.vi</text>
+<rect x="610" y="245" width="280" height="125" rx="16" fill="#FFF7D8" stroke="#746122" stroke-width="4"/>
+<text x="750.0" y="307.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="650" fill="#252525">RS_DLL_GT150GetSysInfo.vi</text>
+<rect x="1020" y="225" width="300" height="165" rx="16" fill="#EAF3FC" stroke="#2B76C4" stroke-width="4"/>
+<text x="1170.0" y="307.5" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="650" fill="#252525">Parse_SYSINFO_Array.vi</text>
+<circle cx="90" cy="275" r="11" fill="#FFF" stroke="#E06B00" stroke-width="5"/>
+<text x="108" y="261" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#E06B00">UnitNo I32</text>
+<circle cx="90" cy="360" r="11" fill="#FFF" stroke="#2B76C4" stroke-width="5"/>
+<text x="108" y="346" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#2B76C4">Byte Order</text>
+<circle cx="90" cy="760" r="11" fill="#FFF" stroke="#C53B3B" stroke-width="5"/>
+<text x="108" y="746" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#C53B3B">error in</text>
+<path d="M 90 275 L 180 275 L 180 275 L 240 275" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="180" cy="275" r="5" fill="#E06B00"/>
+<circle cx="180" cy="275" r="5" fill="#E06B00"/>
+<text x="180" y="264" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">UnitNo</text>
+<path d="M 180 275 L 180 315 L 610 315" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="180" cy="315" r="5" fill="#E06B00"/>
+<text x="180" y="304" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">UnitNo</text>
+<path d="M 90 360 L 960 360 L 960 330 L 1020 330" fill="none" stroke="#2B76C4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="960" cy="360" r="5" fill="#2B76C4"/>
+<circle cx="960" cy="330" r="5" fill="#2B76C4"/>
+<text x="960" y="319" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2B76C4">Byte Order</text>
+<path d="M 90 760 L 370 760 L 370 370 L 370 370" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="370" cy="760" r="5" fill="#C53B3B"/>
+<circle cx="370" cy="370" r="5" fill="#C53B3B"/>
+<path d="M 500 345 L 555 345 L 555 345 L 610 345" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="555" cy="345" r="5" fill="#C53B3B"/>
+<circle cx="555" cy="345" r="5" fill="#C53B3B"/>
+<text x="555" y="334" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#C53B3B">AllInit error out</text>
+<path d="M 890 285 L 960 285 L 960 280 L 1020 280" fill="none" stroke="#7D5BBE" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="960" cy="285" r="5" fill="#7D5BBE"/>
+<circle cx="960" cy="280" r="5" fill="#7D5BBE"/>
+<text x="960" y="269" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#7D5BBE">SYSINFO Raw U8[960]</text>
+<path d="M 890 345 L 975 345 L 975 365 L 1020 365" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="975" cy="345" r="5" fill="#C53B3B"/>
+<circle cx="975" cy="365" r="5" fill="#C53B3B"/>
+<text x="975" y="354" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#C53B3B">GetSysInfo error out</text>
+<circle cx="1690" cy="180" r="11" fill="#FFF" stroke="#7D5BBE" stroke-width="5"/>
+<text x="1672" y="166" text-anchor="end" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#7D5BBE">Module List</text>
+<path d="M 1320 245 L 1410 245 L 1410 180 L 1690 180" fill="none" stroke="#7D5BBE" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1410" cy="245" r="5" fill="#7D5BBE"/>
+<circle cx="1410" cy="180" r="5" fill="#7D5BBE"/>
+<text x="1410" y="169" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#7D5BBE">Module List</text>
+<circle cx="1690" cy="250" r="11" fill="#FFF" stroke="#E06B00" stroke-width="5"/>
+<text x="1672" y="236" text-anchor="end" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#E06B00">MdlNo_RAM</text>
+<path d="M 1320 270 L 1410 270 L 1410 250 L 1690 250" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1410" cy="270" r="5" fill="#E06B00"/>
+<circle cx="1410" cy="250" r="5" fill="#E06B00"/>
+<text x="1410" y="239" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">MdlNo_RAM</text>
+<circle cx="1690" cy="320" r="11" fill="#FFF" stroke="#E06B00" stroke-width="5"/>
+<text x="1672" y="306" text-anchor="end" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#E06B00">MdlNo_CAN</text>
+<path d="M 1320 295 L 1410 295 L 1410 320 L 1690 320" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1410" cy="295" r="5" fill="#E06B00"/>
+<circle cx="1410" cy="320" r="5" fill="#E06B00"/>
+<text x="1410" y="309" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">MdlNo_CAN</text>
+<circle cx="1690" cy="390" r="11" fill="#FFF" stroke="#2B76C4" stroke-width="5"/>
+<text x="1672" y="376" text-anchor="end" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#2B76C4">Endian_RAM</text>
+<path d="M 1320 320 L 1410 320 L 1410 390 L 1690 390" fill="none" stroke="#2B76C4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1410" cy="320" r="5" fill="#2B76C4"/>
+<circle cx="1410" cy="390" r="5" fill="#2B76C4"/>
+<text x="1410" y="379" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2B76C4">Endian_RAM</text>
+<circle cx="1690" cy="460" r="11" fill="#FFF" stroke="#2F8F46" stroke-width="5"/>
+<text x="1672" y="446" text-anchor="end" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#2F8F46">RAM Module Found?</text>
+<path d="M 1320 345 L 1410 345 L 1410 460 L 1690 460" fill="none" stroke="#2F8F46" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1410" cy="345" r="5" fill="#2F8F46"/>
+<circle cx="1410" cy="460" r="5" fill="#2F8F46"/>
+<text x="1410" y="449" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2F8F46">RAM Module Found?</text>
+<circle cx="1690" cy="530" r="11" fill="#FFF" stroke="#2F8F46" stroke-width="5"/>
+<text x="1672" y="516" text-anchor="end" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#2F8F46">CAN Module Found?</text>
+<path d="M 1320 370 L 1410 370 L 1410 530 L 1690 530" fill="none" stroke="#2F8F46" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1410" cy="370" r="5" fill="#2F8F46"/>
+<circle cx="1410" cy="530" r="5" fill="#2F8F46"/>
+<text x="1410" y="519" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2F8F46">CAN Module Found?</text>
+<rect x="1450" y="620" width="260" height="170" rx="8" fill="#FCFBF8" stroke="#8A7C69" stroke-width="5"/>
+<rect x="1478" y="598" width="420" height="44" rx="7" fill="#EEE8DD" stroke="#8A7C69" stroke-width="3"/>
+<text x="1498" y="627" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="700" fill="#51483D">Parser error.status Case：True / Falseは別図</text>
+<polygon points="1450,694 1433,711 1450,728 1467,711" fill="#E8F7EC" stroke="#2F8F46" stroke-width="4"/>
+<text x="1472" y="716" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2F8F46">selector</text>
+<path d="M 1320 380 L 1370 380 L 1370 711 L 1433 711" fill="none" stroke="#2F8F46" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1370" cy="380" r="5" fill="#2F8F46"/>
+<circle cx="1370" cy="711" r="5" fill="#2F8F46"/>
+<text x="1370" y="700" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2F8F46">Unbundle status</text>
+<path d="M 1320 760 L 1710 760" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1710" y="749" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#C53B3B">Parser error out</text>
+</svg>

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="800" viewBox="0 0 1800 800" role="img" aria-labelledby="title desc">
+<title id="title">RAMScope_Init.vi — 09 First Nonzero? Case：False</title>
+<desc id="desc">Parser error=False → RAM Found=True → PGT error=False → First Nonzero?=Falseの実配線を示すLabVIEWブロックダイアグラム。</desc>
+<defs>
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#333" flood-opacity=".14"/></filter>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="context-stroke"/></marker>
+</defs>
+<rect width="1800" height="800" fill="#FFFFFF"/>
+<text x="900" y="48" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="30" font-weight="700" fill="#202124">RAMScope_Init.vi — 09 First Nonzero? Case：False</text>
+<rect x="70" y="72" width="1660" height="50" rx="12" fill="#F4F1EA" stroke="#B9AD9B"/>
+<text x="95" y="105" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="18" font-weight="600" fill="#51483D">Case階層: Parser error=False → RAM Found=True → PGT error=False → First Nonzero?=False</text>
+<rect x="180" y="180" width="1440" height="470" rx="8" fill="#FCFBF8" stroke="#8A7C69" stroke-width="5"/>
+<rect x="208" y="158" width="420" height="44" rx="7" fill="#EEE8DD" stroke="#8A7C69" stroke-width="3"/>
+<text x="228" y="187" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="17" font-weight="700" fill="#51483D">First Nonzero? Case：False</text>
+<polygon points="180,254 163,271 180,288 197,271" fill="#E8F7EC" stroke="#2F8F46" stroke-width="4"/>
+<text x="202" y="276" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#2F8F46">selector</text>
+<circle cx="90" cy="300" r="11" fill="#FFF" stroke="#E06B00" stroke-width="5"/>
+<text x="108" y="286" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#E06B00">First Slot Index SR左</text>
+<circle cx="90" cy="570" r="11" fill="#FFF" stroke="#C53B3B" stroke-width="5"/>
+<text x="108" y="556" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#C53B3B">error SR左</text>
+<rect x="1610" y="290" width="20" height="20" fill="#FFF" stroke="#E06B00" stroke-width="4"/>
+<text x="1637" y="306" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="600" fill="#E06B00">First Slot Index SR右</text>
+<rect x="1610" y="380" width="20" height="20" fill="#FFF" stroke="#E06B00" stroke-width="4"/>
+<text x="1637" y="396" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="600" fill="#E06B00">First Slot Error SR右</text>
+<rect x="1610" y="560" width="20" height="20" fill="#FFF" stroke="#C53B3B" stroke-width="4"/>
+<text x="1637" y="576" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="600" fill="#C53B3B">error SR右</text>
+<circle cx="90" cy="390" r="11" fill="#FFF" stroke="#E06B00" stroke-width="5"/>
+<text x="108" y="376" text-anchor="start" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="15" font-weight="600" fill="#E06B00">First Slot Error SR左</text>
+<path d="M 90 300 L 1620 300" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1620" y="289" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">現在値を維持（-1へ戻さない）</text>
+<path d="M 90 390 L 480 390 L 480 430 L 1560 430 L 1560 390 L 1620 390" fill="none" stroke="#E06B00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="480" cy="390" r="5" fill="#E06B00"/>
+<circle cx="480" cy="430" r="5" fill="#E06B00"/>
+<circle cx="1560" cy="430" r="5" fill="#E06B00"/>
+<circle cx="1560" cy="390" r="5" fill="#E06B00"/>
+<text x="1560" y="419" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#E06B00">First Slot Errorの現在値を維持</text>
+<rect x="520" y="500" width="760" height="64" rx="12" fill="#EEF5FC" stroke="#2B76C4" stroke-width="2"/>
+<text x="900.0" y="534.0" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="14" font-weight="550" fill="#333">非ゼロ未検出、または既に最初の非ゼロを保存済み</text>
+<path d="M 90 570 L 1620 570" fill="none" stroke="#C53B3B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1620" y="559" text-anchor="middle" font-family="Yu Gothic, Noto Sans JP, sans-serif" font-size="13" font-weight="600" fill="#C53B3B">両Caseともerrorをそのまま通過</text>
+</svg>
