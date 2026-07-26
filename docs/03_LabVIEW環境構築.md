@@ -3,6 +3,8 @@
 > **本章の役割**：VIを作り始める前に、開発PCと試験用PCの実行環境を同じ前提へ揃える。
 >
 > 操作手順は[00A](./00A_LabVIEW実装資料の記述ルール.md)に従い、対象、操作場所、入力値、確認結果を明記する。RAMScope固有のDLL配置、エラー193、CLFN疎通、VIフォルダ詳細は[10](./10_RAMScope実装方針.md)を正とする。
+>
+> **2026-07-26更新**：基準環境をLabVIEW／TestStand 2026 Q1 64bitへ統一した。NI-VISA、Run-Time Engine、Adapterの組合せは[00C](./00C_一次資料とバージョン基準.md)に従い、導入時に実Versionを記録する。
 
 ## 3.1 採用する基本構成
 
@@ -218,6 +220,62 @@ AutoTestSystem\
 - [ ] 開発PCと試験PCの差分を記録
 
 ### RAMScope
+
+## 3.9 2026 Q1環境の詳細確認手順
+
+### 0. 実現したい状態
+
+開発PCと試験PCで、LabVIEW VIを開けることだけでなく、TestStandから同じbit数・同じAdapter条件で呼び出せる状態を作る。RAMScope DLL、CANalyzer ActiveX、VISA機器を同じプロセスで扱うため、構成差を作業開始前に検出する。
+
+### 1. 開発PCで記録する値
+
+| 記録項目 | 確認場所 | 合格条件 |
+|---|---|---|
+| LabVIEW Edition／Version／bit数 | `Help → About LabVIEW` | `2026 Q1`、64bit |
+| TestStand Version／bit数 | Sequence EditorのAbout | `2026 Q1`、64bit |
+| LabVIEW Adapter | `Configure → Adapters → LabVIEW` | LabVIEW 2026 Q1 64bitを選択 |
+| NI-VISA Version | NI Package Manager | 対象OSとLabVIEWをサポート |
+| VISA検出 | NI MAX | 対象Resourceが表示される |
+| RAMScope DLL | PowerShell疎通と第10章 | x64、Handle非ゼロ、Export一致 |
+| CANalyzer Type Library | LabVIEW ActiveX定数選択画面 | 対象VersionのApplication型を選択可能 |
+
+### 2. Adapter設定
+
+1. TestStand Sequence Editorで`Configure → Adapters`を開く。
+2. `LabVIEW`を選び、Adapter Configurationを開く。
+3. 開発中は、ブロックダイアグラムを開いてデバッグできるLabVIEW Development Systemを選択する。
+4. 配布試験では、ビルド済みVIの条件を確認したうえでLabVIEW Run-Time Engineを選択する。
+5. 同一プロセス実行を選ぶ場合は、TestStand、LabVIEW、外部DLLをすべて64bitへそろえる。
+6. 設定画面の選択値を環境記録へ転記する。
+
+NI公式Adapter資料では、同一プロセス実行は呼出し性能を優先できる一方、プロセス分離時と使用できる機能が異なる。開発PCと試験PCで実行方式を変える場合は、両方を結合試験する。
+
+### 3. 最小確認VI
+
+`Environment_Smoke_Test.vi`のような新規本番VIは追加せず、既存の各PoCを使用する。
+
+```text
+VISA機器      → NI MAXのVISA Test Panel → 対象機器PoC
+RAMScope      → Test-RAMScopeDll.ps1 → PoC_RAMScope_Main.vi
+CANalyzer     → PoC_CANalyzer_01_Open_Close.vi
+TestStand     → 既存公開APIを1個だけ呼ぶ確認Sequence
+```
+
+### 4. 試験PCでの再確認
+
+1. Run-Time Engine、NI-VISA、機器ドライバ、外部DLLを導入する。
+2. 開発PCからVIだけでなく依存ファイルを含む配布物を移す。
+3. TestStand AdapterのVersion、bit数、実行方式を開発時記録と照合する。
+4. VISA Resource名、DLL絶対パス、CANalyzer登録Type Libraryを再確認する。
+5. 各PoCとTestStand単一呼出しを実行し、エラーコード、ログ、Versionを保存する。
+
+### 5. 異常テスト
+
+- 32bit DLLを指定し、bit数不一致を検出できること。
+- DLL依存ファイルを一時的に隔離し、エラー126相当を切り分けられること。
+- 存在しないVISA Resourceで初期化し、VISA errorを保持できること。
+- LabVIEW Adapterを未導入Versionへ向けた状態を検出できること。
+- VI Serverの公開設定で対象VIを除外した場合、TestStand呼出しが失敗すること。
 
 - [ ] LabVIEWとPowerShellが64bit
 - [ ] `RAMScopeVP_API_x64.dll`を使用

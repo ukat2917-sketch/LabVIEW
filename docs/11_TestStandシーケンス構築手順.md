@@ -3,6 +3,8 @@
 > **本章の役割**：LabVIEW単体で確認済みの公開API VIを、TestStandのSetup / Main / Cleanupへ組み込む。
 >
 > RAMScopeは[10](./10_RAMScope実装方針.md)の`PoC_RAMScope_Main.vi`完了後に組み込む。操作手順は[00A](./00A_LabVIEW実装資料の記述ルール.md)に従い、操作場所、選択項目、変数名、期待結果を省略しない。
+>
+> **2026-07-26更新**：LabVIEW Adapter、VI Server、Module指定、Run-Time Engine実行の要件はNI公式TestStand資料を根拠とし、参照先を[00C](./00C_一次資料とバージョン基準.md)へ集約した。
 
 ---
 
@@ -383,6 +385,49 @@ MainSequence
 ---
 
 ## 11.17 完了条件
+
+## 11.18 2026 Q1 Adapter・VI呼出し監査
+
+### 0. 目的
+
+LabVIEWで成功したVIがTestStandでだけ失敗する原因を、Adapter、VI Server、Module Path、端子マッピング、bit数へ分解して確認する。
+
+### 1. Adapter設定記録
+
+| 項目 | 記録値 |
+|---|---|
+| TestStand Version／bit数 | 2026 Q1／64bit |
+| LabVIEW Version／bit数 | 2026 Q1／64bit |
+| 実行エンジン | Development SystemまたはRun-Time Engine |
+| 実行プロセス | 同一プロセスまたは別プロセス |
+| VI Server公開 | 対象VIが許可されていること |
+
+### 2. 1 VI呼出しの詳細手順
+
+1. Sequence Editorで対象Sequenceを開く。
+2. Stepを追加し、Adapterとして`LabVIEW`を選択する。
+3. Stepを右クリックして`Specify Module`を開く。
+4. Repository内の公開API VIを選択する。`RS_DLL_*`、Builder、Parserを直接選択しない。
+5. VI Prototypeを再読込みし、コネクタペインと表示端子が一致することを確認する。
+6. 各入力をParameters、FileGlobalsまたはLocalsへ明示的に割り当てる。
+7. 各出力の格納先を割り当てる。未使用出力も意図的に未接続と判断したことを記録する。
+8. `error in`へ前段結果を接続し、`error out`、`Status`、`TestError`を別変数へ保存する。
+9. Precondition、Post Action、Loop、Timeoutを確認する。
+10. Step単体実行後、Moduleタブの値、LabVIEW Probe、TestStand ResultListを照合する。
+
+### 3. Prototype変更時
+
+公開APIのコネクタペインを変更した場合は、TestStand側のPrototypeを自動的に正しいとみなさない。NI公式のVI Call更新機能を使って呼出しを更新し、全端子マッピングを再確認する。既決VIの改名や分割は行わない。
+
+### 4. 異常テスト
+
+- Module Path不正。
+- VI Server非公開。
+- Adapter Version不一致。
+- DLL bit数不一致。
+- 必須入力未割当。
+- `error in.status=True`。
+- Main途中Terminate後もCleanupが実行されること。
 
 - [ ] RAMScope単体PoCが完了
 - [ ] CAN使用時は採用方式の単体PoCが完了

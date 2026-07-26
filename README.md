@@ -2,11 +2,12 @@
 
 NI社製LabVIEWとTestStandを利用し、複数機器を連携させる自動テストシステムの構築手順をまとめた資料です。
 
-> **最終整理日：2026-07-18**
+> **最終整理日：2026-07-26**
 >
 > 画面を見ながら再現できる実装手順は[00A_LabVIEW実装資料の記述ルール.md](./docs/00A_LabVIEW実装資料の記述ルール.md)を正とする。
 > 機能要求をデータモデル、アルゴリズムおよびLabVIEW構造へ落とし込む設計意図は[00B_LabVIEW学習型VI設計ルール.md](./docs/00B_LabVIEW学習型VI設計ルール.md)を正とする。
 > すべてのVI作成・改訂資料は00Aと00Bの両方へ従う。
+> 製品Version、NI公式Help、ベンダー仕様書および実機確認状態は[00C_一次資料とバージョン基準.md](./docs/00C_一次資料とバージョン基準.md)を正とする。
 > RAMScopeの環境準備、DLLラッパ、構造体生成、Parser、公開API、PoCは[10_RAMScope実装方針.md](./docs/10_RAMScope実装方針.md)を唯一の正本とする。
 
 ---
@@ -31,6 +32,8 @@ NI社製LabVIEWとTestStandを利用し、複数機器を連携させる自動�
   ↓
 00B LabVIEW学習型VI設計ルール
   ↓
+00C 一次資料とバージョン基準
+  ↓
 01  システム概要
   ↓
 02  LabVIEW / TestStandの役割分担
@@ -50,7 +53,7 @@ NI社製LabVIEWとTestStandを利用し、複数機器を連携させる自動�
 10  RAMScope GT170実装ガイド
   ├─ 環境準備・DLL疎通
   ├─ RAMScope_Code_To_Error.vi
-  ├─ 薄いDLLラッパ12個
+  ├─ 薄いDLLラッパ18個
   ├─ typedef・数値⇔U8変換
   ├─ 構造体Builder
   ├─ SYSINFO / Buffer Parser
@@ -130,6 +133,7 @@ TestStandは`RS_DLL_*`を直接呼ばない。
 | 00 | [docs/00_資料の読み方と正本ルール.md](./docs/00_資料の読み方と正本ルール.md) | 情報の優先順位、確定・未確定、更新ルール |
 | 00A | [docs/00A_LabVIEW実装資料の記述ルール.md](./docs/00A_LabVIEW実装資料の記述ルール.md) | 初心者が画面を見ながら再現できる手順記載の共通ルール |
 | 00B | [docs/00B_LabVIEW学習型VI設計ルール.md](./docs/00B_LabVIEW学習型VI設計ルール.md) | 機能要求をデータモデル、アルゴリズム、LabVIEW構造へ変換する共通ルール |
+| 00C | [docs/00C_一次資料とバージョン基準.md](./docs/00C_一次資料とバージョン基準.md) | NI公式・ベンダー一次資料、採用Version、確認証跡の共通ルール |
 | 01 | [docs/01_システム概要と構成.md](./docs/01_システム概要と構成.md) | 目的、機器構成、接続方式 |
 | 02 | [docs/02_役割分担とアーキテクチャ.md](./docs/02_役割分担とアーキテクチャ.md) | LabVIEWとTestStandの責務 |
 | 03 | [docs/03_LabVIEW環境構築.md](./docs/03_LabVIEW環境構築.md) | 開発PC、試験PC、ドライバ、DLL準備 |

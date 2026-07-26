@@ -2,11 +2,11 @@
 
 > **本章の役割**：既存のPython COM APIロジックをLabVIEW 2026 Q1 64bitのActiveX機能へ置き換え、CANalyzerの接続・新規起動・Configuration確認・Measurement制御・System Variable読書き・故障注入・最小PoC・LabVIEW単体本番VI・TestStand組み込みまでを、画面操作で再現できる粒度で定義する。
 >
-> VI作成手順は[00A_LabVIEW実装資料の記述ルール.md](./00A_LabVIEW実装資料の記述ルール.md)を正とする。
+> VI作成手順は[00A_LabVIEW実装資料の記述ルール.md](./00A_LabVIEW実装資料の記述ルール.md)を正とし、ActiveXの一般仕様とCANalyzer固有Type Libraryの確認順は[00C](./00C_一次資料とバージョン基準.md)に従う。
 >
 > CANalyzer COM APIのプロパティ名・メソッド名は、対象PCに登録されたCANalyzer Type Libraryを一次情報とする。CANalyzerの版によって表示名や引数が異なる場合は推測で固定せず、`実機確認待ち`として`10_ActiveX_Wrapper`だけを差し替える。
 
-**最終整理日：2026-07-17**
+**最終整理日：2026-07-26**
 
 ---
 

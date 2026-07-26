@@ -1,12 +1,14 @@
 # 10. RAMScope GT170 実装・学習ガイド
 
-**最終整理日：2026-07-23**
+**最終整理日：2026-07-26**
 
 > 本章をRAMScope実装資料の唯一の正本とする。
 >
 > 本章は、LabVIEWで初めてVIを組む読者が、画面を再現するだけでなく、各VIの責務、データモデル、アルゴリズム、Case Structure、For Loop、Shift RegisterおよびCLFNを選ぶ理由を説明できる状態を目標とする。
 >
 > 本章は環境準備からctl、共通VI、薄いDLL Wrapper、公開API、TDMS保存VI、通信確認PoC、ロギングPoCまでを一つの作成順で説明する。既存VIのロギング対応も各VIの既存手順へ統合し、後段の修正付録を正本としない。
+>
+> NI標準関数の一般仕様とVersion基準は[00C](./00C_一次資料とバージョン基準.md)、RAMScope関数のシグネチャは配布DLL同梱`RAMScopeVP.h`とAPI仕様書を根拠とする。ctl 11個、Common／Builder／Parser 11個、Wrapper 18個、公開API 11個、TDMS VI 4個、PoC 2個の既決構成は変更しない。
 
 ---
 
@@ -880,7 +882,7 @@ Log Triggerは次の値を持つ。
 - 既存エラーCaseで返す各出力。
 - 各Wrapper固有の単体テスト。
 
-[02_DLLラッパVI_全12個_CLFN配線手順.md](./02_DLLラッパVI_全12個_CLFN配線手順.md)へ、12個それぞれの手順を復元した。共通節はテンプレートとして利用してよいが、個別節を削除してはならない。
+[10.8 薄いDLLラッパVI 18個](#108-薄いdllラッパvi-18個)へ、18個それぞれの手順を統合した。共通節はテンプレートとして利用してよいが、個別節を削除してはならない。
 
 ##### 1.2 Public APIの配線順が設計メモの粒度だった
 
@@ -892,7 +894,7 @@ TrueケースでPGT設定ラッパを呼ぶ。
 SlotErrを走査し、非ゼロがあればcode=-700141を生成する。
 ```
 
-これではCaseをどこへ配置するか、Bundle By Nameの基準クラスタ、status、source、Format String、出力トンネルが分からない。[05_Public_API_8個_監査済み作成手順.md](./05_Public_API_8個_監査済み作成手順.md)で、8個すべてを端子単位へ補正した。
+これではCaseをどこへ配置するか、Bundle By Nameの基準クラスタ、status、source、Format String、出力トンネルが分からない。[10.11 公開API 11個](#1011-公開api-11個)で、11個すべてを端子単位へ補正した。
 
 ##### 1.3 ParserとBuilderに「なぜその構造か」の説明が不足していた
 
@@ -1144,7 +1146,7 @@ LabVIEW設定クラスタ
 | `Build_CHINFO_170_Raw.vi` | 24byte×ChNumのCHINFO配列を生成 | 入力検証Case、For、配列とerrorのShift Register |
 | `Build_LOGINFO_Raw.vi` | 136byte LOGINFOを生成 | For、更新配列・Seen・errorのShift Register |
 
-Parser側で使用する`U8x4_To_U32.vi`、`U8x4_To_I32.vi`、`U8x8_To_U64.vi`は[Parser詳細](./04_Parser_VI作成手順.md)を参照する。
+Parser側で使用する`U8x4_To_U32.vi`、`U8x4_To_I32.vi`、`U8x8_To_U64.vi`は[10.10 Parser](#1010-parser)を参照する。
 
 ---
 
@@ -1976,7 +1978,7 @@ CLFNは正常でもAPI ReturnCodeが0以外の場合は、RAMScope APIエラー�
 
 本節は既存12個とロギング追加6個、合計18個の薄いDLL Wrapperを同じ規則で作成する。各VIのCプロトタイプ、CLFN Parameters、左右端子、事前確保、Function Name、配線は本章内の該当節を参照する。
 
-復元元の詳細手順と本書または[00_現行補正](./00_00A_00B監査結果と現行補正.md)が競合する場合は、現行補正を優先する。
+過去資料の詳細手順と本書が競合する場合は、本書の[10.5 一本化した作成順・確定仕様・監査結果](#105-一本化した作成順確定仕様監査結果)を優先する。
 
 ---
 
@@ -3260,7 +3262,7 @@ LabVIEW設定クラスタ
 | `Build_CHINFO_170_Raw.vi` | 24byte×ChNumのCHINFO配列を生成 | 入力検証Case、For、配列とerrorのShift Register |
 | `Build_LOGINFO_Raw.vi` | 136byte LOGINFOを生成 | For、更新配列・Seen・errorのShift Register |
 
-Parser側で使用する`U8x4_To_U32.vi`、`U8x4_To_I32.vi`、`U8x8_To_U64.vi`は[Parser詳細](./04_Parser_VI作成手順.md)を参照する。
+Parser側で使用する`U8x4_To_U32.vi`、`U8x4_To_I32.vi`、`U8x8_To_U64.vi`は[10.10 Parser](#1010-parser)を参照する。
 
 ---
 
