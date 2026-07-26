@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img">
+<rect width="1920" height="1080" fill="#FFFFFF"/>
+<text x="70" y="82" text-anchor="start" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="42" font-weight="700" fill="#252525">実験PC向け LabVIEW／TestStand ライセンス選定</text>
+<text x="70" y="125" text-anchor="start" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="21" font-weight="400" fill="#5B6168">結論：完成済みEXEの実行はLabVIEW開発ライセンス不要。TestStandは用途ごとに実験PC単位で選択する。</text>
+<line x1="0" y1="150" x2="1920" y2="150" stroke="#B51225" stroke-width="7"/>
+<rect x="595" y="185" width="730" height="100" rx="24" fill="#FFF8F8" stroke="#B51225" stroke-width="4"/>
+<circle cx="660" cy="235" r="38" fill="#B51225"/>
+<text x="660" y="242" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="38" font-weight="700" fill="#FFFFFF">?</text>
+<text x="985" y="250" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="36" font-weight="700" fill="#252525">実験PCで何をしたい？</text>
+<path d="M960 285 V330 M235 330 H1685 M235 330 V365 M720 330 V365 M1200 330 V365 M1685 330 V365" fill="none" stroke="#B51225" stroke-width="5"/>
+<rect x="50" y="365" width="420" height="250" rx="22" fill="#FFFFFF" stroke="#078455" stroke-width="4"/>
+<circle cx="105" cy="425" r="38" fill="#078455"/>
+<text x="105" y="432" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="19" font-weight="700" fill="#FFFFFF">EXE</text>
+<text x="300" y="400" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="20" font-weight="700" fill="#078455">完成済みLabVIEW</text>
+<text x="300" y="427" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="20" font-weight="700" fill="#078455">EXEを実行</text>
+<text x="260" y="520" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="19" font-weight="400" fill="#444">VIの配置・処理順は変更しない</text>
+<path d="M260 615 V650" stroke="#078455" stroke-width="5"/>
+<polygon points="248,650 272,650 260,667" fill="#078455"/>
+<rect x="50" y="667" width="420" height="245" rx="20" fill="#F8FAFB" stroke="#078455" stroke-width="3"/>
+<text x="260" y="710" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="18" font-weight="700" fill="#078455">実験PCに必要</text>
+<text x="260" y="758" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="22" font-weight="700" fill="#222">LabVIEW Run-Time Engine</text>
+<text x="260" y="840" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="23" font-weight="700" fill="#078455">0円</text>
+<text x="260" y="880" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="16" font-weight="500" fill="#555">TestStandを使わない構成</text>
+<rect x="535" y="365" width="420" height="250" rx="22" fill="#FFFFFF" stroke="#078455" stroke-width="4"/>
+<circle cx="590" cy="425" r="38" fill="#078455"/>
+<text x="590" y="432" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="19" font-weight="700" fill="#FFFFFF">RUN</text>
+<text x="785" y="400" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="20" font-weight="700" fill="#078455">完成済みTestStand</text>
+<text x="785" y="427" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="20" font-weight="700" fill="#078455">シーケンスを実行</text>
+<text x="745" y="520" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="19" font-weight="400" fill="#444">定義済みループ・条件・レポートを実行</text>
+<path d="M745 615 V650" stroke="#078455" stroke-width="5"/>
+<polygon points="733,650 757,650 745,667" fill="#078455"/>
+<rect x="535" y="667" width="420" height="245" rx="20" fill="#F8FAFB" stroke="#078455" stroke-width="3"/>
+<text x="745" y="710" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="18" font-weight="700" fill="#078455">実験PCに必要</text>
+<text x="745" y="758" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="22" font-weight="700" fill="#222">TestStand Base Deployment</text>
+<text x="745" y="788" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="22" font-weight="700" fill="#222">Engine</text>
+<text x="745" y="840" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="23" font-weight="700" fill="#078455">116,000円／PC・永続</text>
+<text x="745" y="880" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="16" font-weight="500" fill="#555">シーケンス編集・開発は不可</text>
+<rect x="1020" y="365" width="420" height="250" rx="22" fill="#FFFFFF" stroke="#D97706" stroke-width="4"/>
+<circle cx="1075" cy="425" r="38" fill="#D97706"/>
+<text x="1075" y="432" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="19" font-weight="700" fill="#FFFFFF">DBG</text>
+<text x="1270" y="400" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="20" font-weight="700" fill="#D97706">配備先でデバッグ</text>
+<text x="1270" y="427" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="20" font-weight="700" fill="#D97706">軽微な不具合修正</text>
+<text x="1230" y="520" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="19" font-weight="400" fill="#444">配備済みシステムの原因調査</text>
+<path d="M1230 615 V650" stroke="#D97706" stroke-width="5"/>
+<polygon points="1218,650 1242,650 1230,667" fill="#D97706"/>
+<rect x="1020" y="667" width="420" height="245" rx="20" fill="#F8FAFB" stroke="#D97706" stroke-width="3"/>
+<text x="1230" y="710" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="18" font-weight="700" fill="#D97706">実験PCに必要</text>
+<text x="1230" y="758" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="22" font-weight="700" fill="#222">TestStand Debug</text>
+<text x="1230" y="788" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="22" font-weight="700" fill="#222">Deployment Environment</text>
+<text x="1230" y="840" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="23" font-weight="700" fill="#D97706">438,000円／PC・永続</text>
+<text x="1230" y="880" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="16" font-weight="500" fill="#555">新機能追加・本格開発は不可</text>
+<rect x="1505" y="365" width="420" height="250" rx="22" fill="#FFFFFF" stroke="#B51225" stroke-width="4"/>
+<circle cx="1560" cy="425" r="38" fill="#B51225"/>
+<text x="1560" y="432" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="19" font-weight="700" fill="#FFFFFF">DEV</text>
+<text x="1755" y="400" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="20" font-weight="700" fill="#B51225">VI／シーケンスを</text>
+<text x="1755" y="427" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="20" font-weight="700" fill="#B51225">開発・変更</text>
+<text x="1715" y="520" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="19" font-weight="400" fill="#444">ステップ追加・並べ替え・機能変更</text>
+<path d="M1715 615 V650" stroke="#B51225" stroke-width="5"/>
+<polygon points="1703,650 1727,650 1715,667" fill="#B51225"/>
+<rect x="1505" y="667" width="420" height="245" rx="20" fill="#F8FAFB" stroke="#B51225" stroke-width="3"/>
+<text x="1715" y="710" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="18" font-weight="700" fill="#B51225">実験PCに必要</text>
+<text x="1715" y="758" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="22" font-weight="700" fill="#222">開発ライセンス</text>
+<text x="1715" y="840" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="23" font-weight="700" fill="#B51225">用途により年額／永続</text>
+<text x="1715" y="880" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="16" font-weight="500" fill="#555">TestStand</text>
+<text x="1715" y="904" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="16" font-weight="500" fill="#555">Development＋必要なLabVIEW版</text>
+<rect x="70" y="950" width="1780" height="80" rx="14" fill="#FFF9E8" stroke="#C79622" stroke-width="2"/>
+<text x="105" y="986" text-anchor="start" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="20" font-weight="700" fill="#9A6700">重要</text>
+<text x="190" y="986" text-anchor="start" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="20" font-weight="600" fill="#252525">入力条件違いのループは、TestStandで実装した場合のみTestStandが必要。LabVIEW EXE内へ実装すればTestStandなしでも実行可能。</text>
+<text x="190" y="1015" text-anchor="start" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="16" font-weight="400" fill="#555">Visionなど一部モジュール／ツールキットは別途Runtimeライセンスが必要な場合がある。価格は添付NI購入画面の参考値で、正式見積を優先。</text>
+</svg>

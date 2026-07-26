@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img">
+<rect width="1920" height="1080" fill="#FFFFFF"/>
+<text x="70" y="82" text-anchor="start" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="42" font-weight="700" fill="#252525">実験PCで行う作業別の最小ライセンス費用</text>
+<text x="70" y="125" text-anchor="start" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="21" font-weight="400" fill="#5B6168">参考価格：添付のNI購入画面。公開価格は変動するため、購入時はNI／社内EA契約の正式見積を優先する。</text>
+<line x1="0" y1="150" x2="1920" y2="150" stroke="#B51225" stroke-width="7"/>
+<rect x="35" y="190" width="430" height="70" rx="0" fill="#3F4246" stroke="#FFFFFF" stroke-width="1"/>
+<text x="250.0" y="235" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="19" font-weight="700" fill="#FFFFFF">実験PCで行うこと</text>
+<rect x="465" y="190" width="360" height="70" rx="0" fill="#3F4246" stroke="#FFFFFF" stroke-width="1"/>
+<text x="645.0" y="235" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="19" font-weight="700" fill="#FFFFFF">LabVIEW</text>
+<rect x="825" y="190" width="420" height="70" rx="0" fill="#3F4246" stroke="#FFFFFF" stroke-width="1"/>
+<text x="1035.0" y="235" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="19" font-weight="700" fill="#FFFFFF">TestStand</text>
+<rect x="1245" y="190" width="300" height="70" rx="0" fill="#3F4246" stroke="#FFFFFF" stroke-width="1"/>
+<text x="1395.0" y="235" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="19" font-weight="700" fill="#FFFFFF">最小参考費用／PC</text>
+<rect x="1545" y="190" width="340" height="70" rx="0" fill="#3F4246" stroke="#FFFFFF" stroke-width="1"/>
+<text x="1715.0" y="235" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="19" font-weight="700" fill="#FFFFFF">できないこと・注意</text>
+<rect x="35" y="260" width="430" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="250.0" y="297" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="600" fill="#242424">完成済みLabVIEW EXEだけ実行</text>
+<rect x="465" y="260" width="360" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="645.0" y="297" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Run-Time Engine</text>
+<text x="645.0" y="320" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">無料</text>
+<rect x="825" y="260" width="420" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1035.0" y="297" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">不要</text>
+<rect x="1245" y="260" width="300" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1395.0" y="297" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">0円</text>
+<rect x="1545" y="260" width="340" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1715.0" y="297" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">VI編集不可。</text>
+<text x="1715.0" y="320" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">必要なドライバと同一版・</text>
+<text x="1715.0" y="343" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">bitnessのRTEを導入。</text>
+<rect x="35" y="368" width="430" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="250.0" y="405" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="600" fill="#242424">完成済みTestStandシーケンスを実行</text>
+<rect x="465" y="368" width="360" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="645.0" y="405" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Run-Time Engine</text>
+<text x="645.0" y="428" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">原則無料</text>
+<rect x="825" y="368" width="420" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1035.0" y="405" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Base Deployment Engine</text>
+<rect x="1245" y="368" width="300" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1395.0" y="405" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">116,000円・永続</text>
+<rect x="1545" y="368" width="340" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1715.0" y="405" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">定義済み条件変更・ループ実行は可。</text>
+<text x="1715.0" y="428" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Sequence</text>
+<text x="1715.0" y="451" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Editorでの開発は不可。</text>
+<rect x="35" y="476" width="430" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="250.0" y="513" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="600" fill="#242424">配備先でデバッグ／軽微修正</text>
+<rect x="465" y="476" width="360" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="645.0" y="513" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Debug Deploymentの範囲</text>
+<rect x="825" y="476" width="420" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1035.0" y="513" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Debug Deployment</text>
+<text x="1035.0" y="536" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Environment</text>
+<rect x="1245" y="476" width="300" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1395.0" y="513" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">438,000円・永続</text>
+<rect x="1545" y="476" width="340" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1715.0" y="513" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">配備済みシステムの不具合修正向け。</text>
+<text x="1715.0" y="536" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">機能追加や本格開発は不可。</text>
+<rect x="35" y="584" width="430" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="250.0" y="621" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="600" fill="#242424">TestStandシーケンスを追加・並べ替え</text>
+<rect x="465" y="584" width="360" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="645.0" y="621" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">コードモジュールを</text>
+<text x="645.0" y="644" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">変更しないなら不要</text>
+<rect x="825" y="584" width="420" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1035.0" y="621" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Development System</text>
+<rect x="1245" y="584" width="300" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1395.0" y="621" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">336,000円／年</text>
+<text x="1395.0" y="644" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">または1,176,000円・永続</text>
+<rect x="1545" y="584" width="340" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1715.0" y="621" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">TestStandの開発・編集が可能。</text>
+<text x="1715.0" y="644" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">実験PCを開発機として扱う。</text>
+<rect x="35" y="692" width="430" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="250.0" y="729" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="600" fill="#242424">VIを編集する</text>
+<rect x="465" y="692" width="360" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="645.0" y="729" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Base 87,000円／年～</text>
+<rect x="825" y="692" width="420" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1035.0" y="729" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">TestStand不使用なら不要</text>
+<rect x="1245" y="692" width="300" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1395.0" y="729" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">87,000円／年～</text>
+<rect x="1545" y="692" width="340" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1715.0" y="729" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">使用関数・ツールキットにより</text>
+<text x="1715.0" y="752" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Full／Professionalが必要。</text>
+<text x="1715.0" y="775" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">BaseだけではEXEビルド不可。</text>
+<rect x="35" y="800" width="430" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="250.0" y="837" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="600" fill="#242424">VI編集＋EXEを再ビルド</text>
+<rect x="465" y="800" width="360" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="645.0" y="837" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Professional</text>
+<text x="645.0" y="860" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">またはBase／Full＋</text>
+<text x="645.0" y="883" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Application Builder</text>
+<rect x="825" y="800" width="420" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1035.0" y="837" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">必要に応じ</text>
+<text x="1035.0" y="860" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Development System</text>
+<rect x="1245" y="800" width="300" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1395.0" y="837" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Professional</text>
+<text x="1395.0" y="860" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">380,000円／年～</text>
+<rect x="1545" y="800" width="340" height="108" rx="0" fill="#FFFFFF" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1715.0" y="837" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">LabVIEWとTestStand双方を</text>
+<text x="1715.0" y="860" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">変更する場合、両方の開発権が必要。</text>
+<rect x="35" y="908" width="430" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="250.0" y="945" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="600" fill="#242424">LabVIEW＋TestStandを一式開発</text>
+<rect x="465" y="908" width="360" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="645.0" y="945" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">LabVIEW</text>
+<text x="645.0" y="968" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Professionalを含む</text>
+<rect x="825" y="908" width="420" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1035.0" y="945" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">Development Systemを含む</text>
+<rect x="1245" y="908" width="300" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1395.0" y="945" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">LabVIEW+ Suite</text>
+<text x="1395.0" y="968" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">569,000円／年</text>
+<text x="1395.0" y="991" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">または1,992,000円・永続</text>
+<rect x="1545" y="908" width="340" height="108" rx="0" fill="#F7F9FA" stroke="#C9CDD1" stroke-width="1"/>
+<text x="1715.0" y="945" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">社内EA契約がある場合は</text>
+<text x="1715.0" y="968" text-anchor="middle" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="400" fill="#242424">契約価格・利用条件を優先。</text>
+<text x="45" y="1050" text-anchor="start" font-family="Noto Sans JP Thin, Noto Sans JP, Yu Gothic, Meiryo, sans-serif" font-size="15" font-weight="400" fill="#555">価格注記：表示額は税別とみられる参考値。NIサイトは地域・契約・サービス条件で変動。Base Deployment／Debug Deploymentは実験PCごとに必要。</text>
+</svg>
