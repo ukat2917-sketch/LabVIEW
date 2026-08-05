@@ -1,0 +1,59 @@
+name: Run RAMScope documentation migration
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out default branch
+        uses: actions/checkout@v4
+        with:
+          ref: claude/labview-teststand-automation-docs-fri3r4
+          fetch-depth: 0
+
+      - name: Execute embedded migration
+        shell: python
+        run: |
+          from pathlib import Path
+          import textwrap
+
+          workflow_path = Path('.github/workflows/merge-ramscope-read-doc.yml')
+          source = workflow_path.read_text(encoding='utf-8')
+          section = source.index('      - name: Merge Read guide into chapter 10')
+          start = source.index('        run: |\n', section) + len('        run: |\n')
+          end = source.index('\n      - name: Validate consolidation', start)
+          code = textwrap.dedent(source[start:end])
+          exec(compile(code, str(workflow_path), 'exec'))
+
+          Path('.github/workflows/run-ramscope-migration.yml').unlink()
+
+      - name: Validate migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e docs/10R_RAMScope_Read_vi_作成手順.md
+          test ! -e .github/workflows/merge-ramscope-read-doc.yml
+          test ! -e .github/workflows/run-ramscope-migration.yml
+          grep -Fq '#### 5. `RAMScope_Read.vi`（GetBufferDataNum対応の最終仕様・詳細作成手順）' docs/10_RAMScope実装方針.md
+          grep -Fq 'PoC Max Buffer Bytes I64' docs/10_RAMScope実装方針.md
+          grep -Fq '`Max Buffer Bytes` I64がRead VIの同名端子へ接続され' docs/10_RAMScope実装方針.md
+          grep -Fq '`-700166`' docs/10_RAMScope実装方針.md
+          ! grep -Fq '%lld' docs/10_RAMScope実装方針.md
+          ! grep -Fq '10R_RAMScope_Read_vi_作成手順.md' README.md
+
+      - name: Commit migrated documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'docs: consolidate RAMScope Read guide into chapter 10'
+          git push origin HEAD:claude/labview-teststand-automation-docs-fri3r4
