@@ -7,6 +7,10 @@ on:
       - claude/labview-teststand-automation-docs-fri3r4
     paths:
       - .github/workflows/merge-ramscope-read-doc.yml
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - claude/labview-teststand-automation-docs-fri3r4
 
 permissions:
   contents: write
@@ -14,11 +18,13 @@ permissions:
 jobs:
   consolidate:
     runs-on: ubuntu-latest
+    env:
+      TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          ref: claude/labview-teststand-automation-docs-fri3r4
+          ref: ${{ env.TARGET_BRANCH }}
           fetch-depth: 0
 
       - name: Merge Read guide into chapter 10
@@ -294,4 +300,4 @@ RequestedDataNum <= AvailableDataNum
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add README.md docs/10_RAMScope実装方針.md docs/10R_RAMScope_Read_vi_作成手順.md .github/workflows/merge-ramscope-read-doc.yml
           git commit -m "docs: consolidate RAMScope Read guide into chapter 10"
-          git push origin HEAD:claude/labview-teststand-automation-docs-fri3r4
+          git push origin HEAD:"$TARGET_BRANCH"
