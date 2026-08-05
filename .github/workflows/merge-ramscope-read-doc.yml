@@ -1,4 +1,4 @@
-# One-time documentation migration. This file deletes itself after success.
+# One-time documentation migration for PR execution. This file deletes itself after success.
 name: Consolidate RAMScope Read documentation
 
 on:
