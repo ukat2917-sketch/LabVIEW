@@ -1,0 +1,2 @@
+ORIGINAL
+line2
