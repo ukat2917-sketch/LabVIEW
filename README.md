@@ -8,7 +8,7 @@ NI社製LabVIEWとTestStandを利用し、複数機器を連携させる自動�
 > 機能要求をデータモデル、アルゴリズムおよびLabVIEW構造へ落とし込む設計意図は[00B_LabVIEW学習型VI設計ルール.md](./docs/00B_LabVIEW学習型VI設計ルール.md)を正とする。
 > すべてのVI作成・改訂資料は00Aと00Bの両方へ従う。
 > 製品Version、NI公式Help、ベンダー仕様書および実機確認状態は[00C_一次資料とバージョン基準.md](./docs/00C_一次資料とバージョン基準.md)を正とする。
-> RAMScopeの環境準備、DLLラッパ、構造体生成、Parser、公開API、PoCは[10_RAMScope実装方針.md](./docs/10_RAMScope実装方針.md)を上位正本とし、`RAMScope_Read.vi`の端子・Case・配線単位の詳細は[10R_RAMScope_Read_vi_作成手順.md](./docs/10R_RAMScope_Read_vi_作成手順.md)を使用する。
+> RAMScopeの環境準備、DLLラッパ、構造体生成、Parser、公開API、Read詳細手順、PoCは[10_RAMScope実装方針.md](./docs/10_RAMScope実装方針.md)を唯一の正本として使用する。
 
 ---
 
@@ -58,7 +58,6 @@ NI社製LabVIEWとTestStandを利用し、複数機器を連携させる自動�
   ├─ 構造体Builder
   ├─ SYSINFO / Buffer Parser
   ├─ 公開API
-  ├─ 10R RAMScope_Read.vi詳細作成手順
   └─ RAMScope単体PoC
   ↓
 CAN方式確定・CAN単体PoC
@@ -70,7 +69,7 @@ CAN方式確定・CAN単体PoC
 13  ロードマップと完了条件
 ```
 
-RAMScope実装では旧`10A`、`10B`、`10B-1`から`10B-4`を参照しない。第10章を上位正本とし、`RAMScope_Read.vi`の詳細作業だけは子文書`10R`を併用する。
+RAMScope実装では旧`10A`、`10B`、`10B-1`から`10B-4`を参照しない。環境準備から`RAMScope_Read.vi`の詳細作業、PoCまで第10章だけを使用する。
 
 ---
 
@@ -145,7 +144,6 @@ TestStandは`RS_DLL_*`を直接呼ばない。
 | 08 | [docs/08_負荷電流VIと並列処理.md](./docs/08_負荷電流VIと並列処理.md) | 負荷電流ランプ、並列処理 |
 | 09 | [docs/09_CAN通信の実装.md](./docs/09_CAN通信の実装.md) | CAN方式選定と実装方針 |
 | 10 | [docs/10_RAMScope実装方針.md](./docs/10_RAMScope実装方針.md) | RAMScope環境準備からPoCまでの上位実装ガイド |
-| 10R | [docs/10R_RAMScope_Read_vi_作成手順.md](./docs/10R_RAMScope_Read_vi_作成手順.md) | GetBufferDataNum対応後のRead公開APIを端子・Case・配線単位で再現する詳細手順 |
 | 11 | [docs/11_TestStandシーケンス構築手順.md](./docs/11_TestStandシーケンス構築手順.md) | TestStandへの組み込み |
 | 12 | [docs/12_異常系処理とシャットダウン設計.md](./docs/12_異常系処理とシャットダウン設計.md) | Cleanup、安全停止、データ退避 |
 | 13 | [docs/13_構築ロードマップ.md](./docs/13_構築ロードマップ.md) | 現在地、残作業、完了条件 |
