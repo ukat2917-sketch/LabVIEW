@@ -1,0 +1,46 @@
+name: Patch RAMScope metadata documentation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-documentation:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out canonical branch
+        uses: actions/checkout@v4
+        with:
+          ref: claude/labview-teststand-automation-docs-fri3r4
+          fetch-depth: 0
+
+      - name: Apply metadata documentation patch
+        run: python scripts/patch-ramscope-metadata-doc.py
+
+      - name: Verify documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'ramscope-metadata-detail-start' docs/10_RAMScope実装方針.md
+          grep -q 'RAMScope_File_Log_Write_Metadata.vi: TDMS file reference is invalid.' docs/10_RAMScope実装方針.md
+          grep -q 'RAMScope_File_Log_Write_Metadata.vi: Channel List must not be empty. ChannelCount=%d' docs/10_RAMScope実装方針.md
+          grep -q '| `-700179` | `RAMScope_File_Log_Write_Metadata.vi` | TDMS File Refが無効 |' docs/10_RAMScope実装方針.md
+          grep -q '| `-700181` | `RAMScope_File_Log_Write_Metadata.vi` | Channel Listが空 |' docs/10_RAMScope実装方針.md
+          git diff --check
+
+      - name: Commit canonical document
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'No documentation changes.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/10_RAMScope実装方針.md
+          git commit -m 'docs: detail RAMScope metadata writer implementation'
+          git push origin HEAD:claude/labview-teststand-automation-docs-fri3r4
