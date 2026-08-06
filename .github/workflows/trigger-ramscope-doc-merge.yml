@@ -1,0 +1,33 @@
+name: Trigger RAMScope chapter 10 consolidation
+
+on:
+  push:
+    branches:
+      - claude/labview-teststand-automation-docs-fri3r4
+    paths:
+      - .github/workflows/trigger-ramscope-doc-merge.yml
+
+permissions:
+  contents: write
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: claude/labview-teststand-automation-docs-fri3r4
+          fetch-depth: 0
+
+      - name: Trigger consolidation workflow and remove this trigger
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          printf '\n# Triggered by one-time launcher at %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> .github/workflows/merge-ramscope-read-doc.yml
+          rm .github/workflows/trigger-ramscope-doc-merge.yml
+          git add .github/workflows/merge-ramscope-read-doc.yml .github/workflows/trigger-ramscope-doc-merge.yml
+          git commit -m "chore: launch RAMScope documentation consolidation"
+          git push origin HEAD:claude/labview-teststand-automation-docs-fri3r4
