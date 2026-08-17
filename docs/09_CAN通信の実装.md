@@ -8,8 +8,10 @@
 > VI作成手順は[00A_LabVIEW実装資料の記述ルール.md](./00A_LabVIEW実装資料の記述ルール.md)を正とし、ActiveXの一般仕様とCANalyzer固有Type Libraryの確認順は[00C](./00C_一次資料とバージョン基準.md)に従う。
 >
 > CANalyzer COM APIのプロパティ名・メソッド名は、対象PCに登録されたCANalyzer Type Libraryを一次情報とする。CANalyzerの版によって表示名や引数が異なる場合は推測で固定せず、`実機確認待ち`として`10_ActiveX_Wrapper`だけを差し替える。
+>
+> **2026-08-17 実装追補**：LabVIEW 2026 Q3 / CANalyzer 12.0 Type Library Version 1.3bで実際に確認したInterface、作成済みWrapper / Serviceの具体的配線、参照所有権、error正規化、Coding Agent制約、次回再開位置は[`09A_CANalyzer_ActiveXラッパ実装実績.md`](./09A_CANalyzer_ActiveXラッパ実装実績.md)へ統合している。既存VIの手順は09A側で実型・実配線とマージして記録し、別の重複手順は作らない。
 
-**最終整理日：2026-07-26**
+**最終整理日：2026-08-17**
 
 ---
 
@@ -19,10 +21,10 @@
 
 | 項目 | 採用内容 | 状態 |
 |---|---|---|
-| LabVIEW | 2026 Q1 64bit | 確定 |
-| TestStand | 2026 Q1 64bit | 確定 |
+| LabVIEW | 2026 Q3 64bit | 確定 |
+| TestStand | 2026 Q3 64bit | 確定 |
 | CANalyzer | 64bit | 確定 |
-| CANalyzer版 | 確認中 | 実機確認待ち |
+| CANalyzer版 | 12.0 Type Library Version 1.3b | 開発PC確認済み |
 | 制御方式 | LabVIEW ActiveX Automation | 採用 |
 | ProgID | `CANalyzer.Application` | 既存ロジックで使用済み |
 | 起動済み環境 | 既存CANalyzerを再利用 | 必須 |
@@ -260,63 +262,11 @@ Public、Service、TestStandはCANalyzer固有ActiveX型へ依存させない。
 
 ---
 
-# 9.6 フォルダ構成
+# 9.6 以降の詳細設計
 
-```text
-60_CAN
-├─ 00_Common
-├─ 10_ActiveX_Wrapper
-├─ 20_Service
-├─ 30_Public
-├─ 40_PoC
-├─ 50_Standalone
-└─ 90_TestStand
-```
+以降の詳細な既存設計、VI一覧、Phase、Public API、Fault、Cleanup、Standalone、TestStand統合は従来の`09_CAN通信の実装.md`を正とする。
 
----
-
-# 9.7 00_Common
-
-（以下、既存内容は維持）
-
-> **2026-08-17 実装追補**：実際に作成したWrapper / Serviceの型・配線・参照所有権・error正規化・Coding Agent制約は[`09A_CANalyzer_ActiveXラッパ実装実績.md`](./09A_CANalyzer_ActiveXラッパ実装実績.md)へ統合済み。既存VIの概念手順と重複する内容は09A側で実型をマージしている。
-
----
-
-# 9.8 実装Phase
-
-設計上のPhase順は従来どおり維持する。
-
-2026-08-17時点の実装済み範囲：
-
-```text
-10_ActiveX_Wrapper
-├─ CAN_AX_Open_Application.vi
-├─ CAN_AX_Get_System.vi
-├─ CAN_AX_Get_Measurement.vi
-├─ CAN_AX_Get_Measurement_Running.vi
-├─ CAN_AX_Start_Measurement.vi
-├─ CAN_AX_Stop_Measurement.vi
-├─ CAN_AX_Get_Namespace.vi
-├─ CAN_AX_Get_Variables.vi
-├─ CAN_AX_Get_Variable_Item.vi
-├─ CAN_AX_Read_Variable_Value.vi
-├─ CAN_AX_Write_Variable_Value.vi
-├─ CAN_AX_Get_Version.vi
-├─ CAN_AX_Get_Version_FullName.vi
-├─ CAN_AX_Get_Configuration.vi
-├─ CAN_AX_Get_Configuration_Path.vi
-├─ CAN_AX_Open_Configuration.vi
-└─ CAN_AX_Quit_Application.vi
-
-20_Service
-├─ CANalyzer_Resolve_SysVar.vi
-├─ CANalyzer_Value_To_Variant.vi
-└─ CANalyzer_Variant_To_Value.vi
-
-40_PoC
-└─ PoC_CANalyzer_01_Open_Close.vi
-```
+**ただし、2026-08-17に実際に作成したVIの具体的な手順は、既存手順とマージした[`09A_CANalyzer_ActiveXラッパ実装実績.md`](./09A_CANalyzer_ActiveXラッパ実装実績.md)を実装時の追補正本とする。**
 
 次回再開位置：
 
@@ -324,5 +274,3 @@ Public、Service、TestStandはCANalyzer固有ActiveX型へ依存させない。
 Phase 6
 PoC_CANalyzer_02_SysVar_Read_Write.vi
 ```
-
-詳細は09Aを参照する。
