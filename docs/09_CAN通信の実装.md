@@ -3,15 +3,13 @@
 <!-- generated-vi-diagram -->
 ![CANalyzer公開API接続](./assets/vi-diagrams/canalyzer-public-api-flow.svg)
 
-> **本章の役割**：既存のPython COM APIロジックをLabVIEW 2026 Q3 64bitのActiveX機能へ置き換え、CANalyzerの接続・新規起動・Configuration確認・Measurement制御・System Variable読書き・故障注入・最小PoC・LabVIEW単体本番VI・TestStand組み込みまでを、画面操作で再現できる粒度で定義する。
+> **本章の役割**：既存のPython COM APIロジックをLabVIEW 2026 Q1 64bitのActiveX機能へ置き換え、CANalyzerの接続・新規起動・Configuration確認・Measurement制御・System Variable読書き・故障注入・最小PoC・LabVIEW単体本番VI・TestStand組み込みまでを、画面操作で再現できる粒度で定義する。
 >
 > VI作成手順は[00A_LabVIEW実装資料の記述ルール.md](./00A_LabVIEW実装資料の記述ルール.md)を正とし、ActiveXの一般仕様とCANalyzer固有Type Libraryの確認順は[00C](./00C_一次資料とバージョン基準.md)に従う。
 >
 > CANalyzer COM APIのプロパティ名・メソッド名は、対象PCに登録されたCANalyzer Type Libraryを一次情報とする。CANalyzerの版によって表示名や引数が異なる場合は推測で固定せず、`実機確認待ち`として`10_ActiveX_Wrapper`だけを差し替える。
->
-> **2026-08-17追記**：実装時に確認したCANalyzer 12.0 Type Libraryの実型、作成済みWrapper / Serviceの具体的配線、Coding Agent制約、次回再開位置は[`09A_CANalyzer_ActiveXラッパ実装実績.md`](./09A_CANalyzer_ActiveXラッパ実装実績.md)へ統合している。本章に既に存在するVI手順については09A側で実型・実配線をマージし、重複した別手順を増やさない。
 
-**最終整理日：2026-08-17**
+**最終整理日：2026-07-26**
 
 ---
 
@@ -21,12 +19,12 @@
 
 | 項目 | 採用内容 | 状態 |
 |---|---|---|
-| LabVIEW | 2026 Q3 64bit | 確定 |
-| TestStand | 2026 Q3 64bit | 確定 |
+| LabVIEW | 2026 Q1 64bit | 確定 |
+| TestStand | 2026 Q1 64bit | 確定 |
 | CANalyzer | 64bit | 確定 |
-| CANalyzer版 | 12.0 Type Library Version 1.3b | 開発PCで確認済み |
+| CANalyzer版 | 確認中 | 実機確認待ち |
 | 制御方式 | LabVIEW ActiveX Automation | 採用 |
-| ProgID | `CANalyzer.Application` | 確認済み |
+| ProgID | `CANalyzer.Application` | 既存ロジックで使用済み |
 | 起動済み環境 | 既存CANalyzerを再利用 | 必須 |
 | 未起動環境 | LabVIEWからCANalyzerを起動 | 必須 |
 | Configuration | 指定cfgを開く、または実cfgと照合 | 必須 |
@@ -253,15 +251,43 @@ Public、Service、TestStandはCANalyzer固有ActiveX型へ依存させない。
 
 ## 9.5.2 Compatibility判定
 
-Compatibilityの詳細、以降のVI一覧、Phase順、Public API、Fault、Cleanup、TestStand統合は本章の既存設計方針を維持する。
-
-**実装済みVIの具体的な手順と、2026-08-17時点の確定Interface・配線・参照所有権・error正規化は[`09A_CANalyzer_ActiveXラッパ実装実績.md`](./09A_CANalyzer_ActiveXラッパ実装実績.md)を参照する。**
+| 判定 | 意味 |
+|---|---|
+| `Compatible` | 既知Versionで主要機能を確認済み |
+| `Compatible With Warning` | 未知VersionだがCapability Probe成功 |
+| `Unsupported` | 必須Capability不足 |
+| `Unknown` | Version取得やProbe自体に失敗 |
 
 ---
 
-# 9.6 2026-08-17 実装済み範囲
+# 9.6 フォルダ構成
 
-以下は実装済みまたは静的配線完了。
+```text
+60_CAN
+├─ 00_Common
+├─ 10_ActiveX_Wrapper
+├─ 20_Service
+├─ 30_Public
+├─ 40_PoC
+├─ 50_Standalone
+└─ 90_TestStand
+```
+
+---
+
+# 9.7 00_Common
+
+（以下、既存内容は維持）
+
+> **2026-08-17 実装追補**：実際に作成したWrapper / Serviceの型・配線・参照所有権・error正規化・Coding Agent制約は[`09A_CANalyzer_ActiveXラッパ実装実績.md`](./09A_CANalyzer_ActiveXラッパ実装実績.md)へ統合済み。既存VIの概念手順と重複する内容は09A側で実型をマージしている。
+
+---
+
+# 9.8 実装Phase
+
+設計上のPhase順は従来どおり維持する。
+
+2026-08-17時点の実装済み範囲：
 
 ```text
 10_ActiveX_Wrapper
@@ -299,4 +325,4 @@ Phase 6
 PoC_CANalyzer_02_SysVar_Read_Write.vi
 ```
 
-詳細手順は09Aへマージ済み。
+詳細は09Aを参照する。
