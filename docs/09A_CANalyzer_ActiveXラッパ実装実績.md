@@ -2,7 +2,7 @@
 
 **最終整理日：2026-08-17**
 
-> **本章の役割**：[`09_CAN通信の実装.md`](./09_CAN通信の実装.md) を設計正本とし、2026-08-17時点でLabVIEW上から実際のCANalyzer Type Libraryを確認しながら作成したActiveX Wrapperと最小PoCの実装手順・確認結果を記録する。
+> **本章の役割**：[`09_CAN通信の実装.md`](./09_CAN通信の実装.md) を設計正本とし、2026-08-17時点でLabVIEW上から実際のCANalyzer Type Libraryを確認しながら作成したActiveX Wrapper、Service、最小PoCの実装手順・確認結果を記録する。
 >
 > 本章では、Type Libraryで確認できた事実と、まだ実行確認していない事項を分離する。CANalyzer固有API名、Interface名、引数は推測で補わない。
 
@@ -20,6 +20,7 @@
 | LabVIEW Project | `C:\LabVIEW work\SVS_AutoTestSystem\SVS_AutoSystem.lvproj` | Confirmed |
 | CAN実装ルート | `C:\LabVIEW work\SVS_AutoTestSystem\60_CAN\` | Confirmed |
 | ActiveX Wrapper | 手動作成 | Static wiring confirmed |
+| Service | 一部手動作成 | Static wiring confirmed |
 | 実CAN通信 | 未実施 | 実験PC確認待ち |
 | SysVar実値Read / Write | 未実施 | 実験PC確認待ち |
 | Measurement実動作 | 未実施 | 実験PC確認待ち |
@@ -38,354 +39,109 @@ LabVIEW Coding Agentについて、CANalyzer実装前にCapability Probeを実�
 
 既存の手動作成WrapperをSubVIとして配置するProbeでは、`Unsupported SubVI`となり生成できなかった。
 
-したがって、現時点では次をCoding Agent主体で生成しない。
+## 2.2 CANalyzer ActiveX Member選択
 
-- 既存Wrapperを組み合わせるService VI
-- 既存Wrapperを組み合わせるPublic VI
-- 既存Wrapperを組み合わせるPoC
+`CANalyzer.ISystem3`、`CANalyzer.INamespaces2`、`CANalyzer.INamespace`等の型端子自体は生成できたが、以下は成立しなかった。
 
-## 2.2 ActiveX Property / Invoke Member選択
+- `ISystem3.Namespaces` Property選択
+- `INamespaces2.Item` Method選択
+- それに続くString index配線
+- `INamespace`出力確定
 
-`CAN_AX_Get_Namespace.vi`相当のCapability Probeでは、以下のCANalyzer型端子自体は生成可能だった。
-
-- `CANalyzer.ISystem3`
-- `CANalyzer.INamespaces2`
-- `CANalyzer.INamespace`
-
-一方、Coding Agentでは以下が成立しなかった。
-
-- `ISystem3.Namespaces` Propertyの選択
-- `INamespaces2.Item` Methodの選択
-- Member確定後の配線完了
-
-したがって、**CANalyzer固有のProperty Node / Invoke Nodeを使用するWrapperは人手で作成する。**
+したがって、CANalyzer Type Libraryに依存するProperty / Invoke NodeのMember選択は手動実装とした。
 
 ## 2.3 `.ctl` / typedef
 
-Coding Agentでは`.ctl`の新規作成およびtypedef構築が未対応だった。
+`.ctl`新規作成はCoding Agentで未対応だった。
 
-したがって、`00_Common`のtypedef / ctlも人手作成とする。
+また、人手作成済みの`CANalyzer_SysVar_Value.ctl`、`CANalyzer_Value_Type.ctl`を既存typedefとして利用する処理も成立しなかった。
 
----
+## 2.4 既存VIの差分編集
 
-# 3. ActiveX Wrapper共通実装ルール
+既存`CANalyzer_Variant_To_Value.vi`へerror正規化処理だけを追加するProbeも実施したが、既存配線・トンネル・cluster端子の解決に失敗し、HOLDとなった。
 
-保存先：
-
-```text
-60_CAN\10_ActiveX_Wrapper\
-```
-
-共通ルール：
-
-1. CANalyzer固有ActiveX型は`10_ActiveX_Wrapper`内に閉じ込める。
-2. `error in` / `error out`を直列配線する。
-3. 入力されたActiveX RefはWrapper内でCloseしない。
-4. 呼び出し側へ返すActiveX RefはWrapper内でCloseしない。
-5. Wrapper内部だけで取得する一時RefはWrapper内でCloseする。
-6. Property / Method / Interface名はType Library実値を使用する。
-7. Connector Paneは主入力を左上、`error in`を左下、主出力を右上、`error out`を右下とする基本配置へ統一する。
-8. VariantからCOM Interfaceへ変換する場合は`Variant To Data`を使用する。
-
----
-
-# 4. Type Libraryで確認したActiveX型経路
-
-2026-08-17時点のCANalyzer 12.0環境で確認した主経路は以下。
+### 現時点の分担
 
 ```text
-CANalyzer.Application
-  ↓ Automation Open
-IApplication10
-  ├─ System
-  │    ↓ Variant
-  │  ISystem3
-  │    ↓ Namespaces
-  │  Variant
-  │    ↓ cast
-  │  INamespaces2
-  │    ↓ Item(index: String)
-  │  INamespace
-  │    ↓ Variables
-  │  Variant
-  │    ↓ cast
-  │  IVariables3
-  │    ↓ Item(index: String)
-  │  IVariable
-  │    ↓ Value
-  │  Variant
-  │
-  ├─ Measurement
-  │    ↓ Variant
-  │  IMeasurement5
-  │    ├─ Running
-  │    ├─ Start
-  │    └─ Stop
-  │
-  ├─ Version
-  │    ↓ Variant
-  │  IVersion2
-  │    └─ FullName
-  │
-  └─ Configuration
-       ↓ Variant
-     IConfiguration16
-       └─ Path
+人手
+├─ .ctl / typedef作成
+├─ CANalyzer ActiveX Wrapper
+├─ 既存typedefを使うService VI
+├─ 既存SubVIを組み合わせるComposite VI
+└─ 既存VIの差分修正
+
+Coding Agent
+├─ 設計レビュー
+├─ 手順レビュー
+├─ テスト観点整理
+└─ LabVIEW標準Primitiveだけで完結する新規VIの限定的検討
 ```
 
 ---
 
-# 5. `CAN_AX_Open_Application.vi`
+# 3. CANalyzer 12.0で確認済みのActiveX型経路
 
-## 5.1 目的
-
-CANalyzer ApplicationのAutomation Refを取得する。
-
-## 5.2 入出力
-
-| 端子名 | 方向 | 型 |
-|---|---|---|
-| `Open New Instance?` | 入力 | Boolean |
-| `error in` | 入力 | error cluster |
-| `Application Ref` | 出力 | `CANalyzer.IApplication10` |
-| `error out` | 出力 | error cluster |
-
-## 5.3 配置・配線
-
-1. CANalyzer Type Libraryから`Application (CANalyzer.Application.1)`を指定したAutomation Refnumを配置する。
-2. オートメーションを開く（Automation Open）へ型Refnumを接続する。
-3. `Open New Instance?`をAutomation Openへ接続する。
-4. `error in` / `error out`を直列接続する。
-5. Automation Open出力を`Application Ref`として返す。
-6. このVI内ではApplication RefをCloseしない。
-
-**Type Library実値**：`IApplication10`
-
-**State**：手動実装済み
-
----
-
-# 6. `CAN_AX_Get_System.vi`
-
-## 6.1 目的
-
-ApplicationからSystem Interfaceを取得する。
-
-## 6.2 入出力
-
-| 端子名 | 方向 | 型 |
-|---|---|---|
-| `Application Ref` | 入力 | `CANalyzer.IApplication10` |
-| `error in` | 入力 | error cluster |
-| `System Ref` | 出力 | `CANalyzer.ISystem3` |
-| `error out` | 出力 | error cluster |
-
-## 6.3 配線順
+## 3.1 Application
 
 ```text
-Application Ref : IApplication10
-  ↓ Property: System
-Variant
-  ↓ Variant To Data
-CANalyzer.ISystem3
-  ↓
-System Ref
+Application (CANalyzer.Application.1)
+→ CANalyzer.IApplication10
 ```
 
-`IApplication10.System`の戻り値はVariantであるため、`Variant To Data`で`ISystem3`へ変換する。
-
-**State**：手動実装済み
-
----
-
-# 7. Measurement Wrapper
-
-## 7.1 `CAN_AX_Get_Measurement.vi`
+## 3.2 System
 
 ```text
-Application Ref : IApplication10
-  ↓ Property: Measurement
-Variant
-  ↓ Variant To Data
-CANalyzer.IMeasurement5
-  ↓
-Measurement Ref
+IApplication10.System
+→ Variant
+→ Variant To Data(type = CANalyzer.ISystem3)
+→ ISystem3
 ```
 
-`IApplication10.Measurement`の戻り値はVariant。
-
-**確認済みInterface**：`IMeasurement5`
-
-**State**：手動実装済み
-
-## 7.2 `CAN_AX_Get_Measurement_Running.vi`
+## 3.3 Measurement
 
 ```text
-Measurement Ref : IMeasurement5
-  ↓ Property: Running
-Boolean
+IApplication10.Measurement
+→ Variant
+→ Variant To Data(type = CANalyzer.IMeasurement5)
+→ IMeasurement5
 ```
 
-| 出力 | 型 | 意味 |
-|---|---|---|
-| `Running` | Boolean | 停止=False、実行=True |
-
-**State**：手動実装済み
-
-## 7.3 `CAN_AX_Start_Measurement.vi`
+`IMeasurement5`では以下を確認済み。
 
 ```text
-Measurement Ref : IMeasurement5
-  ↓ Invoke Method: Start
+Running : Property → Boolean
+Start   : Method
+Stop    : Method
 ```
 
-Start後のRunning待ちはWrapperへ入れない。
-
-**State**：手動実装済み
-
-## 7.4 `CAN_AX_Stop_Measurement.vi`
+## 3.4 System Variable
 
 ```text
-Measurement Ref : IMeasurement5
-  ↓ Invoke Method: Stop
+ISystem3.Namespaces
+→ Variant
+→ Variant To Data(type = CANalyzer.INamespaces2)
+→ INamespaces2.Item(index : String)
+→ INamespace
+→ INamespace.Variables
+→ Variant
+→ Variant To Data(type = CANalyzer.IVariables3)
+→ IVariables3.Item(index : String)
+→ IVariable
+→ IVariable.Value
 ```
 
-Stop後のRunning待ちはWrapperへ入れない。
+`IVariable.Value`のRead戻りはVariant。
 
-**State**：手動実装済み
-
----
-
-# 8. System Variable Wrapper
-
-## 8.1 `CAN_AX_Get_Namespace.vi`
-
-### 入出力
-
-| 端子名 | 方向 | 型 |
-|---|---|---|
-| `System Ref` | 入力 | `CANalyzer.ISystem3` |
-| `Namespace` | 入力 | String |
-| `error in` | 入力 | error cluster |
-| `Namespace Ref` | 出力 | `CANalyzer.INamespace` |
-| `error out` | 出力 | error cluster |
-
-### 配線順
+## 3.5 Version
 
 ```text
-System Ref : ISystem3
-  ↓ Property: Namespaces
-Variant
-  ↓ Variant To Data
-INamespaces2
-  ↓ Invoke Method: Item
-index = Namespace String
-  ↓
-INamespace
-  ↓
-Namespace Ref
+IApplication10.Version
+→ Variant
+→ Variant To Data(type = CANalyzer.IVersion2)
+→ IVersion2
 ```
 
-`INamespaces2`はWrapper内部だけで使用する一時Refのため、`Item`実行後にClose Referenceする。
-
-```text
-error in
-  ↓
-Namespaces
-  ↓
-Variant To Data
-  ↓
-Item
-  ↓
-Close Reference (INamespaces2)
-  ↓
-error out
-```
-
-参照所有権：
-
-- `System Ref`：Closeしない
-- `INamespaces2`：VI内部でClose
-- `Namespace Ref`：Closeせず呼出側へ返す
-
-**State**：手動実装済み
-
-## 8.2 `CAN_AX_Get_Variables.vi`
-
-```text
-Namespace Ref : INamespace
-  ↓ Property: Variables
-Variant
-  ↓ Variant To Data
-CANalyzer.IVariables3
-  ↓
-Variables Ref
-```
-
-入力`Namespace Ref`、出力`Variables Ref`ともWrapper内ではCloseしない。
-
-**State**：手動実装済み
-
-## 8.3 `CAN_AX_Get_Variable_Item.vi`
-
-```text
-Variables Ref : IVariables3
-Variable Name : String
-  ↓ Invoke Method: Item
-index = Variable Name
-  ↓
-CANalyzer.IVariable
-  ↓
-Variable Ref
-```
-
-`IVariables3.Item`の`index`はString。
-
-**State**：手動実装済み
-
-## 8.4 `CAN_AX_Read_Variable_Value.vi`
-
-```text
-Variable Ref : IVariable
-  ↓ Property: Value (Read)
-Variant
-  ↓
-Value Variant
-```
-
-WrapperではI32等へ変換せずVariantのまま返す。
-
-**State**：手動実装済み
-
-## 8.5 `CAN_AX_Write_Variable_Value.vi`
-
-```text
-Variable Ref : IVariable
-Value Variant : Variant
-  ↓ Property: Value (Write)
-```
-
-`Variable Ref`は呼出元所有のためCloseしない。
-
-**State**：手動実装済み
-
----
-
-# 9. Version Wrapper
-
-## 9.1 `CAN_AX_Get_Version.vi`
-
-```text
-Application Ref : IApplication10
-  ↓ Property: Version
-Variant
-  ↓ Variant To Data
-CANalyzer.IVersion2
-  ↓
-Version Ref
-```
-
-Type Library上で`IVersion2`に以下のPropertyが存在することを確認した。
+`IVersion2`で確認済みのProperty：
 
 - `Application`
 - `Build`
@@ -396,272 +152,825 @@ Type Library上で`IVersion2`に以下のPropertyが存在することを確認�
 - `Parent`
 - `Patch`
 
-**State**：手動実装済み
-
-## 9.2 `CAN_AX_Get_Version_FullName.vi`
-
-```text
-Version Ref : IVersion2
-  ↓ Property: FullName
-String
-  ↓
-Version Full Name
-```
-
 `FullName`の戻り値はString。
 
-**State**：手動実装済み
-
----
-
-# 10. Configuration Wrapper
-
-## 10.1 `CAN_AX_Get_Configuration.vi`
+## 3.6 Configuration
 
 ```text
-Application Ref : IApplication10
-  ↓ Property: Configuration
-Variant
-  ↓ Variant To Data
-CANalyzer.IConfiguration16
-  ↓
-Configuration Ref
+IApplication10.Configuration
+→ Variant
+→ Variant To Data(type = CANalyzer.IConfiguration16)
+→ IConfiguration16
 ```
 
-**State**：手動実装済み
+`IConfiguration16`で確認済みのProperty：
 
-## 10.2 `CAN_AX_Get_Configuration_Path.vi`
+- `Path`
+- `FullName`
+- `Name`
+- `Modified`
+- `ReadOnly`
+- その他
+
+`Path`と`FullName`はいずれもString。
+
+`IConfiguration16`のInvoke Methodで確認できたもの：
 
 ```text
-Configuration Ref : IConfiguration16
-  ↓ Property: Path
-String
-  ↓
-Path
+CompileAndVerify
+Save
+SaveAs
 ```
 
-`IConfiguration16.Path`と`IConfiguration16.FullName`はいずれもStringであることを確認済み。
-
-現時点では`Path`を`CAN_AX_Get_Configuration_Path.vi`で採用している。ただし、**PathとFullNameの実値上の意味の違いは未実行確認**。Expected / Actual Configuration比較にどちらを正式採用するかは実値確認後に確定する。
-
-**State**：手動実装済み、意味差は実機確認待ち
-
-## 10.3 `CAN_AX_Open_Configuration.vi`
-
-`IConfiguration16`のInvoke Method一覧では以下を確認した。
-
-- `CompileAndVerify`
-- `Save`
-- `SaveAs`
-
-Configurationを開くMethodは`IConfiguration16`側では確認できなかった。
-
-`IApplication10`のInvoke Method一覧を確認し、`Open`を確認した。
-
-### Type Library実値
+Configuration Openは`IConfiguration16`ではなく`IApplication10.Open`を使用する。
 
 ```text
 IApplication10.Open
-  config      : String
-  autoSave    : Boolean
-  promptUser  : Boolean
+├─ config     : String
+├─ autoSave   : Boolean
+└─ promptUser : Boolean
 ```
 
-### VI入力
-
-| 端子名 | 型 |
-|---|---|
-| `Application Ref` | `CANalyzer.IApplication10` |
-| `Configuration Path` | String |
-| `AutoSave?` | Boolean |
-| `Prompt User?` | Boolean |
-| `error in` | error cluster |
-
-出力は`error out`のみ。
-
-Wrapperでは`autoSave`、`promptUser`を固定せず入力端子として公開する。運用上の既定値はService側で決定する。
-
-**State**：手動実装済み
+`IApplication10.Quit`は引数なし。
 
 ---
 
-# 11. `CAN_AX_Quit_Application.vi`
+# 4. 10_ActiveX_Wrapper 実装済みVI
 
-`IApplication10`のInvoke Method一覧から`Quit`を確認した。
+以下は手動作成済み。
+
+```text
+60_CAN\10_ActiveX_Wrapper\
+├─ CAN_AX_Open_Application.vi
+├─ CAN_AX_Get_System.vi
+├─ CAN_AX_Get_Measurement.vi
+├─ CAN_AX_Get_Measurement_Running.vi
+├─ CAN_AX_Start_Measurement.vi
+├─ CAN_AX_Stop_Measurement.vi
+├─ CAN_AX_Get_Namespace.vi
+├─ CAN_AX_Get_Variables.vi
+├─ CAN_AX_Get_Variable_Item.vi
+├─ CAN_AX_Read_Variable_Value.vi
+├─ CAN_AX_Write_Variable_Value.vi
+├─ CAN_AX_Get_Version.vi
+├─ CAN_AX_Get_Version_FullName.vi
+├─ CAN_AX_Get_Configuration.vi
+├─ CAN_AX_Get_Configuration_Path.vi
+├─ CAN_AX_Open_Configuration.vi
+└─ CAN_AX_Quit_Application.vi
+```
+
+Connector Paneは原則として、主入力を左上、`error in`を左下、主出力を右上、`error out`を右下へ配置する。
+
+---
+
+# 5. Wrapper個別手順
+
+既に`09_CAN通信の実装.md`に概念手順があるVIについては、本章では今回確認した実型と実配線を上書きせず補完する。
+
+## 5.1 `CAN_AX_Open_Application.vi`
+
+### 入出力
+
+```text
+Input
+Open New Instance? : Boolean
+error in
+
+Output
+Application Ref : CANalyzer.IApplication10
+error out
+```
+
+### 配線
+
+```text
+CANalyzer.IApplication10型Automation Refnum
+        ↓
+Automation Open
+        ↑
+Open New Instance?
+        ↑
+error in
+        ↓
+Application Ref
+error out
+```
+
+Application RefはこのVIではCloseしない。
+
+---
+
+## 5.2 `CAN_AX_Get_System.vi`
 
 ```text
 Application Ref : IApplication10
-  ↓ Invoke Method: Quit
+        ↓
+Property Node : System
+        ↓
+Variant
+        ↓
+Variant To Data
+ type = CANalyzer.ISystem3
+        ↓
+System Ref : ISystem3
 ```
 
-`Quit`に追加引数はない。
-
-Application RefのCloseはこのVIの責務に含めない。Quit後のClose ReferenceはCleanup側で実施する。
-
-**State**：手動実装済み
+`IApplication10.System`は直接`ISystem3`を返さずVariantを返すため、`Variant To Data`が必要。
 
 ---
 
-# 12. 実装済みActiveX Wrapper一覧
+## 5.3 `CAN_AX_Get_Measurement.vi`
 
-| VI | Type Library実値 | 状態 |
-|---|---|---|
-| `CAN_AX_Open_Application.vi` | `Application (CANalyzer.Application.1)` → `IApplication10` | 実装済み |
-| `CAN_AX_Get_System.vi` | `IApplication10.System` → Variant → `ISystem3` | 実装済み |
-| `CAN_AX_Get_Measurement.vi` | `IApplication10.Measurement` → Variant → `IMeasurement5` | 実装済み |
-| `CAN_AX_Get_Measurement_Running.vi` | `IMeasurement5.Running` | 実装済み |
-| `CAN_AX_Start_Measurement.vi` | `IMeasurement5.Start` | 実装済み |
-| `CAN_AX_Stop_Measurement.vi` | `IMeasurement5.Stop` | 実装済み |
-| `CAN_AX_Get_Namespace.vi` | `ISystem3.Namespaces` → `INamespaces2.Item` → `INamespace` | 実装済み |
-| `CAN_AX_Get_Variables.vi` | `INamespace.Variables` → Variant → `IVariables3` | 実装済み |
-| `CAN_AX_Get_Variable_Item.vi` | `IVariables3.Item` → `IVariable` | 実装済み |
-| `CAN_AX_Read_Variable_Value.vi` | `IVariable.Value` Read → Variant | 実装済み |
-| `CAN_AX_Write_Variable_Value.vi` | Variant → `IVariable.Value` Write | 実装済み |
-| `CAN_AX_Get_Version.vi` | `IApplication10.Version` → Variant → `IVersion2` | 実装済み |
-| `CAN_AX_Get_Version_FullName.vi` | `IVersion2.FullName` → String | 実装済み |
-| `CAN_AX_Get_Configuration.vi` | `IApplication10.Configuration` → Variant → `IConfiguration16` | 実装済み |
-| `CAN_AX_Get_Configuration_Path.vi` | `IConfiguration16.Path` → String | 実装済み、意味差確認待ち |
-| `CAN_AX_Open_Configuration.vi` | `IApplication10.Open(config, autoSave, promptUser)` | 実装済み |
-| `CAN_AX_Quit_Application.vi` | `IApplication10.Quit` | 実装済み |
+```text
+Application Ref : IApplication10
+        ↓
+Property Node : Measurement
+        ↓
+Variant
+        ↓
+Variant To Data
+ type = CANalyzer.IMeasurement5
+        ↓
+Measurement Ref : IMeasurement5
+```
 
 ---
 
-# 13. Connector Pane
-
-上記WrapperはConnector Pane設定まで実施済み。
-
-基本配置：
+## 5.4 `CAN_AX_Get_Measurement_Running.vi`
 
 ```text
-左上：主入力               右上：主出力
-左下：error in             右下：error out
+Measurement Ref : IMeasurement5
+        ↓
+Property Node : Running
+        ↓
+Running : Boolean
 ```
-
-入力が複数あるVIでは主入力の下へ追加入力を並べる。
 
 ---
 
-# 14. 最小Open / Close PoC
-
-作成先：
+## 5.5 `CAN_AX_Start_Measurement.vi`
 
 ```text
-60_CAN\40_PoC\PoC_CANalyzer_01_Open_Close.vi
-```
-
-構成：
-
-```text
-Open New Instance?
-  ↓
-CAN_AX_Open_Application.vi
-  ↓ Application Ref
-  ├───────────────→ 最後のClose Reference
-  ↓
-CAN_AX_Get_System.vi
-  ↓ System Ref
-Close Reference (System Ref)
-  ↓
-Close Reference (Application Ref)
-  ↓
+Measurement Ref : IMeasurement5
+        ↓
+Invoke Node : Start
+        ↓
 error out
 ```
 
-error clusterの順序：
+Running待ちはWrapper内へ入れない。
+
+---
+
+## 5.6 `CAN_AX_Stop_Measurement.vi`
+
+```text
+Measurement Ref : IMeasurement5
+        ↓
+Invoke Node : Stop
+        ↓
+error out
+```
+
+---
+
+## 5.7 `CAN_AX_Get_Namespace.vi`
+
+### 入出力
+
+```text
+Input
+System Ref : CANalyzer.ISystem3
+Namespace  : String
+error in
+
+Output
+Namespace Ref : CANalyzer.INamespace
+error out
+```
+
+### 配線
+
+```text
+System Ref
+  ↓
+ISystem3.Namespaces
+  ↓ Variant
+Variant To Data
+ type = CANalyzer.INamespaces2
+  ↓
+INamespaces2.Item(index = Namespace)
+  ↓
+Namespace Ref : INamespace
+```
+
+`INamespaces2`はVI内部の一時Refなので、`Item`実行後にClose Referenceする。
+
+error順序：
 
 ```text
 error in
-  ↓
-CAN_AX_Open_Application.vi
-  ↓
-CAN_AX_Get_System.vi
-  ↓
-Close Reference (System Ref)
-  ↓
-Close Reference (Application Ref)
-  ↓
+→ Namespaces
+→ Variant To Data
+→ Item
+→ Close INamespaces2
+→ error out
+```
+
+Ref所有権：
+
+```text
+System Ref     : Closeしない
+INamespaces2   : VI内部でClose
+Namespace Ref  : Closeせず出力
+```
+
+---
+
+## 5.8 `CAN_AX_Get_Variables.vi`
+
+```text
+Namespace Ref : INamespace
+        ↓
+Property Node : Variables
+        ↓
+Variant
+        ↓
+Variant To Data
+ type = CANalyzer.IVariables3
+        ↓
+Variables Ref : IVariables3
+```
+
+Namespace Ref、Variables RefともこのVIではCloseしない。
+
+---
+
+## 5.9 `CAN_AX_Get_Variable_Item.vi`
+
+```text
+Variables Ref : IVariables3
+Variable Name : String
+        ↓
+Invoke Node : Item
+ index = Variable Name
+        ↓
+Variable Ref : IVariable
+```
+
+入力Ref、出力RefともこのVIではCloseしない。
+
+---
+
+## 5.10 `CAN_AX_Read_Variable_Value.vi`
+
+```text
+Variable Ref : IVariable
+        ↓
+Property Node : Value（Read）
+        ↓
+Value Variant : Variant
+```
+
+型変換はService側で行う。
+
+---
+
+## 5.11 `CAN_AX_Write_Variable_Value.vi`
+
+```text
+Variable Ref : IVariable
+Value Variant : Variant
+        ↓
+Property Node : Value（Write）
+        ↓
 error out
 ```
 
-参照は子から親の順でCloseする。
+Variable Refは呼出元所有なのでCloseしない。
+
+---
+
+## 5.12 `CAN_AX_Get_Version.vi`
 
 ```text
-System Ref
-  ↓ Close
+Application Ref : IApplication10
+        ↓
+Property Node : Version
+        ↓
+Variant
+        ↓
+Variant To Data
+ type = CANalyzer.IVersion2
+        ↓
+Version Ref : IVersion2
+```
+
+---
+
+## 5.13 `CAN_AX_Get_Version_FullName.vi`
+
+```text
+Version Ref : IVersion2
+        ↓
+Property Node : FullName
+        ↓
+Version Full Name : String
+```
+
+---
+
+## 5.14 `CAN_AX_Get_Configuration.vi`
+
+```text
+Application Ref : IApplication10
+        ↓
+Property Node : Configuration
+        ↓
+Variant
+        ↓
+Variant To Data
+ type = CANalyzer.IConfiguration16
+        ↓
+Configuration Ref : IConfiguration16
+```
+
+---
+
+## 5.15 `CAN_AX_Get_Configuration_Path.vi`
+
+今回の実装では`IConfiguration16.Path`を採用した。
+
+```text
+Configuration Ref : IConfiguration16
+        ↓
+Property Node : Path
+        ↓
+Path : String
+```
+
+`Path`と`FullName`の意味差、特にファイル名を含む完全パスとしてどちらを採用すべきかは、実CANalyzer Configurationを開いた実値確認で最終確定する。
+
+---
+
+## 5.16 `CAN_AX_Open_Configuration.vi`
+
+### 入力
+
+```text
+Application Ref     : CANalyzer.IApplication10
+Configuration Path  : String
+AutoSave?           : Boolean
+Prompt User?        : Boolean
+error in
+```
+
+### 配線
+
+```text
 Application Ref
-  ↓ Close
+        ↓
+Invoke Node : IApplication10.Open
+├─ config     ← Configuration Path
+├─ autoSave   ← AutoSave?
+└─ promptUser ← Prompt User?
+        ↓
+error out
 ```
 
-**State**：ブロックダイアグラム作成済み。実行結果は未記録。
+Wrapperでは`autoSave`、`promptUser`を固定しない。運用値は上位Serviceで決める。
 
 ---
 
-# 15. 現時点の到達点
+## 5.17 `CAN_AX_Quit_Application.vi`
 
 ```text
-Application取得
-  ↓
-System取得
-  ↓
-Measurement Interface取得
-  ↓
-Running / Start / Stop Member確認
-
-System
-  ↓
-Namespaces
-  ↓
-Namespace
-  ↓
-Variables
-  ↓
-Variable
-  ↓
-Value Read / Write
-
-Application
-  ↓
-Version / FullName
-
-Application
-  ↓
-Configuration / Path
-  ↓
-Open(config, autoSave, promptUser)
-
-Application
-  ↓
-Quit
+Application Ref : IApplication10
+        ↓
+Invoke Node : Quit
+        ↓
+error out
 ```
 
-ActiveX Wrapperの主要なType Library依存箇所は手動実装済み。
+`Quit`は引数なし。
+
+Application RefのCloseは別途Cleanup側で行う。
 
 ---
 
-# 16. 次に実装する内容
+# 6. Phase 3 最小Open / Close PoC
 
-次の実装対象は、`09_CAN通信の実装.md`の設計に従いService層へ進む。
-
-優先順：
-
-1. `CANalyzer_Resolve_SysVar.vi`
-2. `CANalyzer_Value_To_Variant.vi`
-3. `CANalyzer_Variant_To_Value.vi`
-4. `PoC_CANalyzer_02_SysVar_Read_Write.vi`
-
-`CANalyzer_Resolve_SysVar.vi`では次のWrapperを順に使用する。
+`PoC_CANalyzer_01_Open_Close.vi`を手動作成した。
 
 ```text
-System Ref
-  ↓
+Open New Instance?
+        ↓
+CAN_AX_Open_Application.vi
+        ↓ Application Ref
+CAN_AX_Get_System.vi
+        ↓ System Ref
+Close Reference（System Ref）
+        ↓
+Close Reference（Application Ref）
+        ↓
+error out
+```
+
+Application Refは`CAN_AX_Get_System.vi`と最後のCloseへ分岐する。
+
+error順序：
+
+```text
+error in
+→ CAN_AX_Open_Application.vi
+→ CAN_AX_Get_System.vi
+→ Close System Ref
+→ Close Application Ref
+→ error out
+```
+
+静的配線は完了。実行確認は環境条件に応じて別途実施する。
+
+---
+
+# 7. 20_Service 実装済みVI
+
+## 7.1 `CANalyzer_Resolve_SysVar.vi`
+
+### 目的
+
+`System Ref`、`Namespace`、`Variable Name`から最終`Variable Ref`を解決する。
+
+### 入出力
+
+```text
+Input
+System Ref     : CANalyzer.ISystem3
+Namespace      : String
+Variable Name  : String
+error in
+
+Output
+Variable Ref   : CANalyzer.IVariable
+error out
+```
+
+### 配線
+
+```text
+System Ref + Namespace
+        ↓
 CAN_AX_Get_Namespace.vi
-  ↓ Namespace Ref
+        ↓ Namespace Ref
 CAN_AX_Get_Variables.vi
-  ↓ Variables Ref
-CAN_AX_Get_Variable_Item.vi
-  ↓ Variable Ref
+        ↓ Variables Ref
+CAN_AX_Get_Variable_Item.vi ← Variable Name
+        ↓ Variable Ref ─────────→ 出力
+        ↓
+Close Reference（Variables Ref）
+        ↓
+Close Reference（Namespace Ref）
+        ↓
+error out
 ```
 
-Resolver内部で`Namespace Ref`と`Variables Ref`をCloseし、`Variable Ref`だけを呼出側へ返す。
+Ref所有権：
 
-実CAN通信、SysVar値、Measurement動作、Configuration Path / FullNameの意味差は、CANalyzerライセンスとCAN Interfaceが利用可能な実験PCで確認する。
+```text
+System Ref     : 入力なのでCloseしない
+Namespace Ref  : Resolver内部でClose
+Variables Ref  : Resolver内部でClose
+Variable Ref   : Closeせず呼出元へ返す
+```
+
+Close順は子から親の逆順で`Variables Ref → Namespace Ref`。
+
+---
+
+## 7.2 `CANalyzer_Value_To_Variant.vi`
+
+### 既存typedef
+
+`CANalyzer_Value_Type.ctl`
+
+```text
+Boolean
+I32
+U32
+DBL
+String
+```
+
+`CANalyzer_SysVar_Value.ctl`
+
+```text
+Value Type      : CANalyzer_Value_Type.ctl
+Boolean Value   : Boolean
+Numeric Value   : DBL
+String Value    : String
+```
+
+### 基本構造
+
+```text
+CANalyzer_SysVar_Value
+        ↓
+Unbundle By Name
+├─ Value Type
+├─ Boolean Value
+├─ Numeric Value
+└─ String Value
+        ↓
+Case Structure（Value Type）
+├─ Boolean
+├─ I32
+├─ U32
+├─ DBL
+└─ String
+        ↓
+To Variant
+        ↓
+Value Variant
+```
+
+### Boolean
+
+```text
+Boolean Value
+→ To Variant
+```
+
+### DBL
+
+```text
+Numeric Value(DBL)
+→ To Variant
+```
+
+### String
+
+```text
+String Value
+→ To Variant
+```
+
+### I32
+
+`Numeric Value`はDBLのため、変換前に以下を確認する。
+
+```text
+-2147483648 <= Numeric Value <= 2147483647
+AND
+Numeric Valueが整数値
+```
+
+整数判定は、丸めた値と元の値が一致することを利用する。
+
+正常時：
+
+```text
+Numeric Value
+→ I32変換
+→ To Variant
+```
+
+不正時：
+
+```text
+error code = -710106
+```
+
+### U32
+
+```text
+0 <= Numeric Value <= 4294967295
+AND
+Numeric Valueが整数値
+```
+
+正常時：
+
+```text
+Numeric Value
+→ U32変換
+→ To Variant
+```
+
+不正時：
+
+```text
+error code = -710106
+```
+
+範囲外値や小数値を先にI32/U32へ強制変換しない。
+
+---
+
+## 7.3 `CANalyzer_Variant_To_Value.vi`
+
+### 目的
+
+`Value Variant`を`Expected Value Type`へ変換し、`CANalyzer_SysVar_Value` Clusterへ格納する。
+
+### 入出力
+
+```text
+Input
+Value Variant       : Variant
+Expected Value Type : CANalyzer_Value_Type.ctl
+error in
+
+Output
+Value               : CANalyzer_SysVar_Value.ctl
+error out
+```
+
+### 変換Case
+
+```text
+Expected Value Type
+        ↓
+Case Structure
+├─ Boolean → Variant To Data(Boolean)
+├─ I32     → Variant To Data(I32) → DBL化 → Numeric Value
+├─ U32     → Variant To Data(U32) → DBL化 → Numeric Value
+├─ DBL     → Variant To Data(DBL) → Numeric Value
+└─ String  → Variant To Data(String) → String Value
+```
+
+各Caseでは`Bundle By Name`で以下を明示的に構成する。
+
+```text
+Value Type      = Expected Value Type
+Boolean Value   = 対象型がBooleanの場合のみ取得値、それ以外False
+Numeric Value   = 対象数値型の取得値、それ以外0
+String Value    = 対象型がStringの場合のみ取得値、それ以外空文字
+```
+
+### 既存errorの扱い
+
+VI全体の外側に`error in.status` Case Structureを設ける。
+
+```text
+error in.status = True
+→ Variant To Dataを実行しない
+→ error inをerror outへそのまま伝播
+→ Valueは安全な初期値
+
+error in.status = False
+→ Expected Value Type Caseを実行
+```
+
+### Variant変換失敗の共通正規化
+
+当初は各Value Type Case内で`-710106`へ正規化していたが、重複を避けるため、型別Caseの外側へ共通化した。
+
+```text
+Expected Value Type Case
+        ↓
+Variant To Dataのerror out
+        ↓
+Unbundle By Name
+├─ status
+├─ code
+└─ source
+        ↓
+Case Structure（status）
+├─ False
+│   ├─ 変換済みValueをそのまま出力
+│   └─ errorをそのまま出力
+│
+└─ True
+    ├─ Value = 安全な初期値
+    └─ errorを次へ正規化
+```
+
+正規化後error：
+
+```text
+status = True
+code   = -710106
+source =
+  CANalyzer_Variant_To_Value.vi
+  Expected Value Type=%s
+  Original Error Code=%d
+  Original Error Source=%s
+```
+
+Format Into Stringへ以下を接続する。
+
+```text
+%s ← Expected Value Type
+%d ← Variant To Dataの元error.code
+%s ← Variant To Dataの元error.source
+```
+
+これによりBoolean / I32 / U32 / DBL / Stringごとにerror正規化処理を複製せず、1か所で管理する。
+
+### 変換失敗時の安全値
+
+```text
+Value Type      = Expected Value Type
+Boolean Value   = False
+Numeric Value   = 0
+String Value    = ""
+```
+
+`error out.status=True`のため、呼出元はこのValueを正常値として扱わない。
+
+---
+
+# 8. 今日時点の実装到達点
+
+2026-08-17終了時点：
+
+```text
+ActiveX Wrapper
+  ↓ 完成
+PoC_CANalyzer_01_Open_Close.vi
+  ↓ 静的実装完了
+CANalyzer_Resolve_SysVar.vi
+  ↓ 完成
+CANalyzer_Value_To_Variant.vi
+  ↓ 完成
+CANalyzer_Variant_To_Value.vi
+  ↓ 型変換 + 共通error正規化構造まで作成
+次
+  ↓
+PoC_CANalyzer_02_SysVar_Read_Write.vi
+```
+
+次回はPhase 6のSysVar Read / Write PoCから再開する。
+
+テスト予定値：
+
+```text
+Namespace      = ID03AD5D62
+Variable Name  = CORE_SVS_OPE_MODE_COM
+Value Type     = I32
+Numeric Value  = 2
+```
+
+PoC予定フロー：
+
+```text
+CAN_AX_Open_Application.vi
+↓
+CAN_AX_Get_System.vi
+↓
+CANalyzer_Resolve_SysVar.vi
+↓
+CAN_AX_Read_Variable_Value.vi
+↓
+CANalyzer_Variant_To_Value.vi
+↓ Read Before
+CANalyzer_Value_To_Variant.vi
+↓
+CAN_AX_Write_Variable_Value.vi
+↓
+CAN_AX_Read_Variable_Value.vi
+↓
+CANalyzer_Variant_To_Value.vi
+↓ Read After
+Close Variable Ref
+↓
+Close System Ref
+↓
+Close Application Ref
+```
+
+`CANalyzer_Resolve_SysVar.vi`内部でNamespace Ref / Variables RefをCloseするため、PoC側では再度Closeしない。
+
+---
+
+# 9. 未確認・次回確認事項
+
+以下はまだ実CANalyzer環境での実行確認を完了していない。
+
+- 起動済みCANalyzerへの`Open New Instance? = False`実動作
+- `Open New Instance? = True`の実際の新規Instance挙動
+- Measurement Start / Stop / Runningの実動作
+- `IConfiguration16.Path`と`FullName`の実値差
+- `IApplication10.Open`によるConfiguration Open実動作
+- SysVar Read / Write
+- Write後Read Back一致
+- 不正Namespace / Variable Name時のerror内容
+- CAPL側への値反映
+- CAN Interfaceを使用した実CAN通信
+- Application Quit / Ownership安全性
+
+実CAN通信、CAPL、CAN Interfaceを使う確認は実験PCで行う。
+
+---
+
+# 10. 次回の再開位置
+
+次回は以下から再開する。
+
+```text
+Phase 6
+PoC_CANalyzer_02_SysVar_Read_Write.vi
+```
+
+その後、設計正本`09_CAN通信の実装.md`のPhase順に、Measurement待ち、Session Registry、ActiveX直列化、Public SysVar API、Process Detect / Compatibility / Configuration / Ownershipへ進む。
