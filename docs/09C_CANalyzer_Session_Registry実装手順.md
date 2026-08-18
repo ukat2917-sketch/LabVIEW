@@ -2,9 +2,9 @@
 
 **最終整理日：2026-08-18**
 
-> **本章の役割**：作成完了した `CANalyzer_Session_Registry.vi` について、Nigel AIで整理した人手実装手順と現状のAs-Built動作を記録する。
+> **本章の役割**：作成完了した `CANalyzer_Session_Registry.vi` について、人手実装手順と最終As-Built動作を記録する。
 >
-> 設計上の正本は [`09B_CANalyzer_Session_Registry設計.md`](./09B_CANalyzer_Session_Registry設計.md) とする。本章は実装実績を記録するため、設計正本との差分がある箇所は末尾の「設計正本との差分」に明示する。
+> 設計上の正本は [`09B_CANalyzer_Session_Registry設計.md`](./09B_CANalyzer_Session_Registry設計.md) とする。Nigel AIによる設計差分レビュー後、実VIを09Bの確定設計へ合わせて修正済みであり、本章もその最終契約へ統一した。
 
 ---
 
@@ -20,7 +20,7 @@
 | **Get** | Session ID を指定して取得する |
 | **Update** | Session ID を指定して内容を更新する |
 | **Remove** | Session ID を指定して削除する |
-| **Clear All** | 全セッションを初期化する |
+| **Clear All** | Session Array を初期化する。Next Session IDは維持する |
 
 FGV を使う理由は、**共有状態を1カ所に集約し、配線だけで実行順序を明確にできる**ためである。LabVIEWではローカル変数やグローバル変数の多用でレースコンディションが起こりやすいため、この方法を採用した。
 
@@ -46,7 +46,7 @@ FGV を使う理由は、**共有状態を1カ所に集約し、配線だけで�
 | 名前 | 役割 |
 |---|---|
 | **Session ID Out** | 実際に処理対象となった Session ID |
-| **Session Out** | 取得・更新・削除結果として返すセッション |
+| **Session Out** | 取得・登録・更新・削除結果として返すセッション |
 | **Found?** | 対象 Session ID が見つかったか |
 | **エラー出力** | 下流へ渡す error cluster |
 | **Session Array Out** | 現在のセッション配列 |
@@ -73,7 +73,7 @@ FGV を使う理由は、**共有状態を1カ所に集約し、配線だけで�
 | **Next Session ID Out** | 0 |
 | **エラー出力** | 入力 error をそのまま pass-through |
 
-これにより、上流エラー時に状態管理ロジックへ入らないようにしている。
+この返却値は呼出し結果の表示値であり、**FGV内部のSession Array / Next Session IDは変更しない**。上流エラー時はAction処理そのものを実行しない。
 
 ---
 
@@ -89,6 +89,8 @@ FGV を使う理由は、**共有状態を1カ所に集約し、配線だけで�
 | **Next Session ID** | Shift Register | 次回 Create で使う採番値 |
 
 While Loop は1回で停止する。この形で **FGVの呼び出しごとに内部状態を読み書き**する。
+
+VI Executionは **Non-reentrant** とし、Registry内部の状態更新を直列化する。
 
 Session clusterにはActiveX参照が含まれるため、Registryは参照のHolderとして扱い、参照のClose / Quit / Start / Stopは別のCleanup / Public経路で実施する。
 
@@ -108,12 +110,13 @@ Session clusterにはActiveX参照が含まれるため、Registryは参照のHo
 |---|---|
 | 登録先 | Session Array の末尾 |
 | 採番元 | Next Session ID |
-| 0 の扱い | 0 は未使用とし、最初の有効 ID は **1** |
+| 0 の扱い | 0 は Invalid / Unassigned。初回のみ有効 ID **1** を使用 |
+| ID再利用 | LabVIEWプロセス存続中は禁止 |
 | 枯渇判定 | `4294967295 (U32 max)` を使用不可として扱う |
 
 ## 実装手順
 
-`Current Next Session ID` を入力として受ける。まず `Equal?` で **0かどうか**を判定する。0の場合は小さい Case Structure で **1** を出し、それ以外はそのまま通す。この出力を **Effective Session ID** とした。
+`Current Next Session ID` を入力として受ける。未初期化Shift Registerの初回値0を判定し、0の場合は **1** を使用し、それ以外は現在値をそのまま使用する。この出力を **Effective Session ID** とした。
 
 次に `Effective Session ID == 4294967295` を `Equal?` で判定する。ここでCreate成功系と枯渇系に分岐させた。
 
@@ -126,16 +129,20 @@ Session clusterにはActiveX参照が含まれるため、Registryは参照のHo
 | 配列末尾に追加する | **Insert Into Array** |
 | 次 ID を計算する | **Add** |
 
+`Session In.Session ID` は信用せず、Registryが発行した `Effective Session ID` で上書きした **Registered Session** を作成する。
+
 ### Create 成功時の返却値
 
 | 出力 | 値 |
 |---|---|
 | **Found?** | true |
-| **Session Array Out** | 追加後配列 |
+| **Session Array Out** | Registered Session追加後配列 |
 | **Session ID Out** | Effective Session ID |
 | **Next Session ID Out** | Effective Session ID + 1 |
-| **Session Out** | 入力 `Session In` |
+| **Session Out** | **Registered Session** |
 | **エラー出力** | incoming error pass-through |
+
+これにより `Session ID Out` と `Session Out.Session ID` は一致する。
 
 ### Create 枯渇時
 
@@ -206,7 +213,7 @@ Session Arrayから **Session IDだけを抜き出した配列**を作り、そ�
 | **Next Session ID Out** | 変更なし |
 | **エラー出力** | incoming error pass-through |
 
-Getでは、**見つからないこと自体は通常状態**と考え、追加エラーは立てない方針にした。
+Getでは、**見つからないこと自体は通常状態**と考え、追加エラーは立てない。Session存在必須の上位Service / Public API側で `Found?=False` を `-710102` へ変換する。
 
 ---
 
@@ -255,7 +262,10 @@ Getと同じ方法でSession ID配列を作り、`Search 1D Array` でindexを�
 | **Session ID Out** | 入力 Session ID |
 | **Session Array Out** | 変更なし |
 | **Next Session ID Out** | 変更なし |
-| **エラー出力** | incoming error pass-through |
+| **エラー status** | true |
+| **エラー code** | **-710102** |
+
+Updateは「存在するSessionを更新する命令」であるため、不存在をsilent successにはしない。**Fail Closed** とし、不存在Sessionを自動Createしない。
 
 ---
 
@@ -306,17 +316,17 @@ Get / Updateと同じく、Session ArrayからSession ID配列を作る。`Searc
 | **Next Session ID Out** | 変更なし |
 | **エラー出力** | incoming error pass-through |
 
+Removeは **idempotent cleanup** を優先し、不存在をerrorにしない。Registry RemoveではActiveX RefをCloseしない。
+
 ---
 
 # 4.5 Clear All の作成手順
 
 ## 目的
 
-内部保持しているセッション状態を完全に初期化する。
+内部保持しているSession Arrayを初期化する。Clear AllはUnit Test / 開発時Reset用途であり、Productionの通常Cleanupには使用しない。
 
 ## 実装内容
-
-定数で以下を返すだけのシンプルな構成にした。
 
 | 出力 | 値 |
 |---|---|
@@ -324,10 +334,12 @@ Get / Updateと同じく、Session ArrayからSession ID配列を作る。`Searc
 | **Session Out** | default session |
 | **Found?** | false |
 | **Session ID Out** | 0 |
-| **Next Session ID Out** | 0 |
+| **Next Session ID Out** | **Current Next Session IDを維持** |
 | **エラー出力** | incoming error pass-through |
 
-このケースでShift Registerの中身が初期状態へ戻る。
+Clear Allで初期化するのはSession Arrayだけであり、**Next Session IDは0または1へ戻さない**。LabVIEWプロセス存続中は一度発行したSession IDを再利用しない。
+
+また、Clear AllではActiveX RefをCloseしない。ActiveX Refが生存している通常Production経路からClear Allを使用しない。
 
 ---
 
@@ -340,23 +352,28 @@ Get / Updateと同じく、Session ArrayからSession ID配列を作る。`Searc
 | **セッション集合** | 配列で保持 |
 | **検索キー** | Session ID |
 | **採番状態** | Next Session ID を別管理 |
-| **初期状態** | Session Array = 空、Next Session ID = 0 |
+| **初回状態** | 未初期化SRの0を初回Create時のみ1へ正規化 |
+| **Clear All** | Session ArrayのみEmpty、Next Session ID維持 |
 
 ## 5.2 Session ID の扱い
 
 | ルール | 内容 |
 |---|---|
-| **0 は未使用** | 初回 Create で1を割り当てる |
-| **採番は単調増加** | Removeしても詰めない |
-| **U32 max は使用しない** | 枯渇扱いでエラー返却 |
+| **0 は未使用** | Invalid / Unassignedとして予約 |
+| **初回ID** | 1 |
+| **採番は単調増加** | Remove / Clear Allしても詰めない・戻さない |
+| **ID再利用禁止** | LabVIEWプロセス存続中は再利用しない |
+| **U32 max は使用しない** | 枯渇扱いで `-710110` を返す |
 
 ## 5.3 error の扱い
 
 | 場面 | 方針 |
 |---|---|
-| **上流 error あり** | 処理をスキップして pass-through |
-| **Get / Update / Remove で Not Found** | 追加エラーなし |
-| **Create 枯渇** | 専用エラーを返す |
+| **上流 error あり** | Actionをスキップ、内部状態不変、元errorをpass-through |
+| **Get Not Found** | Found?=false、追加errorなし |
+| **Update Not Found** | Found?=false、**-710102** |
+| **Remove Not Found** | Found?=false、追加errorなし |
+| **Create 枯渇** | **-710110** |
 
 ---
 
@@ -366,42 +383,66 @@ Get / Updateと同じく、Session ArrayからSession ID配列を作る。`Searc
 
 | 手順 | 期待結果 |
 |---|---|
-| **Clear All** | 配列空、Next Session ID = 0 |
-| **Create** | Found=true、Session ID Out=1、Next Session ID Out=2 |
-| **Get(ID=1)** | 作成した session を取得 |
-| **Update(ID=1)** | 対象 session が更新される |
-| **Get(ID=1)** | 更新後の session が取得できる |
-| **Remove(ID=1)** | Found=true、削除した session が返る |
-| **Get(ID=1)** | Found=false |
+| 初回 **Create A** | Found=true、Session ID Out=1、Session Out.Session ID=1、Next Session ID Out=2 |
+| **Create B** | Found=true、Session ID Out=2、Session Out.Session ID=2、Next Session ID Out=3 |
+| **Get(ID=1)** | Session Aを取得 |
+| **Update(ID=1)** | 対象sessionが更新される |
+| **Get(ID=1)** | 更新後sessionが取得できる |
+| **Remove(ID=1)** | Found=true、削除したsessionが返る |
+| **Get(ID=1)** | Found=false、errorなし |
+| **Clear All** | Session Arrayは空、Next Session IDは3を維持 |
+| Clear All後 **Create C** | Session ID Out=3。ID=1へ戻らない |
 
 ## 6.2 例外シナリオ
 
 | 手順 | 期待結果 |
 |---|---|
-| 上流 error を入れて呼ぶ | 処理スキップ、error pass-through |
+| 上流 error を入れて呼ぶ | Actionスキップ、内部状態不変、error pass-through |
 | Create を ID 枯渇状態で呼ぶ | `-710110` を返す |
-| 存在しない ID で Get / Update / Remove | Found=false、error 追加なし |
+| 存在しない ID で Get | Found=false、error追加なし |
+| 存在しない ID で Update | Found=false、`-710102` |
+| 存在しない ID で Remove | Found=false、error追加なし |
 
 ---
 
-# 7. 補足
+# 7. Reference Ownership / Concurrency
 
-このVIは **FGVパターンで共有状態を管理するためのレジストリVI** として作成した。
+Registryは `Application Ref` / `System Ref` / `Measurement Ref` の **Holder** であり、ownerではない。
 
-今後セッション数が増える場合は、線形検索のままでも小規模なら十分だが、件数が大きくなる場合は **Map風の構造**や **DVR（Data Value Reference）** を検討余地として残している。現時点では、**可読性と保守性を優先して配列 + Search 1D Array** を採用した。
+Registry内では以下を行わない。
+
+- Close Reference
+- Application Quit
+- Measurement Start
+- Measurement Stop
+
+`Get`で返した `Session Out` のRefはService内部で一時利用する借用コピーとして扱う。
+
+Registry自体はNon-reentrantとし、Session Array / Next Session IDの更新を直列化する。一方、Get後の同一Sessionに対するActiveX操作競合はRegistryでは防がない。本番ActiveX操作は後続の `CANalyzer_Execute_Command.vi` を非再入の一本化ポイントとして使用する。
 
 ---
 
-# 8. 設計正本との差分
+# 8. 確定状態
 
-本章は作成済みVIのAs-Built手順をそのまま記録しているため、`09B_CANalyzer_Session_Registry設計.md` と以下の差分がある。
+Nigel AIによる設計差分レビューで、旧As-Builtとの差分として以下3点を検出した。
 
-| 項目 | 09B 設計正本 | 09C As-Built記録 |
-|---|---|---|
-| Clear All時のNext Session ID | **維持する**。ID再利用禁止 | **0へ戻す** |
-| UpdateでSession ID Not Found | `Found?=False` + `error=-710102` | `Found?=False` + 追加errorなし |
-| Create成功時のSession Out | Session IDを書き込んだ**登録済みSession** | 記録上は入力`Session In` |
+1. Clear All時のNext Session ID reset
+2. Update Not Foundのsilent miss
+3. Create成功時のSession Outが元Session In
 
-特にClear AllでNext Session IDを0へ戻す実装は、Clear All後の次回CreateでSession IDを1から再利用する動作になる。Production契約としてどちらを採用するかは、Public API実装へ進む前に09Bと実VIを再確認して確定する。
+Production Safetyを優先し、**09Bの確定設計を維持して実VIを修正**した。
 
-また、Update Not Foundのerror policyも09BとAs-Builtで異なるため、上位Service / Public APIが期待するNot Found契約を確定してから統合する。
+最終状態は以下で確定する。
+
+| 項目 | 最終契約 |
+|---|---|
+| Clear All時のNext Session ID | **維持する。ID再利用禁止** |
+| UpdateでSession ID Not Found | `Found?=False` + `error=-710102` |
+| Create成功時のSession Out | Session IDを書き込んだ **Registered Session** |
+| Get Not Found | `Found?=False`、errorなし |
+| Remove Not Found | `Found?=False`、errorなし |
+| Create exhausted | `-710110` |
+| Registry ownership | ActiveX Ref Holder。Close / Quit / Start / Stopしない |
+| Concurrency | Registry stateはNon-reentrant。ActiveX操作は後続 `CANalyzer_Execute_Command.vi` で直列化 |
+
+以上を `CANalyzer_Session_Registry.vi` の最終As-Builtとして扱う。
