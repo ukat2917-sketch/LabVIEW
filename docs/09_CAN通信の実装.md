@@ -289,28 +289,37 @@ Automation Openの`open new instance=False`は、既存参照への接続を試�
 
 ## 9.5.4 Application所有権
 
-`CANalyzer_Application_Ownership.ctl`：
+`CANalyzer_Application_Ownership.ctl` の現行Enum順は次で扱う。
 
 ```text
+Unknown
 External
 LabVIEW
-Unknown
 ```
 
-判定例：
+初版`CANalyzer_Open.vi`の確定Ownership contract：
 
 ```text
-Open前に対象プロセスが存在
-  → External候補
+Require Existing
+  Pre Detect Found=True + Open success
+  → External
 
-Open前に存在せず、Open後に存在
-  → LabVIEW候補
+Reuse Existing Or Launch
+  Pre Found=True + Open success
+  → External
 
-複数インスタンス、プロセス名不明、検出失敗
+  Pre Found=False + Open success + Post Found=True
+  → LabVIEW
+
+  Detect failure / Post Found=False / evidence ambiguous
+  → Unknown
+
+Force New Instance
+  Open successでもstatic designでは
   → Unknown
 ```
 
-`Unknown`では安全側としてApplication Quitを実行しない。ActiveX RefだけをCloseする。
+`Unknown`では安全側としてApplication Quitを実行しない。Application Refの`Close Reference`はownershipに関係なく取得済みならcleanupで試行する。
 
 ## 9.5.5 実機確認待ちメンバ
 
@@ -487,6 +496,27 @@ Value Typeで選択されていないフィールドは無視する。
 | `Compatibility Status` | Enum | 互換性 |
 
 ActiveX Refを含むためTestStandへ直接渡さない。
+
+# 9.7.6 `CANalyzer_Compatibility_Policy.ctl`
+
+2026-08-24の`CANalyzer_Open.vi` Final Integration Design ClosureでProduction contractを次に固定する。
+
+```text
+Require Compatible
+Allow Warning
+Allow Unknown
+```
+
+Enum順を変更しない。
+
+| Compatibility Status | Require Compatible | Allow Warning | Allow Unknown |
+|---|---:|---:|---:|
+| `Compatible` | Accept | Accept | Accept |
+| `Compatible With Warning` | Reject | Accept | Accept |
+| `Unknown` | Reject | Reject | Accept |
+| `Unsupported` | Reject | Reject | Reject |
+
+`Allow Unknown`で受け入れるUnknownはmandatory probe pass済みのUnknownに限る。`Unsupported`は全PolicyでRejectする。
 
 ---
 
@@ -1222,83 +1252,381 @@ Actual=%s
 <!-- generated-vi-diagram -->
 ![CANalyzerOpen.vi 入出力イメージ](./assets/vi-diagrams/canalyzeropen.svg)
 
-## 0. 目的
+> **Final Design Review Baseline:** 詳細なFinal Integration Design Closure、Static Acceptance、P0/P1 Model Check Gateは [`09J_CANalyzer_Open設計.md`](./09J_CANalyzer_Open設計.md) を正とする。本節はCANalyzer全体ガイド上の統合要約であり、実装後のModel Check Review Promptは09Jを基準に作成する。
+>
+> 2026-08-24時点でFinal Integration Design Closure AmendmentおよびImplementation-Blocking Final Closure Spot Checkを完了し、**P0=0 / P1=0 / READY FOR MANUAL IMPLEMENTATION**。Implementation / As-Built Review / runtime E2Eは未実施。
 
-Application、Configuration、System、Measurementを準備し、所有権と互換性をSession Registryへ登録する。
+## 0. 目的と責務
 
-## 1. 入出力
+`CANalyzer_Open.vi`は`30_Public`に属するSession ID発行前bootstrap Public APIである。Process Detect、Automation Open、Ownership、Compatibility Phase 1、optional Configuration Open、Configuration Verify、Compatibility Phase 2、Policy、final Session Ref取得、Measurement Start/Wait、Session Registry Createを一つの順序へ統合する。
 
-| 端子 | 方向 | 型 |
-|---|---|---|
-| `Launch Mode` | 入力 | Enum |
-| `Process Name Candidates` | 入力 | String一次元配列 |
-| `Configuration Path` | 入力 | Path |
-| `Open Configuration?` | 入力 | Boolean |
-| `Start Measurement?` | 入力 | Boolean |
-| `Startup Timeout ms` | 入力 | U32 |
-| `Measurement Timeout ms` | 入力 | U32 |
-| `Compatibility Policy` | 入力 | Enum |
-| `error in` | 入力 | error cluster |
-| `Session ID` | 出力 | U32 |
-| `Version String` | 出力 | String |
-| `Actual Configuration Path` | 出力 | Path |
-| `Application Ownership` | 出力 | Enum |
-| `Measurement Started By LabVIEW?` | 出力 | Boolean |
-| `Running?` | 出力 | Boolean |
-| `Compatibility Status` | 出力 | Enum |
-| `error out` | 出力 | error cluster |
+成功時だけApplication/System/Measurement RefのownershipをSession Registry lifecycleへ移管し、失敗時はOpen自身が取得済みresourceを逆順cleanupする。
 
-## 3. 処理順
+初版では`CANalyzer_Execute_Command.vi`を使用せず、`CANalyzer_Open.vi`自身を**Non-reentrant**としてbootstrap処理を直列化する。
+
+## 1. Final Public I/O
+
+### 1.1 Inputs
+
+| 端子 | 方向 | 型 | 契約 |
+|---|---|---|---|
+| `Launch Mode` | 入力 | `CANalyzer_Launch_Mode.ctl` | Require Existing / Reuse Existing Or Launch / Force New Instance |
+| `Process Name Candidates` | 入力 | String一次元配列 | Process Detect候補。Require Existingでは実質必須 |
+| `Configuration Path` | 入力 | Path | Open有無に関係なく必須。Expected Configuration |
+| `Open Configuration?` | 入力 | Boolean | TrueならOpenしてVerify、Falseでも現在cfgを必ずVerify |
+| `Start Measurement?` | 入力 | Boolean | TrueかつInitial Running=FalseでStart + Wait |
+| `Measurement Timeout ms` | 入力 | U32 | Start=True時だけ`>0`必須 |
+| `Compatibility Policy` | 入力 | `CANalyzer_Compatibility_Policy.ctl` | Compatible / Warning / Unknown受入Policy |
+| `error in` | 入力 | error cluster | incoming errorで全副作用bypass |
+
+`Startup Timeout ms`は削除する。現行Closed designに使用先がないdead inputだからである。
+
+Measurement Poll IntervalはPublicへ出さず、Wait ServiceへのProduction内部定数を**100 ms**とする。
+
+### 1.2 Outputs
+
+| 端子 | 方向 | 型 | 契約 |
+|---|---|---|---|
+| `Session ID` | 出力 | U32 | Success=`>0`、Failure=`0` |
+| `Version String` | 出力 | String | Compatibility Service出力。failureでも取得済みなら保持 |
+| `Actual Configuration Path` | 出力 | Path | Verify Actual StringをPath化。failureでも取得済みなら保持 |
+| `Application Ownership` | 出力 | `CANalyzer_Application_Ownership.ctl` | 判定済み値、未判定はUnknown |
+| `Measurement Started By LabVIEW?` | 出力 | Boolean | 今回のOpenでStart Invoke成功したhistory flag |
+| `Running?` | 出力 | Boolean | 最後に実際に観測したRunning値 |
+| `Compatibility Status` | 出力 | `CANalyzer_Compatibility_Status.ctl` | 最後に確定したstatus、未判定はUnknown |
+| `error out` | 出力 | error cluster | primary Operation Error |
+
+## 2. Input Validation
+
+### 2.1 Incoming Error
+
+`error in.status=True`ではProcess Detect、ActiveX、Configuration、Compatibility、Registryを一切実行せず、Session ID=0、Ownership=Unknown、Compatibility=Unknown等の安全なdefaultとoriginal errorを返す。
+
+### 2.2 Configuration Path
 
 ```text
-error in確認
-  ↓
-Open前のProcess検出
-  ↓
-Require ExistingかつProcessなし → Error
-  ↓
-Launch ModeからOpen New Instance?を決定
-  ↓
-CAN_AX_Open_Application.vi
-  ↓
-Open後のProcess検出
-  ↓
-Application Ownershipを判定
-  ↓
-Version取得
-  ↓
-Capability Probe
-  ↓
-必要ならConfiguration Open
-  ↓
-Actual cfg Path取得・比較
-  ↓
-System Ref取得
-  ↓
-Measurement Ref取得
-  ↓
-Running確認
-  ↓
-必要ならStart + Running=True待ち
-  ↓
-Session Registry Create
-  ↓
-Session ID出力
+Configuration Path
+→ Path To String
+→ Trim Whitespace
+→ Empty String/Path?
 ```
 
-途中失敗時は取得済み子参照を逆順でCloseする。Ownership=`Unknown`ではQuitしない。
+empty / whitespace-onlyなら：
 
-## 4. 単体テスト
+```text
+code   = -710116
+source = CANalyzer_Open.vi / Invalid Expected Configuration Path
+```
 
-| 条件 | 期待結果 |
+ActiveX side effectへ進まない。
+
+### 2.3 Measurement Timeout
+
+```text
+Start Measurement? = True
+AND Measurement Timeout ms = 0
+```
+
+なら：
+
+```text
+code   = -710118
+source = CANalyzer_Open.vi / Invalid Measurement Timeout
+```
+
+Start/Waitを呼ばない。`Start Measurement?=False`ならTimeout=0を許可する。
+
+## 3. Final Bootstrap Sequence
+
+```text
+error in guard
+↓
+input validation
+↓
+Launch Mode別Process Detect
+↓
+derive Open New Instance?
+↓
+CAN_AX_Open_Application.vi
+↓
+必要な場合だけPost Detect
+↓
+resolve Application Ownership
+↓
+CANalyzer_Check_Compatibility.vi Phase 1
+↓
+Phase 1 mandatory pass gate
+↓
+if Open Configuration? = True:
+    CAN_AX_Open_Configuration.vi
+↓
+CANalyzer_Verify_Configuration.vi   ← always
+↓
+Verify PASS gate
+↓
+CANalyzer_Check_Compatibility.vi Phase 2
+↓
+Phase 2 mandatory pass gate
+↓
+Compatibility Policy
+↓
+CAN_AX_Get_System.vi
+↓
+CAN_AX_Get_Measurement.vi
+↓
+CAN_AX_Get_Measurement_Running.vi
+↓
+if Start Measurement? = True and Running=False:
+    CAN_AX_Start_Measurement.vi
+    Measurement Started By LabVIEW? = True
+    CANalyzer_Wait_Measurement_State.vi(Expected=True)
+↓
+build CANalyzer_Session_State.ctl
+↓
+CANalyzer_Session_Registry.vi Action=Create
+↓
+Session ID Out
+```
+
+順序は**Phase 1 → optional Configuration Open → Verify → Phase 2 → Policy**で固定する。Verify前にPhase 2を実行しない。
+
+Version Stringは`CANalyzer_Check_Compatibility.vi`のoutputを使用し、Open側でVersion wrapperを二重呼出ししない。
+
+## 4. Launch Mode / Ownership
+
+| Launch Mode | Pre Detect | Post Detect | Ownership |
+|---|---|---|---|
+| Require Existing | Required | Skip | Found=True + Open success → External |
+| Reuse Existing Or Launch | Run | Pre成功 + Found=Falseのときだけ | Pre Found=True → External、Pre False + Post True → LabVIEW、Post False/error → Unknown |
+| Force New Instance | Skip | Skip | Open成功でも初版Unknown |
+
+`Open New Instance?`はRequire Existing=False、Reuse=False、Force New=True。
+
+Require ExistingでPre Detect成功かつFound=FalseならAutomation Openせず`-710109 Required Existing CANalyzer Process Not Found`を返す。Detect mechanism errorは元errorを保持し`-710109`へ変換しない。
+
+ReuseのDetect errorはadvisoryとして隔離し、Ownership=UnknownでAutomation Openを継続する。
+
+## 5. Configuration Contract
+
+Public / Session StateはPathを維持し、Wrapper / Verify境界だけStringへ変換する。
+
+`Open Configuration?=True`では`CAN_AX_Open_Configuration.vi`へ次を固定する。
+
+```text
+AutoSave?    = False
+Prompt User? = False
+```
+
+Open success直後に`Configuration Opened By LabVIEW?=True`。Open failureではFalse。
+
+`Open Configuration?=False`でも`CANalyzer_Verify_Configuration.vi`を必ず呼ぶ。
+
+Verify成功のActual raw StringをPath化し、Public `Actual Configuration Path`とSession State `Configuration Path`へ使用する。
+
+**Documented Limitation: NO AUTOMATIC CONFIGURATION ROLLBACK**。Configuration Open成功後に後段failureしてもprevious cfgへrestoreしない。
+
+## 6. Compatibility Policy
+
+`CANalyzer_Compatibility_Policy.ctl`は次の順で固定する。
+
+```text
+Require Compatible
+Allow Warning
+Allow Unknown
+```
+
+| Status | Require Compatible | Allow Warning | Allow Unknown |
+|---|---:|---:|---:|
+| Compatible | Accept | Accept | Accept |
+| Compatible With Warning | Reject | Accept | Accept |
+| Unknown | Reject | Reject | Accept |
+| Unsupported | Reject | Reject | Reject |
+
+Unsupportedは全PolicyでRejectし、`-710101`を保持する。
+
+Phase 2成功後のWarning / UnknownをPolicyが拒否した場合：
+
+```text
+code   = -710117
+source = CANalyzer_Open.vi / Compatibility Policy Rejected
+         Policy=<policy>
+         Status=<status>
+         Version=<version>
+```
+
+## 7. Measurement Contract
+
+final Measurement Ref取得後にInitial Runningを読む。
+
+- Start=False → Startしない。Running=FalseでもOpen成功可。
+- Start=True + Initial Running=True → Startしない、Started=False。
+- Start=True + Initial Running=False → Startを呼び、**Start Invoke成功直後**に`Measurement Started By LabVIEW?=True`、その後Wait Running=True。
+
+Wait：
+
+```text
+Expected Running? = True
+Timeout ms         = Measurement Timeout ms
+Poll Interval ms   = 100
+```
+
+## 8. Session State / Registry Create
+
+Registry Create直前に13 fieldsを完成する。
+
+| Session Field | Source |
 |---|---|
-| 起動済み + Require Existing | 接続、Ownership=External候補 |
-| 未起動 + Require Existing | Open前にError |
-| 未起動 + Reuse Existing Or Launch | 起動、Ownership=LabVIEW候補 |
-| 停止中 + Start=True | Running=True、開始所有権=True |
-| cfg不一致 | Policyに応じError / Warning |
-| 未検証版 + Probe成功 | Compatible With Warning |
-| COM未登録 | Session未作成、Openエラー |
+| Session ID | 0。Registryが上書き |
+| Application Ref | final Application Ref |
+| System Ref | final System Ref |
+| Measurement Ref | final Measurement Ref |
+| Version String | Compatibility output |
+| Configuration Path | verified Actual Path |
+| Launch Mode | Public input |
+| Application Ownership | resolved ownership |
+| Configuration Opened By LabVIEW? | actual Configuration Open result |
+| Measurement Started By LabVIEW? | actual Start result |
+| Cached Connected? | True |
+| Cached Measuring? | final observed Running |
+| Compatibility Status | Phase 2 final status |
+
+Registry Create成功をApplication/System/Measurement Refのownership transfer pointとする。成功後はOpen success pathでCloseしない。
+
+## 9. Failure Rollback
+
+```text
+Original Operation Errorを保持
+↓
+if Measurement Started By LabVIEW? = True:
+    CAN_AX_Stop_Measurement.vi
+    if Stop success:
+        CANalyzer_Wait_Measurement_State.vi
+            Expected Running? = False
+            Timeout ms         = Measurement Timeout ms
+            Poll Interval ms   = 100
+↓
+if Measurement Ref acquired:
+    Close Measurement Ref
+↓
+if System Ref acquired:
+    Close System Ref
+↓
+if Application Ownership = LabVIEW:
+    CAN_AX_Quit_Application.vi
+↓
+if Application Ref acquired:
+    Close Application Ref
+↓
+Final Error Select
+Operation Error > Cleanup Error
+```
+
+Initial Running=TrueだったMeasurementはStopしない。Stop判定は`Measurement Started By LabVIEW?`だけを使う。
+
+Rollback Wait False成功時は`Running?=False`。再観測できない場合はそれ以前の最後の観測値を保持する。
+
+Application Quit規則：
+
+| Ownership | Quit | Application Ref Close |
+|---|---|---|
+| LabVIEW | Attempt | Attempt |
+| External | Do not call | Attempt |
+| Unknown | Do not call | Attempt |
+
+Quit failureでもApplication Ref Closeをskipしない。
+
+## 10. Error Priority / Error Codes
+
+原則：
+
+```text
+Operation Error > Cleanup Error
+```
+
+最初のOperation failureをprimaryに固定し、Stop / Wait / Close / Quitのcleanup errorでcodeを上書きしない。
+
+重要code：
+
+| Code | Meaning |
+|---:|---|
+| `-710101` | Required Capability Missing |
+| `-710103` | Configuration Mismatch |
+| `-710104` | Measurement State Timeout |
+| `-710109` | Required Existing CANalyzer Process Not Found |
+| `-710116` | Invalid Expected Configuration Path |
+| `-710117` | Compatibility Policy Rejected |
+| `-710118` | Invalid Measurement Timeout |
+
+Automation Open failureは元Wrapper errorを保持し、`-710100`へ強制normalizeしない。
+
+## 11. Failure Output Semantics
+
+Failureでも取得済みdiagnosticを保持する。
+
+```text
+Session ID                      = 0 fixed
+Version String                  = acquiredなら保持
+Actual Configuration Path       = acquiredなら保持
+Application Ownership           = 判定済みなら保持
+Measurement Started By LabVIEW? = historyとして保持
+Running?                        = 最後の実観測値
+Compatibility Status            = 最後の確定値
+error out                       = primary Operation Error
+```
+
+## 12. Static / Model Check Review Baseline
+
+実装完了後は[`09J_CANalyzer_Open設計.md`](./09J_CANalyzer_Open設計.md)のStatic Acceptance全件を照合する。最低限、次をP0/P1 gateとして扱う。
+
+### P0
+
+- Verify前にPhase 2を実行
+- Unsupportedをaccept
+- Registry Create前/失敗時のRef leak
+- External / Unknown ApplicationをQuit
+- Initial Running=TrueだったMeasurementをrollback Stop
+- Start後Wait failureでOpen-started Measurementを放置
+- Operation ErrorをCleanup Errorで上書き
+- failureなのにRegistry Sessionが残る
+- Broken Run Arrow confirmed
+
+### P1
+
+- Public I/O不一致、`Startup Timeout ms`残留
+- Poll 100 ms契約不一致
+- Path/String境界不一致
+- `-710116 / -710118 / -710109 / -710117`契約不一致
+- Detect fatal/advisory / Ownership matrix不一致
+- Phase 1 → Config → Verify → Phase 2順序不一致
+- `AutoSave=False / Prompt User=False`不一致
+- Open Configuration?=FalseでVerify skip
+- Compatibility Policy enum / matrix不一致
+- Start成功直後のStarted flag不一致
+- rollback Stop + Wait False不足
+- Session State mapping不一致
+- Operation Error > Cleanup Error不一致
+
+Closure条件：
+
+```text
+P0 = 0
+P1 = 0
+Functional Design Alignment = PASS
+Broken Run Arrow = NO
+```
+
+## 13. Design Status
+
+```text
+CANalyzer_Open.vi
+Design Status            = FINAL / CLOSED
+P0                        = 0
+P1                        = 0
+Implementation Readiness = READY FOR MANUAL IMPLEMENTATION
+Implementation           = PENDING
+As-Built Review           = PENDING
+Runtime / Hardware E2E    = PENDING
+```
 
 # 9.10.2 `CANalyzer_Write_SysVar.vi`
 
@@ -1739,7 +2067,7 @@ CANalyzer.ActiveX.Session.<SessionID>
 
 | code | 用途 |
 |---:|---|
-| `-710100` | ActiveX Open失敗 |
+| `-710100` | ActiveX Open失敗（legacy allocation。`CANalyzer_Open.vi`はWrapper errorをこのcodeへ強制normalizeしない） |
 | `-710101` | 必須Capability不足 |
 | `-710102` | Session ID未登録 |
 | `-710103` | Configuration不一致 |
@@ -1750,6 +2078,10 @@ CANalyzer.ActiveX.Session.<SessionID>
 | `-710108` | Fault Clear失敗 |
 | `-710109` | Require Existingで起動済みCANalyzerなし |
 | `-710116` | Invalid Expected Configuration Path |
+| `-710117` | Compatibility Policy Rejected |
+| `-710118` | Invalid Measurement Timeout |
+
+`-710109 / -710117 / -710118`は2026-08-24のOpen Design Closure時のlocal Project collision確認で未使用として採用した。
 
 ## 9.14.2 error source
 
@@ -1802,6 +2134,9 @@ error code / source
 - [ ] Start / Stopできる
 - [ ] 参照を明示Closeできる
 - [x] `CANalyzer_Verify_Configuration.vi`のStatic As-Built確認（P0=0 / P1=0、Broken Run Arrow=NO）
+- [x] `CANalyzer_Open.vi` Final Integration Design Closure（P0=0 / P1=0、READY FOR MANUAL IMPLEMENTATION）
+- [ ] `CANalyzer_Open.vi` Manual Implementation
+- [ ] `CANalyzer_Open.vi` Focused As-Built / Model Check Review
 
 ## System Variable
 
