@@ -1,13 +1,13 @@
 # 09I. CANalyzer_Verify_Configuration.vi 最終設計
 
-**最終整理日：2026-08-21**
+**最終整理日：2026-08-24**
 
-> **本章の役割**：`CANalyzer_Verify_Configuration.vi` のProduction向け確定設計を定義する。
+> **本章の役割**：`CANalyzer_Verify_Configuration.vi` のProduction向け確定設計と設計判断の根拠を定義する。
 > 本VIは `20_Service` に属するread-only Verify Serviceであり、現在CANalyzerで有効なConfiguration Pathを取得し、callerが要求したExpected Configuration Pathと照合することだけを担当する。
 >
-> CANalyzer全体のレイヤ構成と呼出順は [`09_CAN通信の実装.md`](./09_CAN通信の実装.md) を正とする。VI作成手順の記述規則は [`00A_LabVIEW実装資料の記述ルール.md`](./00A_LabVIEW実装資料の記述ルール.md)、仕様根拠と確認状態は [`00C_一次資料とバージョン基準.md`](./00C_一次資料とバージョン基準.md) に従う。
+> CANalyzer全体のレイヤ構成と呼出順、および**作成・再構築手順の正本**は [`09_CAN通信の実装.md`](./09_CAN通信の実装.md) の `9.9.8 CANalyzer_Verify_Configuration.vi` とする。本章は設計根拠を保持し、同じ詳細作成手順を複製しない。VI作成手順の記述規則は [`00A_LabVIEW実装資料の記述ルール.md`](./00A_LabVIEW実装資料の記述ルール.md)、仕様根拠と確認状態は [`00C_一次資料とバージョン基準.md`](./00C_一次資料とバージョン基準.md) に従う。
 >
-> 本章は実装前のFinal Design ClosureおよびFinal Design Closure AmendmentでP0/P1を全件Closeした内容を正本化したものである。実VI完成後は本章を基準にFocused As-Built Reviewを実施する。
+> Final Design Closure、Focused As-Built Review、Closure Spot Checkを完了し、2026-08-24時点で `P0=0 / P1=0`、Functional Design Alignment=`PASS`。Broken Run Arrowは人間確認で問題なし。残件は内部定数名のP2 cosmetic事項のみで、機能Closureを阻害しない。
 
 ---
 
@@ -90,8 +90,8 @@ Final Design Closure時にlocal Projectの既存WrapperをREAD ONLYで確認し�
 | Version | RepositoryのCANalyzer実装基準に従う。製品Version固有差はWrapper層へ閉じ込める |
 | Symbol | `CAN_AX_Get_Configuration.vi`, `CAN_AX_Get_Configuration_Path.vi`, `Configuration.Path` |
 | Signature | Application ActiveX Ref → Configuration Ref、Configuration Ref → Path String、各Wrapperにerror in/out |
-| Verified by | local ProjectのFront Panel / Block Diagram / Connector PaneをREAD ONLY確認 |
-| State | Wrapper部分は`実VI確認済み`、Verify本体は`既決設計・実装前` |
+| Verified by | local ProjectのFront Panel / Block Diagram / Connector PaneをREAD ONLY確認、Focused As-Built Review、Closure Spot Check |
+| State | **AS-BUILT CONFIRMED / Functional Design Alignment PASS** |
 
 未確認のCANalyzer製品Version固有表現を本Service側で推測して補完しない。
 
@@ -277,7 +277,7 @@ CAN_AX_Get_Configuration_Path.vi
 Actual Configuration Path (raw String)
 ```
 
-Configuration Refは本VIが取得したtemporary refであり、Path取得後またはoperation failure後にcleanupする。
+Configuration Refは本VIが取得したtemporary refである。Get Configuration成功時のみacquiredとして扱い、Get Path failure / Match / Mismatchではcleanupする。Get Configuration failureではunacquired RefをCloseしない。
 
 ---
 
@@ -320,7 +320,7 @@ Expected=<expected path>
 Actual=<actual path>
 ```
 
-診断用sourceには人間が読めるrawまたはtrim済みpathを残す。lowercase化したnormalized値だけへ置換しない。
+診断用sourceではExpectedにtrim済みpath、Actualにraw pathを使用する。lowercase化したnormalized値だけへ置換しない。
 
 ### 9.3 Actual Path empty
 
@@ -346,6 +346,8 @@ error.code                 = -710103
 Actual Configuration Path = ""
 Configuration Match?       = False
 error out                  = original ActiveX / Wrapper error
+Configuration Ref Acquired?= False
+Close Reference            = 実行しない
 ```
 
 元error code / sourceを保持する。
@@ -356,6 +358,7 @@ error out                  = original ActiveX / Wrapper error
 Actual Configuration Path = ""
 Configuration Match?       = False
 Operation Error            = original ActiveX / Wrapper error
+Configuration Ref Acquired?= True
 Configuration Ref          = cleanup対象
 ```
 
@@ -393,15 +396,25 @@ Wrapper自身が返したActiveX / conversion等のerror codeは本VIで別code�
 | Ref | Owner | 本VIでClose | Timing |
 |---|---|---:|---|
 | `Application Ref` | caller | **No** | never |
-| `Configuration Ref` | Verify temporary | **Yes** | Path取得後またはfailure cleanup |
+| `Configuration Ref` | Verify temporary | **取得成功時のみYes** | Get Path後またはacquired後のfailure cleanup |
 
 追加temporary ActiveX RefはFinal Design Closure時のWrapper evidenceでは確認されていない。
 
-### 12.1 禁止
+### 12.1 Cleanup Gate
+
+| Path | Ref Acquired? | Close |
+|---|---:|---:|
+| Get Config Failure | No | No |
+| Get Path Failure | Yes | Yes |
+| Match | Yes | Yes |
+| Mismatch | Yes | Yes |
+
+### 12.2 禁止
 
 - Application RefをClose Referenceへ接続しない
 - caller-owned refをcleanup対象へ含めない
-- Configuration Refをsuccess pathだけCloseしてfailure pathでリークさせない
+- unacquired Configuration Refを無条件Closeしない
+- acquired Configuration Refをfailure pathでリークさせない
 
 ---
 
@@ -433,11 +446,15 @@ Operation処理
   ↓
 Operation Errorを保持
 
-No Error / Clear Errors
-  ↓
-Close Reference(Configuration Ref)
-  ↓
-Cleanup Error
+Configuration Ref Acquired?
+  ├─ False → Close skip / Cleanup Error = No Error
+  └─ True
+       ↓
+       No Error / Clear Errors
+       ↓
+       Close Reference(Configuration Ref)
+       ↓
+       Cleanup Error
 
 Operation Error.status?
   ├─ True  → Final Error = Operation Error
@@ -473,8 +490,13 @@ error in.status?
         Get Configuration
         ↓
         failure?
-        ├─ YES → original operation error保持 → cleanup if ref acquired
+        ├─ YES
+        │   ├─ original operation error保持
+        │   ├─ Acquired=False
+        │   └─ Close skip
         └─ NO
+            ↓
+            Acquired=True
             ↓
             Get Configuration Path
             ↓
@@ -493,7 +515,7 @@ error in.status?
                     ├─ Match? = False
                     └─ Operation Error = -710103
         ↓
-        Close Configuration Ref with independent cleanup error chain
+        Acquired=Trueの場合だけConfiguration Ref Close
         ↓
         Final Error Select
         Operation Error > Cleanup Error
@@ -527,7 +549,7 @@ Configurationを開くかどうかは上位`CANalyzer_Open.vi`が決定する。
 
 | VI | 責務 |
 |---|---|
-| `CANalyzer_Verify_Configuration.vi` | 正しいConfigurationが開かれているか確認 |
+| `CANalyzer_Verify_Configuration.vi` | 正しいConfigurationが開いているか確認 |
 | `CANalyzer_Check_Compatibility.vi` | その環境で必要Capabilityが実際に使用可能か確認 |
 
 Verify内では次を行わない。
@@ -563,51 +585,49 @@ CANalyzer_Verify_Configuration.vi
 
 ## 18. Static Acceptance Contract
 
-実VI完成後、少なくとも次をFocused As-Built Reviewで追跡する。
-
-| Case | Expected |
-|---|---|
-| Incoming Error | Actual=`""`, Match=False, original error、ActiveX未実行 |
-| Expected Path empty after trim | Actual=`""`, Match=False, `-710116`、ActiveX未実行 |
-| Get Configuration failure | Actual=`""`, Match=False, original Wrapper error |
-| Get Path failure | Actual=`""`, Match=False, original Wrapper error、Configuration Ref cleanupを試行 |
-| `C:\Test\Config.cfg` vs `c:\test\config.cfg` | Match=True |
-| `C:/Test/Config.cfg` vs `c:\test\config.cfg` | Match=True |
-| Different cfg | Match=False, `-710103` |
-| Wrapper success + Actual=`""` | Match=False, `-710103` |
-| `Z:\Config.cfg` vs `\\server\share\Config.cfg` | Match=False |
-| Operation success + Close failure | Final error=Cleanup Error |
-| Mismatch `-710103` + Close failure | Primary=`-710103` |
-| Wrapper failure + Close failure | Primary=original Wrapper operation error |
-| Application Ref ownership | never closed |
+| Case | Expected | As-Built |
+|---|---|---|
+| Incoming Error | Actual=`""`, Match=False, original error、ActiveX未実行 | PASS |
+| Expected Path empty after trim | Actual=`""`, Match=False, `-710116`、ActiveX未実行 | PASS |
+| Get Configuration failure | Actual=`""`, Match=False, original Wrapper error、Closeなし | PASS |
+| Get Path failure | Actual=`""`, Match=False, original Wrapper error、Configuration Ref cleanup | PASS |
+| `C:\Test\Config.cfg` vs `c:\test\config.cfg` | Match=True | PASS |
+| `C:/Test/Config.cfg` vs `c:\test\config.cfg` | Match=True | PASS |
+| Different cfg | Match=False, `-710103` | PASS |
+| Wrapper success + Actual=`""` | Match=False, `-710103` | PASS |
+| `Z:\Config.cfg` vs `\\server\share\Config.cfg` | Match=False | PASS |
+| Operation success + Close failure | Final error=Cleanup Error | PASS |
+| Mismatch `-710103` + Close failure | Primary=`-710103` | PASS |
+| Wrapper failure + Close failure | Primary=original Wrapper operation error | PASS |
+| Application Ref ownership | never closed | PASS |
 
 ---
 
 ## 19. Focused As-Built Review Gate
 
-実装完了後は、本章の契約に対してFocused As-Built Reviewを行う。
-
 ### P0
 
 - Application RefをCloseしている
 - Configuration Ref leak
-- Expected emptyでもActiveX処理を実行する
 - mismatchを検出できない
-- mismatchが`-710103`にならない
-- operation error時にcleanupがskipする
+- operation error時にacquired Ref cleanupがskipする
 - Cleanup ErrorがOperation Errorを上書きする
 - Close-only errorを捨てる
 - Verify内でConfiguration Open / Measurement制御 / SysVar操作を行う
+- Broken Run Arrowが確認された
 
 ### P1
 
-- `-710116`契約違反
+- Expected empty時の`-710116`契約違反
+- Expected emptyでもActiveX処理を実行する
 - Expected / Actualでnormalize規則が異なる
 - `/`→`\`統一がない
 - lowercase化がない
 - exact compareでない
+- mismatchが`-710103`にならない
 - raw Actual Pathを出力へ保持しない
 - Wrapper failureを`-710103`へ誤normalizeする
+- Get Configuration failureでunacquired RefをCloseする
 - Connector Pane契約違反
 
 ### P2
@@ -619,50 +639,58 @@ Closure条件：
 ```text
 P0 = 0
 P1 = 0
-Design Alignment = PASS
+Functional Design Alignment = PASS
+Broken Run Arrow = NO（人間確認可）
 ```
+
+**2026-08-24 Closure結果：条件達成。**
 
 ---
 
 ## 20. 実装完了条件
 
-実VIが次をすべて満たすこと。
+- [x] 3 inputs / 3 outputs
+- [x] incoming errorでActiveX bypass
+- [x] Expected Path Trim後emptyで`-710116`
+- [x] empty Expected時にActiveX未実行
+- [x] `CAN_AX_Get_Configuration.vi`を使用
+- [x] `CAN_AX_Get_Configuration_Path.vi`を使用
+- [x] Expected / Actualへ同一normalize
+- [x] Trim Whitespace
+- [x] `/` → `\`
+- [x] lowercase
+- [x] exact compare
+- [x] mismatchで`-710103`
+- [x] Wrapper failureの元error保持
+- [x] raw Actual Pathを出力
+- [x] Get Configuration成功時だけConfiguration Ref acquired
+- [x] acquired Configuration Ref cleanup
+- [x] Application Ref never close
+- [x] Operation Error > Cleanup Error
+- [x] Close-only errorを保持
+- [x] Configuration Openなし
+- [x] SysVar操作なし
+- [x] Measurement制御なし
+- [x] Session Registry操作なし
+- [x] Broken Run Arrowなし（人間確認済み）
 
-- [ ] 3 inputs / 3 outputs
-- [ ] incoming errorでActiveX bypass
-- [ ] Expected Path Trim後emptyで`-710116`
-- [ ] empty Expected時にActiveX未実行
-- [ ] `CAN_AX_Get_Configuration.vi`を使用
-- [ ] `CAN_AX_Get_Configuration_Path.vi`を使用
-- [ ] Expected / Actualへ同一normalize
-- [ ] Trim Whitespace
-- [ ] `/` → `\`
-- [ ] lowercase
-- [ ] exact compare
-- [ ] mismatchで`-710103`
-- [ ] Wrapper failureの元error保持
-- [ ] raw Actual Pathを出力
-- [ ] Configuration Ref cleanup
-- [ ] Application Ref never close
-- [ ] Operation Error > Cleanup Error
-- [ ] Close-only errorを保持
-- [ ] Configuration Openなし
-- [ ] SysVar操作なし
-- [ ] Measurement制御なし
-- [ ] Session Registry操作なし
-- [ ] Broken Run Arrowなし
+実機CANalyzerを使用したruntime/hardware E2Eは、このstatic As-Built Closureとは別工程で確認・記録する。
 
 ---
 
-## 21. Final Design Status
+## 21. Final Status
 
 ```text
 CANalyzer_Verify_Configuration.vi
-Design Status       = FINAL / CLOSED
-Implementation      = PENDING
-As-Built Review     = PENDING
-P0 Design Findings  = 0
-P1 Design Findings  = 0
+Design Status              = FINAL / CLOSED
+Implementation             = COMPLETE
+As-Built Status            = CONFIRMED
+Functional Design Alignment= PASS
+Focused Review P0          = 0
+Focused Review P1          = 0
+Remaining                  = P2 cosmetic only
+Broken Run Arrow           = NO / HUMAN VERIFIED
+Runtime / Hardware E2E     = NOT RECORDED HERE
 ```
 
-次工程は人手実装である。実装後は本章を基準にFocused As-Built Reviewを行い、PASS後に実装手順・As-Built記録を別章へ反映する。
+本VIの設計・static As-Built Closureは完了。**作成・再構築手順の正本は `09_CAN通信の実装.md` §9.9.8** とし、本章は設計判断とClosure根拠を保持する。
