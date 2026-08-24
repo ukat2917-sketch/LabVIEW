@@ -9,7 +9,7 @@
 >
 > CANalyzer COM APIのプロパティ名・メソッド名は、対象PCに登録されたCANalyzer Type Libraryを一次情報とする。CANalyzerの版によって表示名や引数が異なる場合は推測で固定せず、`実機確認待ち`として`10_ActiveX_Wrapper`だけを差し替える。
 
-**最終整理日：2026-07-26**
+**最終整理日：2026-08-24**
 
 ---
 
@@ -355,6 +355,7 @@ Open前に存在せず、Open後に存在
 │  ├─ CAN_AX_Read_Variable_Value.vi
 │  ├─ CAN_AX_Write_Variable_Value.vi
 │  ├─ CAN_AX_Get_Version.vi
+│  ├─ CAN_AX_Get_Configuration.vi
 │  ├─ CAN_AX_Get_Configuration_Path.vi
 │  ├─ CAN_AX_Open_Configuration.vi
 │  └─ CAN_AX_Quit_Application.vi
@@ -704,12 +705,15 @@ CANalyzer版確定後、Type Libraryの正式メンバで作成する。
 
 ```text
 CAN_AX_Get_Version.vi
+CAN_AX_Get_Configuration.vi
 CAN_AX_Get_Configuration_Path.vi
 CAN_AX_Open_Configuration.vi
 CAN_AX_Quit_Application.vi
 ```
 
 1VIへ1 Propertyまたは1 Methodだけを置く。
+
+`CAN_AX_Get_Configuration.vi` はApplication Refから`CANalyzer.IConfiguration16`を取得し、`CAN_AX_Get_Configuration_Path.vi` はそのConfiguration Refの`Path` PropertyをStringで返す。これらのWrapperはConfiguration RefをCloseしないため、取得したService側が所有権に従ってCloseする。
 
 ---
 
@@ -908,6 +912,306 @@ Public VI
 ```
 
 PoCではWrapper直呼び可。本番前にDispatcher経由へ統一する。
+
+# 9.9.8 `CANalyzer_Verify_Configuration.vi`
+
+> 詳細な設計判断の根拠は [`09I_CANalyzer_Verify_Configuration設計.md`](./09I_CANalyzer_Verify_Configuration設計.md) を参照する。本節を**作成・再構築手順の正本**とし、同じ詳細手順を別章へ複製しない。
+>
+> 2026-08-24時点でFocused As-Built ReviewおよびClosure Spot Checkを完了し、`P0=0 / P1=0`、Functional Design Alignment=`PASS`。Broken Run Arrowは人間確認で問題なし。残るP2は内部定数名のcosmetic事項のみで、機能Closureを阻害しない。
+
+## 0. 目的と処理概要
+
+`CANalyzer_Verify_Configuration.vi` は `20_Service` に属するread-only Verify Serviceである。callerが所有する`CANalyzer.IApplication10`を借用し、CANalyzerで現在有効なConfiguration Pathを取得して、callerが要求するExpected Configuration Pathと照合する。
+
+このVIはConfigurationを開かない。状態変更は上位`CANalyzer_Open.vi`の責務とし、本VIは「今開かれているConfigurationが期待どおりか」の確認だけを行う。
+
+```text
+Application Ref（borrowed / never close）
+  ↓
+Expected PathをTrim・入力検証
+  ↓
+CAN_AX_Get_Configuration.vi
+  ↓
+Configuration Ref（temporary）
+  ↓
+CAN_AX_Get_Configuration_Path.vi
+  ↓
+Actual Path raw String
+  ↓
+Expected / Actualを同一規則でnormalize
+  ↓
+Equal? exact compare
+  ↓
+Match / -710103 Mismatch
+  ↓
+Configuration Refを取得済みの場合だけClose
+  ↓
+Operation Error > Cleanup Errorで最終errorを選択
+```
+
+本VIでは次を行わない。
+
+- Configuration Open / Save
+- Measurement Start / Stop
+- SysVar Read / Write
+- Version判定
+- Compatibility Probe
+- Session Registry操作
+- `CANalyzer_Execute_Command.vi`経由化
+- Application Quit
+- Application Ref Close
+- relative path canonicalization
+- mapped driveとUNCのalias解決
+
+### 0.1 確定設計仕様
+
+| ID | 仕様 |
+|---|---|
+| F-01 | `error in.status=True`ではActiveX処理を開始せず、元errorをそのまま返す |
+| F-02 | `Expected Configuration Path`は最初に`Trim Whitespace.vi`へ通す |
+| F-03 | Trim後Expectedがemptyなら`-710116`を返し、ActiveX処理を開始しない |
+| F-04 | `CAN_AX_Get_Configuration.vi`でConfiguration Refを取得する |
+| F-05 | `CAN_AX_Get_Configuration_Path.vi`でActual PathをStringとして取得する |
+| F-06 | Expected / Actualの両方へ`Trim → /を\へ置換 → lowercase`を同じ順序で適用する |
+| F-07 | 比較は`Equal?`によるnormalized Stringの完全一致とする |
+| F-08 | mismatch時は`-710103`を返す |
+| F-09 | mismatch sourceはExpectedにtrim済み期待値、Actualにraw取得値を残す |
+| F-10 | `Actual Configuration Path`出力にはnormalize前のraw Actual Pathを返す |
+| F-11 | Configuration RefはGet Configuration成功時だけ「acquired」とし、acquired時だけCloseする |
+| F-12 | Get Configuration failure時はunacquired RefをCloseしない |
+| F-13 | Get Path failure / Match / Mismatchではacquired Configuration RefをCloseする |
+| F-14 | 最終error優先順位は`Operation Error > Cleanup Error`とする |
+| F-15 | Application Refはcaller-ownedのため本VIでは絶対にCloseしない |
+
+### 0.2 Path比較契約
+
+初版のExpected Pathはfully-qualified absolute Windows file path Stringを前提とする。absolute UNC pathは使用可能とする。
+
+```text
+Expected:
+Trim Whitespace
+→ Search and Replace String で "/" を "\" へ全置換
+→ To Lower Case
+
+Actual:
+Trim Whitespace
+→ Search and Replace String で "/" を "\" へ全置換
+→ To Lower Case
+
+Normalized Expected == Normalized Actual
+```
+
+初版ではrelative→absolute変換、`.` / `..`解決、short/long path同一視、junction / symbolic link解決、mapped driveとUNCの同一視、network alias解決、trailing separator吸収は行わない。
+
+## 1. 入出力
+
+| 端子 | 方向 | 型 | 用途 |
+|---|---|---|---|
+| `CANalyzer.IApplication10` | 入力 | ActiveX Ref | caller-owned Application Ref。borrowed、never close |
+| `Expected Configuration Path` | 入力 | String | 期待するfully-qualified absolute Configuration Path |
+| `エラー入力 (エラーなし)` | 入力 | error cluster | prior error。status=Trueなら最外周でbypass |
+| `Actual Configuration Path` | 出力 | String | CANalyzerから取得したraw Configuration Path |
+| `Configuration Match?` | 出力 | Boolean | normalized Expected / Actualの完全一致結果 |
+| `エラー出力` | 出力 | error cluster | 元error、`-710116`、`-710103`、Wrapper error、Cleanup-only errorの最終結果 |
+
+Connector Paneは3 inputs / 3 outputsとする。
+
+```text
+Left upper   : CANalyzer.IApplication10
+Left middle  : Expected Configuration Path
+Left lower   : エラー入力 (エラーなし)
+Right upper  : Actual Configuration Path
+Right middle : Configuration Match?
+Right lower  : エラー出力
+```
+
+## 2. 配置する関数およびSubVI等
+
+| 数 | 日本語名 / 実VI表示名 | 英語名 | 配置場所・追加方法 | 用途 |
+|---:|---|---|---|---|
+| 1 | `CAN_AX_Get_Configuration.vi` | SubVI | `60_CAN\10_ActiveX_Wrapper` | Application Refから`CANalyzer.IConfiguration16`を取得 |
+| 1 | `CAN_AX_Get_Configuration_Path.vi` | SubVI | `60_CAN\10_ActiveX_Wrapper` | Configuration Refの`Path`をStringで取得 |
+| 2 | `Trim Whitespace.vi` | Trim Whitespace | Quick Dropで`Trim Whitespace` | Expected / Actual先頭末尾の空白除去 |
+| 1 | 空文字列/パス判定 | Empty String/Path? | プログラミング → 文字列 | trim後Expectedのempty判定 |
+| 2 | 文字列検索・置換 | Search and Replace String | プログラミング → 文字列 | `/`を`\`へ全置換 |
+| 2 | 小文字へ変換 | To Lower Case | プログラミング → 文字列 | case-insensitive比較用normalize |
+| 1 | 等しい? | Equal? | プログラミング → 比較 | normalized Stringのexact compare |
+| 必要数 | 名前でバンドル解除 | Unbundle By Name | プログラミング → クラスタ、クラス、バリアント | error.status取得 |
+| 必要数 | 名前でバンドル | Bundle By Name | プログラミング → クラスタ、クラス、バリアント | `-710116` / `-710103` error生成 |
+| 1 | 文字列にフォーマット | Format Into String | プログラミング → 文字列 | mismatch sourceへExpected/Actualを埋め込む |
+| 1 | エラーをクリア | Clear Errors | Quick Dropで`Clear Errors` | cleanup error chainをOperation Errorから分離 |
+| 1 | リファレンスを閉じる | Close Reference | 接続 → ActiveX、またはプログラミング → アプリケーション制御 | acquired Configuration RefのClose |
+| 必要数 | ケースストラクチャ | Case Structure | プログラミング → ストラクチャ | incoming / validation / wrapper result / compare / cleanup gate / final error選択 |
+
+関数がパレットで見つからない場合は`Ctrl + Space`を開き、表の英語名でQuick Drop検索する。実VIで確認したSubVI connectorを優先し、存在しない端子名を推測で追加しない。
+
+## 3. 配線順
+
+### 3.1 Front PanelとConnector Pane
+
+1. Front Panelへ`CANalyzer.IApplication10` ActiveX Ref control、String control `Expected Configuration Path`、error cluster control `エラー入力 (エラーなし)`を配置する。
+2. String indicator `Actual Configuration Path`、Boolean indicator `Configuration Match?`、error cluster indicator `エラー出力`を配置する。
+3. Label先頭へtabなどの不可視文字を入れない。
+4. Connector Paneへ1節の3-in / 3-out配置で割り当てる。
+
+### 3.2 Incoming Error Guard
+
+1. `エラー入力 (エラーなし)`を`Unbundle By Name`へ接続し、`status`を取り出す。
+2. `status`を最外周Case Structureのselectorへ接続する。
+3. True CaseではActiveX SubVIを配置しない。`Actual Configuration Path=""`、`Configuration Match?=False`、`エラー出力=元error in`を明示配線する。
+4. False Caseだけを通常処理へ進める。
+
+### 3.3 Expected Path入力検証
+
+1. `Expected Configuration Path`を1個目の`Trim Whitespace.vi`へ接続し、出力を`Trimmed Expected`として扱う。
+2. `Trimmed Expected`を`Empty String/Path?`へ接続する。
+3. empty=True Caseでは`Actual Configuration Path=""`、`Configuration Match?=False`を明示する。
+4. 同Caseでerror clusterを`Bundle By Name`し、`status=True`、`code=-710116`、`source="CANalyzer_Verify_Configuration.vi / Invalid Expected Configuration Path"`を設定する。
+5. empty=True Caseから`CAN_AX_Get_Configuration.vi`へ進まない。
+
+### 3.4 Configuration Ref取得
+
+1. empty=False Caseで`CAN_AX_Get_Configuration.vi`を配置する。
+2. `CANalyzer.IApplication10`をSubVIのApplication Ref入力へ接続する。
+3. 現在のoperation error wireをSubVIのerror inへ接続する。
+4. SubVIの`Configuration Ref`と`error out`を受ける。
+5. Get Configurationのerror statusで分岐する。
+6. failure Caseでは`Actual Configuration Path=""`、`Configuration Match?=False`、Operation Error=元Wrapper error、`Configuration Ref Acquired?=False`とする。`-710103`へ変換しない。
+7. success CaseではConfiguration Refを保持し、`Configuration Ref Acquired?=True`として次へ進む。
+
+### 3.5 Configuration Path取得
+
+1. Get Configuration success Caseだけに`CAN_AX_Get_Configuration_Path.vi`を配置する。
+2. acquired Configuration RefをSubVIへ接続する。
+3. operation error wireをerror inへ接続する。
+4. Path出力Stringを`Raw Actual Path`として保持する。
+5. Get Path failureでは`Actual Configuration Path=""`、`Configuration Match?=False`、Operation Error=元Wrapper error、`Configuration Ref Acquired?=True`を保持してcleanupへ進む。
+6. Get Path successだけをPath比較へ進める。
+
+### 3.6 Expected / Actual Path normalize
+
+Expected側：
+
+1. `Trimmed Expected`を1個目の`Search and Replace String`へ接続する。
+2. search stringへ`/`、replace stringへ`\`を設定し、対象を全置換する設定にする。
+3. 置換後Stringを1個目の`To Lower Case`へ接続し、`Normalized Expected`とする。
+
+Actual側：
+
+4. `Raw Actual Path`を2個目の`Trim Whitespace.vi`へ接続する。
+5. Trim出力を2個目の`Search and Replace String`へ接続し、Expected側と同じ`/`→`\`全置換を行う。
+6. 置換後Stringを2個目の`To Lower Case`へ接続し、`Normalized Actual`とする。
+7. `Raw Actual Path`は別wireで保持し、`Actual Configuration Path`出力と診断source用に使用する。normalize後値をActual出力へ接続しない。
+
+### 3.7 Exact Compare
+
+1. `Normalized Expected`と`Normalized Actual`を`Equal?`へ接続する。
+2. Equal?出力をMatch / Mismatch Case Structureのselectorへ接続する。
+3. substring、Contains、filename-only比較へ置き換えない。
+
+### 3.8 Match / Mismatch
+
+Match=True Case：
+
+1. `Actual Configuration Path=Raw Actual Path`を接続する。
+2. `Configuration Match?=True`を接続する。
+3. Operation ErrorをNo Errorのまま保持する。
+
+Mismatch Case：
+
+4. `Actual Configuration Path=Raw Actual Path`を接続する。
+5. `Configuration Match?=False`を接続する。
+6. `Format Into String`で次を作る。
+
+```text
+CANalyzer_Verify_Configuration.vi / Configuration Mismatch
+Expected=%s
+Actual=%s
+```
+
+7. 1個目の`%s`には`Trimmed Expected`を接続する。lowercase済みNormalized Expectedを診断sourceへ使わない。
+8. 2個目の`%s`には`Raw Actual Path`を接続する。
+9. error clusterを`Bundle By Name`し、`status=True`、`code=-710103`、`source=Format Into String出力`を設定する。
+10. Wrapper successかつ`Raw Actual Path=""`の場合も通常のMismatchとして`-710103`を返す。
+
+### 3.9 Conditional Cleanup
+
+1. operation結果とは別に`Configuration Ref Acquired?` Booleanをcleanup Case Structureのselectorへ接続する。
+2. False CaseはCloseを実行しない。cleanup errorはNo Errorとする。
+3. True Caseではoperation error wireをClose Referenceへ直接入れない。
+4. `Clear Errors.vi`または明示的なNo Errorからcleanup用error chainを開始する。
+5. acquired Configuration Refを`Close Reference`へ接続する。
+6. Close Referenceのerror outを`Cleanup Error`として保持する。
+7. Get Configuration failureではAcquired=FalseなのでCloseしない。
+8. Get Path failure / Match / MismatchではAcquired=TrueなのでCloseする。
+9. Application RefをClose Referenceへ接続しない。
+
+### 3.10 Final Error Selection
+
+1. 保持していた`Operation Error.status`を取得する。
+2. Final Error用Case Structureのselectorへ接続する。
+3. Operation status=Falseでは`Cleanup Error`を`エラー出力`へ接続する。これによりClose-only failureを失わない。
+4. Operation status=Trueでは`Operation Error`を`エラー出力`へ接続する。Cleanup Errorで主原因を上書きしない。
+
+優先順位は次で固定する。
+
+| Operation | Cleanup | Final Error |
+|---|---|---|
+| OK | OK | No Error |
+| OK | FAIL | Cleanup Error |
+| FAIL | OK | Operation Error |
+| FAIL | FAIL | Operation Error |
+
+## 4. 単体テスト
+
+### 4.1 静的受け入れ条件
+
+| Case | 入力 / 状態 | 期待結果 |
+|---|---|---|
+| Incoming Error | `error in.status=True` | Actual=`""`、Match=False、元error、ActiveX未実行 |
+| Expected whitespace-only | Trim後empty | Actual=`""`、Match=False、`-710116`、ActiveX未実行 |
+| Normalize symmetry | Expected=`" C:/Test/Config.cfg "`、Actual=`" c:\test\config.cfg "` | Match=True |
+| Get Configuration failure | Wrapper failure | 元Wrapper error、Config Ref Closeしない |
+| Get Path failure | Config取得成功後にPath failure | 元Wrapper error、Config Ref Closeする |
+| Different cfg | normalized String不一致 | Match=False、`-710103`、Config Ref Closeする |
+| Match | normalized String一致 | Match=True、Operation Errorなし、Config Ref Closeする |
+| Actual empty | Wrapper success、Actual=`""` | Match=False、`-710103` |
+| Operation OK + Close FAIL | Close Reference failure | Final Error=Cleanup Error |
+| Operation FAIL + Close FAIL | operationとCloseの両方failure | Final Error=Operation Error |
+| Application Ref ownership | 任意 | Application Refを一度もCloseしない |
+
+### 4.2 As-Built確認状態
+
+| 項目 | 状態 |
+|---|---|
+| 3 inputs / 3 outputs | PASS |
+| Incoming Error Guard | PASS |
+| Empty Expected `-710116` | PASS |
+| Get Configuration / Get Path | PASS |
+| Expected / Actual normalize symmetry | PASS |
+| Exact Compare | PASS |
+| Mismatch `-710103` | PASS |
+| Wrapper error preservation | PASS |
+| Raw Actual Path output | PASS |
+| Conditional Configuration Ref cleanup | PASS |
+| Application Ref never close | PASS |
+| Operation Error > Cleanup Error | PASS |
+| Forbidden side effects | PASS |
+| Broken Run Arrow | **NO（人間確認済み）** |
+| P0 | 0 |
+| P1 | 0 |
+| 残件 | P2 cosmetic only |
+
+### 4.3 Source / Version / Verified by / State
+
+| 項目 | 内容 |
+|---|---|
+| Source | local Projectの`CANalyzer_Verify_Configuration.vi`、`CAN_AX_Get_Configuration.vi`、`CAN_AX_Get_Configuration_Path.vi`、登録済みCANalyzer Type Library |
+| Version | RepositoryのCANalyzer実装基準と00Cに従う。製品Version固有差はWrapper層へ閉じ込める |
+| Verified by | Final Design Closure、Focused As-Built Review、Closure Spot Check、Broken Run Arrow人間確認 |
+| State | **AS-BUILT CONFIRMED / Functional Design Alignment PASS** |
+
+実機CANalyzerを使用したruntime/hardware E2E結果は本節のstatic As-Built確認とは別に記録する。
 
 ---
 
@@ -1445,6 +1749,7 @@ CANalyzer.ActiveX.Session.<SessionID>
 | `-710107` | Batch Request不正 |
 | `-710108` | Fault Clear失敗 |
 | `-710109` | Require Existingで起動済みCANalyzerなし |
+| `-710116` | Invalid Expected Configuration Path |
 
 ## 9.14.2 error source
 
@@ -1496,6 +1801,7 @@ error code / source
 - [ ] System、Measurement、Runningを取得できる
 - [ ] Start / Stopできる
 - [ ] 参照を明示Closeできる
+- [x] `CANalyzer_Verify_Configuration.vi`のStatic As-Built確認（P0=0 / P1=0、Broken Run Arrow=NO）
 
 ## System Variable
 
