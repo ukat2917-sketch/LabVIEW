@@ -19,12 +19,14 @@ Human direct visual confirmation済み。
 
 | Item | Value |
 |---|---|
-| Field label | `CANalyzer_Execute_Command_Type` |
+| Field label | `Execute_Command_Type` |
 | Field type | `CANalyzer_Execute_Command_Type.ctl` |
 | Semantic role | Command selector |
 | Close value | `Close Session` |
 
-既存shared typedefの互換性を優先し、`Command`へのrenameは行わない。
+既存shared typedefの互換性を優先し、`Command`や別名へのrenameは行わない。
+
+> 2026-08-26 correction: 先行版でfield labelを `CANalyzer_Execute_Command_Type` と転記していたが、Front PanelのHuman direct visual evidenceとlocal reflected typeの再確認により、actual field labelは `Execute_Command_Type` と確定した。`CANalyzer_Execute_Command_Type.ctl` はfield type名でありfield labelではない。
 
 ## 実装順序
 
@@ -78,7 +80,7 @@ cluster末尾へ数値Controlを追加する。
 
 既存fieldの名前・型・順序を変更しない。
 
-command selector fieldのactual labelは `CANalyzer_Execute_Command_Type` のまま維持する。
+command selector fieldのactual labelは `Execute_Command_Type` のまま維持する。
 
 ## CANalyzer_Execute_Command_Result.ctl
 
@@ -184,7 +186,7 @@ Close Session case内で `Request` clusterを `Unbundle By Name` へ接続する
 - `Session ID`
 - `Measurement Timeout ms`
 
-`CANalyzer_Execute_Command_Type` はdispatcher Case selectorで既にClose Sessionが選択されているため、case内部の処理条件として再判定しない。
+`Execute_Command_Type` はdispatcher Case selectorで既にClose Sessionが選択されているため、case内部の処理条件として再判定しない。
 
 ---
 
@@ -638,7 +640,7 @@ Block Diagramへdefault `CANalyzer_Execute_Command_Request` cluster constantと 
 
 | Field | Value |
 |---|---|
-| `CANalyzer_Execute_Command_Type` | `Close Session` |
+| `Execute_Command_Type` | `Close Session` |
 | `Session ID` | Public Session ID |
 | `Measurement Timeout ms` | Public Measurement Timeout ms |
 
@@ -649,7 +651,7 @@ Block Diagramへdefault `CANalyzer_Execute_Command_Request` cluster constantと 
 | From | To |
 |---|---|
 | default Request cluster | Bundle By Name base |
-| `Close Session` enum constant | `CANalyzer_Execute_Command_Type` |
+| `Close Session` enum constant | `Execute_Command_Type` |
 | Public Session ID | `Session ID` |
 | Public Measurement Timeout ms | `Measurement Timeout ms` |
 | Bundle output | `CANalyzer_Execute_Command.vi.Request` |
@@ -716,7 +718,7 @@ Shared typedefとVI変更後に確認する。
 - Connector Pane不変。
 - 意図しないcoercion dotなし。
 - unwired tunnelなし。
-- `CANalyzer_Execute_Command_Type` actual field labelを使用。
+- `Execute_Command_Type` actual field labelを使用。
 - Close Session enumは末尾。
 - Request `Measurement Timeout ms`は末尾U32。
 - Result `Session Removed?`は末尾Boolean。
