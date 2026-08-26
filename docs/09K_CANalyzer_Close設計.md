@@ -118,10 +118,12 @@ incoming errorがある場合、Close中の詳細errorはPublic `error out`に�
 Human direct visual confirmationにより、command selectorのactual field labelは次である。
 
 ```text
-CANalyzer_Execute_Command_Type
+Execute_Command_Type
 ```
 
-semantic roleはCommand selector。既存shared typedefの互換性を優先し、`Command`へのrenameは行わない。
+field typeは `CANalyzer_Execute_Command_Type.ctl`。semantic roleはCommand selector。既存shared typedefの互換性を優先し、`Command`や別名へのrenameは行わない。
+
+> 2026-08-26 correction: 先行文書でactual field labelを `CANalyzer_Execute_Command_Type` と転記していたが、Front PanelのHuman direct visual evidenceとlocal reflected typeの再確認により `Execute_Command_Type` がactual labelであることを確定した。これは実装変更ではなくbaseline文書の転記修正である。
 
 ## 4.3 Result
 
