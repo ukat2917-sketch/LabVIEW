@@ -1,12 +1,13 @@
 # 09K. CANalyzer_Close / Execute_Command Close Session 最終設計・実装正本
 
-**Status:** FINAL CANONICAL / INTERNAL AS-BUILT CLOSED  
+**Status:** FINAL CANONICAL / STATIC IMPLEMENTATION CLOSED  
 **Design:** FINAL / CLOSED  
 **`CANalyzer_Execute_Command.vi / Close Session`:** IMPLEMENTED / AS-BUILT CLOSED  
 **Internal Design Drift Review:** P0=0 / P1=0 / P2=0 / observable DESIGN DRIFT=0  
 **Human Static Check:** PASS  
 **GUI Reconstruction Procedure:** FINAL / COMPLETE  
-**Public `CANalyzer_Close.vi`:** DESIGN FINAL / AS-BUILT REVIEW PENDING  
+**Public `CANalyzer_Close.vi`:** IMPLEMENTED / AS-BUILT CLOSED  
+**Public Design Drift Review:** P0=0 / P1=0 / observable DESIGN DRIFT=0  
 **Runtime / Hardware E2E:** PENDING  
 
 > 本書を `CANalyzer_Close.vi` と `CANalyzer_Execute_Command.vi / Close Session` の設計思想、契約、LabVIEW GUI実装手順、As-Built差分、Static Acceptanceの**単一正本**とする。  
@@ -872,7 +873,7 @@ Result outputへupdated clusterを接続し、error outへFinal First Close Erro
 
 # 9. Public `CANalyzer_Close.vi` GUI Procedure
 
-> **Status:** DESIGN FINAL / AS-BUILT REVIEW PENDING。Public wrapper完成後は本節を基準にFocused As-Built Reviewする。
+> **Status:** DESIGN FINAL / AS-BUILT CLOSED。Public wrapperのFocused As-Built Re-CheckはP0=0 / P1=0、observable design driftなしでPASS。
 
 ## 9.1 Front Panel
 
@@ -1051,26 +1052,46 @@ GUI RECONSTRUCTION PROCEDURE = COMPLETE
 
 # 13. Public Wrapper Closure Gate
 
-Public `CANalyzer_Close.vi` は次を満たした後にAs-Built Closedとする。
+Public `CANalyzer_Close.vi` Focused As-Built Re-Check：
 
-- [ ] Front Panel / Connector Paneが4節契約どおり
-- [ ] Request.Execute_Command_Type=`Close Session`
-- [ ] Request.Session ID=Public Session ID
-- [ ] Request.Measurement Timeout ms=Public input
-- [ ] Execute_Command.error in=No Error
-- [ ] caller Original Errorをdispatcherへ渡さない
-- [ ] Result.Session Removed?をPublicへ返す
-- [ ] Final Error=`Original Error > Close Error`
-- [ ] Broken Run Arrowなし
-- [ ] coercion / unwired tunnel / broken typedefなし
+- [x] Front Panel / Connector Paneが4節契約どおり
+- [x] Request.Execute_Command_Type=`Close Session`
+- [x] Request.Session ID=Public Session ID
+- [x] Request.Measurement Timeout ms=Public input
+- [x] Execute_Command.error in=No Error
+- [x] caller Original Errorをdispatcherへ渡さない
+- [x] Result.Session Removed?をPublicへ返す
+- [x] Final Error=`Original Error > Close Error`
+- [x] Broken Run Arrowなし
+- [x] coercion / unwired tunnel / broken typedefなし
+- [x] Public側にActiveX / Registry cleanup logicなし
+- [x] 4-state reachable matrixがcontract一致
 
-Public wrapper完成後のReviewも本書を基準とする。
+Review result：
+
+```text
+P0 = 0
+P1 = 0
+Observable Design Drift = 0
+Public I/O = PASS
+Request Build = PASS
+Execute_Command clean call = PASS
+Session Removed semantics = PASS
+Original Error > Close Error = PASS
+Responsibility Boundary = PASS
+Reachable State Matrix = PASS
+
+CANalyzer_Close.vi
+PUBLIC AS-BUILT REVIEW = PASS
+PUBLIC CLOSE IMPLEMENTATION = CLOSED
+CANalyzer_Close STATIC IMPLEMENTATION = CLOSED
+```
 
 ---
 
 # 14. Runtime / Hardware E2E
 
-Static design / internal As-Built closureとRuntime E2Eを混同しない。
+Static design / As-Built closureとRuntime E2Eを混同しない。
 
 Runtime / Hardwareでは最低限次を確認する。
 
@@ -1103,6 +1124,7 @@ CANalyzer_Close Architecture / Design = FINAL / CLOSED
 CANalyzer_Execute_Command Close Session = IMPLEMENTED / AS-BUILT CLOSED
 Observable Design Drift = NONE
 GUI Reconstruction Procedure = FINAL / COMPLETE
-Public CANalyzer_Close.vi = DESIGN FINAL / AS-BUILT REVIEW PENDING
+Public CANalyzer_Close.vi = IMPLEMENTED / AS-BUILT CLOSED
+CANalyzer_Close Static Implementation = CLOSED
 Runtime / Hardware E2E = PENDING
 ```
