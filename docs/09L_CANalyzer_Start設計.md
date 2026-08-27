@@ -1,14 +1,15 @@
-# 09L. CANalyzer_Start / Execute_Command Start Measurement 最終設計正本
+# 09L. CANalyzer_Start / Execute_Command Start Measurement 最終設計・実装正本
 
-**Status:** FINAL DESIGN / FROZEN / IMPLEMENTATION PENDING  
+**Status:** FINAL DESIGN / FROZEN / GUI RECONSTRUCTION COMPLETE / IMPLEMENTATION PENDING  
 **Design Review:** P0=0 / P1=0  
+**GUI Documentation Gap:** 0  
 **Public `CANalyzer_Start.vi`:** NOT IMPLEMENTED  
 **`CANalyzer_Execute_Command.vi / Start Measurement`:** NOT IMPLEMENTED  
 **Runtime / Hardware E2E:** PENDING
 
-> 本書を `CANalyzer_Start.vi` と `CANalyzer_Execute_Command.vi / Start Measurement` の設計正本とする。  
-> Production StartのPublic I/O、Command拡張、ownership/cache契約、failure policy、error priorityは本書を優先する。  
-> `09D_CANalyzer_Execute_Command設計.md` はRead / Write初期Vertical Sliceの正本として残し、Start Measurement追加に関する差分は本書を優先する。  
+> 本書を `CANalyzer_Start.vi` と `CANalyzer_Execute_Command.vi / Start Measurement` の設計、契約、LabVIEW GUI再構築手順、Static Acceptanceの単一正本とする。  
+> Production StartのPublic I/O、Command拡張、ownership/cache契約、failure policy、error priority、GUI実装手順は本書を優先する。  
+> `09D_CANalyzer_Execute_Command設計.md` はRead / Write初期Vertical Sliceの正本として残すが、Start Measurement追加に関する差分は本書を優先する。  
 > Session RegistryのAction契約は `09B_CANalyzer_Session_Registry設計.md`、Open時のStart/rollback意味論は `09J_CANalyzer_Open設計.md`、Close時のownership消費契約は `09K_CANalyzer_Close設計.md` を参照する。
 
 ---
@@ -28,8 +29,6 @@
 7. Wait failureとStart failureを区別する。
 8. Public APIへActiveX RefやSession Stateを露出しない。
 
-概念フロー：
-
 ```text
 Public CANalyzer_Start.vi
   ↓ Start Measurement Request
@@ -37,10 +36,14 @@ CANalyzer_Execute_Command.vi [Non-reentrant]
   ↓
 Registry Get
   ↓
-actual Running read
+Found?
+  ↓
+Get actual Running
+  ↓
+Get Running Error Gate
   ↓
 Running=True ?
-├─ Yes → no-op / ownership preserve / Result Running=True
+├─ Yes → pure no-op / ownership preserve / Result Running=True
 └─ No
     ↓
     Timeout validate
@@ -65,10 +68,10 @@ Running=True ?
 担当：
 
 - Public I/O
-- Start Measurement Request build
+- `Start Measurement` Request build
 - `CANalyzer_Execute_Command.vi` call
 - `Result.Measurement Running?` extraction
-- standard `error in / error out` pass-through
+- standard `error in / error out`
 
 担当しない：
 
@@ -86,6 +89,7 @@ Public wrapperはActiveX Ref、Variant、Session Stateを公開しない。
 
 - Session Get / Found判定
 - actual Running read
+- Get Running Error Gate
 - Start要否判定
 - timeout validation
 - Start Invoke
@@ -100,7 +104,7 @@ Public wrapperはActiveX Ref、Variant、Session Stateを公開しない。
 
 # 2. Public API Contract
 
-## 2.1 Inputs
+## Inputs
 
 | Terminal | Type | Contract |
 |---|---|---|
@@ -108,11 +112,11 @@ Public wrapperはActiveX Ref、Variant、Session Stateを公開しない。
 | `Measurement Timeout ms` | U32 | Start後Running=True確認timeout |
 | `error in` | error cluster | status=TrueではStart commandをbypass |
 
-## 2.2 Outputs
+## Outputs
 
 | Terminal | Type | Contract |
 |---|---|---|
-| `Measurement Running?` | Boolean | 最後に観測できたactual Running状態。actual観測が一度も成立していない場合はFalse |
+| `Measurement Running?` | Boolean | 最後に正常観測できたactual Running。観測未成立ならFalse |
 | `error out` | error cluster | Start command final error |
 
 Publicへ`Start Invoked?`、`Measurement Started By LabVIEW?`、`Cached Measuring?`は出さない。
@@ -150,11 +154,11 @@ Start Measurement Caseで使用：
 
 ## 3.3 `CANalyzer_Execute_Command_Result.ctl`
 
-既存末尾`Session Removed?`の後へ追加：
+既存末尾`Session Removed?`の後へappend：
 
-| Field | Type |
-|---|---|
-| `Measurement Running?` | Boolean |
+| Field | Type | Default |
+|---|---|---|
+| `Measurement Running?` | Boolean | False |
 
 Start Measurement Result：
 
@@ -165,13 +169,13 @@ Start Measurement Result：
 | `Read Value` | default |
 | `Verified?` | False |
 | `Session Removed?` | False/default |
-| `Measurement Running?` | last observed actual Running、未観測ならFalse |
+| `Measurement Running?` | last successfully observed actual Running、未観測ならFalse |
 
 既存Result fieldをStart用の別意味へ流用しない。
 
 ---
 
-# 4. Common Error Contract
+# 4. Common Error Contract / Base Result
 
 Startはcleanup APIではない。
 
@@ -183,9 +187,22 @@ error in.status=True
 → error out=original error
 ```
 
-Closeのような「caller errorでもcleanup実行」の特殊契約はStartへコピーしない。
-
 Public `CANalyzer_Start.vi` はpublic `error in`を通常どおり `CANalyzer_Execute_Command.vi.error in`へ渡す。
+
+Start Measurement Caseへ入った直後にBase Resultを作る。
+
+```text
+default CANalyzer_Execute_Command_Result
++ Bundle By Name
+    Session ID = Request.Session ID
+    Measurement Running? = False
+```
+
+その他fieldはdefault。Start Measurement Case内の全branchでこのResult stateをpassする。
+
+したがってStart Caseへ入った後はRegistry Get error、Session Not Found、Get Running error、Invalid Timeout、Start error、Stage1 Update error、Wait error、Stage2 Update errorでも`Result.Session ID=Request.Session ID`を保持する。
+
+outer incoming-error bypassだけは既存契約どおりDefault Resultのまま。
 
 ---
 
@@ -198,11 +215,11 @@ function StartMeasurement(Request, errorIn):
 
     result = DefaultResult
     result.SessionID = Request.SessionID
+    result.MeasurementRunning = false
     running = false
 
-    get = Registry.Get(Request.SessionID)
+    get = Registry.Get(Request.SessionID, errorIn /* status=False */)
     if get.error:
-        result.MeasurementRunning = running
         return result, get.error
 
     if not get.found:
@@ -212,17 +229,19 @@ function StartMeasurement(Request, errorIn):
 
     session = get.session
 
-    initial = GetMeasurementRunning(session.MeasurementRef)
+    initial = GetMeasurementRunning(
+        session.MeasurementRef,
+        get.error /* status=False */)
+
     if initial.error:
-        result.MeasurementRunning = running
         return result, initial.error
 
     running = initial.running
     result.MeasurementRunning = running
 
     if running:
-        // pure no-op path
-        // preserve ownership
+        // pure no-op
+        // ownership preserve
         // no Registry Update
         return result, NoError
 
@@ -231,31 +250,34 @@ function StartMeasurement(Request, errorIn):
             Error(-710118,
                   "CANalyzer_Execute_Command.vi / Invalid Measurement Timeout")
 
-    start = StartMeasurementInvoke(session.MeasurementRef)
+    start = StartMeasurementInvoke(
+        session.MeasurementRef,
+        initial.error /* status=False */)
+
     if start.error:
         return result, start.error
 
-    // Start Invoke success establishes new LabVIEW ownership history.
     ownedState = session
     ownedState.MeasurementStartedByLabVIEW = true
-    ownedState.CachedMeasuring = running   // initial actual false
+    ownedState.CachedMeasuring = false
 
     ownershipUpdate = Registry.Update(
         Request.SessionID,
         ownedState,
-        cleanError)
+        NoError)
 
     if ownershipUpdate.error:
         primary = ownershipUpdate.error
 
-        stop = StopMeasurement(session.MeasurementRef, cleanError)
+        stop = StopMeasurement(session.MeasurementRef, NoError)
         if not stop.error:
             waitFalse = WaitMeasurementState(
                 MeasurementRef=session.MeasurementRef,
                 ExpectedRunning=false,
                 TimeoutMs=Request.MeasurementTimeoutMs,
                 PollIntervalMs=100,
-                errorIn=cleanError)
+                errorIn=NoError)
+
             if waitFalse produced an actual observation:
                 running = waitFalse.ActualRunning
 
@@ -267,7 +289,7 @@ function StartMeasurement(Request, errorIn):
         ExpectedRunning=true,
         TimeoutMs=Request.MeasurementTimeoutMs,
         PollIntervalMs=100,
-        errorIn=cleanError)
+        errorIn=ownershipUpdate.error /* status=False */)
 
     running = waitTrue.ActualRunning
     result.MeasurementRunning = running
@@ -279,7 +301,7 @@ function StartMeasurement(Request, errorIn):
     cacheUpdate = Registry.Update(
         Request.SessionID,
         finalState,
-        cleanError)
+        NoError)
 
     if waitTrue.error:
         return result, waitTrue.error
@@ -290,7 +312,7 @@ function StartMeasurement(Request, errorIn):
     return result, NoError
 ```
 
-上記は機能意味論を示す。GUI実装では既存SubVIのincoming-error behaviorとCase Structureを使って同じobservable semanticsを成立させる。
+上記は機能意味論を示す。GUIではCase Structureで同じobservable semanticsを成立させる。
 
 ---
 
@@ -303,9 +325,13 @@ Incoming Error Guard
 ↓
 Registry Get
 ↓
+Registry Get Error Gate
+↓
 Found?
 ↓
 Get actual Running
+↓
+Get Running Error Gate
 ↓
 Running=True ?
 ├─ Yes → success no-op
@@ -316,19 +342,13 @@ Running=True ?
     └─ No  → Start
 ```
 
-Timeout validationをRegistry Getより前へ置かない。
-
-理由：
-
-- Session不存在は`-710102`を優先する。
-- TimeoutはStart side effectが必要なbranchでだけ意味を持つ。
-- Running=Trueのno-opではTimeout=0でも成功できる。
+Timeout validationをRegistry Getより前へ置かない。Get Running error時にTimeout判定やStartへ進まない。
 
 ---
 
 # 7. Initial Running=True No-op Contract
 
-actual Running=TrueならStartしない。
+actual Running=Trueなら：
 
 ```text
 Start Invoke = No
@@ -343,9 +363,7 @@ ownershipは既存値をpreserveする。
 | False | False |
 | True | True |
 
-Running=Trueだけを理由にFalse→Trueへ変更しない。
-
-`Cached Measuring?` refreshだけのためにRegistry Updateをmandatoryにしない。Final designではno-op pathのRegistry writeはskipする。
+Running=Trueだけを理由にFalse→Trueへ変更しない。cache refreshだけのRegistry writeもskipする。
 
 ---
 
@@ -361,13 +379,14 @@ Measurement Timeout ms == 0
 → Start Invokeなし
 → Registry Updateなし
 → Waitなし
+→ rollback Stopなし
 ```
 
 Result `Measurement Running?`はinitial actual observationのFalseを保持する。
 
 ---
 
-# 9. Start Ownership Contract
+# 9. Start Ownership / Two-stage Persistence
 
 new ownership=Trueの根拠はStart Invoke successだけ。
 
@@ -376,31 +395,26 @@ Start Invoke success
 → Measurement Started By LabVIEW? = True
 ```
 
-Start Invoke failureでは既存ownershipを変更しない。
-
-Start Invoke successだけを理由に`Cached Measuring?=True`としてはいけない。
-
-ownership-first persist時：
-
-```text
-Measurement Started By LabVIEW? = True
-Cached Measuring? = Initial actual Running = False
-```
-
-これをWaitより先にRegistryへ保存する。
-
----
-
-# 10. Two-stage Persistence
+Start Invoke failureではexisting ownershipを変更しない。
 
 ## Stage 1: ownership persist
 
-Start Invoke success直後、Wait前にRegistry Update。
+Start成功直後、Waitより前にworking copyを作る。
 
-目的：
+```text
+Measurement Started By LabVIEW? = True
+Cached Measuring? = False
+その他field = existing session preserve
+```
 
-- Wait中のfailureでもClose / Stopがownershipを知れるようにする。
-- Start済みMeasurementをuntrackedにしない。
+Registry Update：
+
+```text
+Action = Update
+Session ID = Request.Session ID
+Session In = ownership working copy
+error in = No Error constant
+```
 
 ## Stage 2: actual cache persist
 
@@ -411,24 +425,20 @@ Measurement Started By LabVIEW? = True
 Cached Measuring? = Wait.Actual Running?
 ```
 
-Wait errorが存在してもcache Updateはclean errorでattemptする。
-
-Wait errorをRegistry Update.error inへ直接渡してbypassさせない。
+Stage2 Registry UpdateはWait errorを直接渡さずNo Error constantでattemptする。
 
 ---
 
-# 11. Ownership Persist Failure Rollback
+# 10. Ownership Persist Failure Rollback
 
-Start Invoke success後、Stage 1 Registry Updateが失敗した場合はownership tracking failure。
-
-Measurementをそのまま残さない。
+Stage1 Registry Update failureはownership tracking failure。
 
 ```text
-Primary Error = Registry Update error
+Primary Error = Stage1 Registry Update error
 ↓
-Stop attempt [clean error]
+Rollback Stop [error in = No Error]
 ↓
-Stop successならWait False [clean error]
+Stop successなら Wait False [error in = No Error]
 Expected Running? = False
 Timeout ms = Request.Measurement Timeout ms
 Poll Interval ms = 100
@@ -440,42 +450,36 @@ Final error priority：
 Ownership Persist Error > Rollback Error
 ```
 
-rollback errorでprimaryを上書きしない。
-
 Registry SessionはRemoveしない。
+
+Rollback Wait Falseでは`Actual Running?`をcaptureする。
+
+- actual observationが成立した場合：`Measurement Running? = Wait False.Actual Running?`
+- actual observationが成立しなかった場合：それ以前のlast successfully observed Runningを保持
+- Wait False errorの有無だけを理由にActual Runningを捨てない
 
 ---
 
-# 12. Wait Running=True Failure Policy
+# 11. Wait Running=True Failure Policy
 
-Stage 1 ownership persist成功後のWait failureではautomatic Stop rollbackしない。
+Stage1 ownership persist成功後のWait failureではautomatic Stop rollbackしない。
 
 ```text
 Start Invoke = success
 ownership persist = success
 Wait Running=True = error
 → ownership=TrueをRegistryへ残す
-→ Actual Running?をResultへ保持
-→ cache updateをattempt
+→ Wait Actual Running?をResultへ保持
+→ Stage2 cache Updateをattempt
 → Wait errorをcallerへ返す
 → automatic Stopなし
 ```
 
-理由：
-
-- Wait timeoutはStart Invoke failureではない。
-- 実MeasurementがRunningになっている可能性がある。
-- ownershipが追跡済みなので、後続`CANalyzer_Stop.vi` / `CANalyzer_Close.vi`で安全に停止できる。
-
-Open時のStart failure rollbackとは異なる。OpenはRegistry Create前でSessionが未成立のためrollback ownerになるが、Standalone Startは既存Sessionを利用する。
+Open時のStart failure rollbackとは異なる。Standalone Startは既存Sessionを利用しownershipが追跡済みなので、後続Stop / Closeで安全に停止できる。
 
 ---
 
-# 13. Final Cache Update Error Policy
-
-Stage 1 ownership persist後なので、Stage 2 cache Update失敗だけではrollback Stopしない。
-
-Error priority：
+# 12. Final Cache Update Error Policy
 
 | Wait | Cache Update | Final Error |
 |---|---|---|
@@ -484,11 +488,16 @@ Error priority：
 | error | success | Wait error |
 | error | error | Wait error |
 
-ownershipはStage 1で追跡済み。
+Wait errorとStage2 Update errorのmergeはpriority selectを明示する。
+
+```text
+Wait error.status = True  → Final Error = Wait error
+Wait error.status = False → Final Error = Stage2 Update error
+```
 
 ---
 
-# 14. Error Priority
+# 13. Error Priority
 
 到達順：
 
@@ -502,53 +511,432 @@ ownershipはStage 1で追跡済み。
 8. Wait Running=True error
 9. Final Cache Registry Update error
 
-Stage 1 ownership persist failure後のrollback errorはprimary errorを上書きしない。
+Stage1 ownership persist failure後のrollback errorはprimaryを上書きしない。
 
 ---
 
-# 15. Result Semantics
+# 14. Result Semantics
 
 `Measurement Running?`：
 
 > last successfully observed actual Measurement Running state
 
-ルール：
-
 - actual観測が一度も成立していない場合はFalse。
 - Initial Running=True no-opではTrue。
 - Initial Running=False + Timeout=0ではFalse。
 - Start Invoke成功だけを理由にTrueへ推定しない。
-- Wait後はWait serviceのactual observationを採用する。
+- Wait True後はWait serviceのactual observationを採用する。
 - rollback Wait Falseがactual観測できた場合はその値を採用する。
 
 `Measurement Running?`はownershipではない。
 
 ---
 
-# 16. Reachable State Matrix
+# 15. Detailed LabVIEW GUI Reconstruction Procedure
 
-| Case | Expected |
+本節をStart Measurement GUI再構築手順の正本とする。Nigel内部UID / Node ID / Wire IDは使用しない。
+
+## 15.1 Shared Typedef Amendment
+
+### `CANalyzer_Execute_Command_Type.ctl`
+
+1. enumの既存`Read SysVar`、`Write SysVar`、`Close Session`を変更しない。
+2. 末尾へ`Start Measurement`を追加。
+3. ordinalが`0 / 1 / 2 / 3`であることを確認。
+
+### `CANalyzer_Execute_Command_Request.ctl`
+
+変更なし。
+
+### `CANalyzer_Execute_Command_Result.ctl`
+
+1. cluster末尾、`Session Removed?`の後へBooleanを追加。
+2. Label=`Measurement Running?`。
+3. Default=False。
+4. existing field順序・label・型を変更しない。
+
+## 15.2 Dispatcher / Base Result
+
+1. `CANalyzer_Execute_Command.vi`を開く。
+2. `Execute_Command_Type` Case Structureへ`Start Measurement` caseを追加。
+3. outer incoming-error guardは変更しない。
+4. Start Case先頭にdefault Result constant + Bundle By Nameを置く。
+5. `Session ID=Request.Session ID`、`Measurement Running?=False`を設定。
+6. このBase ResultをStart Case内の全branchへpassする。
+
+## 15.3 Registry Get
+
+`CANalyzer_Session_Registry.vi`：
+
+| Terminal | Source |
 |---|---|
-| incoming error | command bypass / original error / Running=False default |
-| Session missing + Timeout=0 | `-710102` / no ActiveX |
-| Found + Running=True + Timeout=0 | success no-op / ownership preserve / Running=True |
-| Found + Running=False + Timeout=0 | `-710118` / no Start / Running=False |
-| Running=True + ownership=False | no Start / ownership remains False / Running=True |
-| Running=True + ownership=True | no Start / ownership remains True / Running=True |
-| Running=False + Start failure | ownership unchanged / Start error / Running=False last observation |
-| Start success + Stage1 persist success + Wait success | ownership=True / cache=True / Running=True / success |
-| Start success + Stage1 persist success + Wait timeout + Actual=False | ownership=True / cache=False / Running=False / Wait error / no rollback |
-| Start success + Stage1 persist success + Wait timeout + Actual=True | ownership=True / cache=True / Running=True / Wait error / no rollback |
-| Start success + Stage1 persist failure + rollback success | primary=Registry Update error / Running=False if confirmed |
-| Start success + Stage1 persist failure + rollback failure | primary=Registry Update error / rollback secondary / Running=last observation |
-| Wait success + Stage2 cache Update failure | ownership tracked / Running=True / Cache Update error |
-| Wait failure + Stage2 cache Update failure | ownership tracked / Running=Wait actual / Wait error |
+| Action | `Get` constant |
+| Session ID | Request.Session ID |
+| Session In | default Session State |
+| error in | Execute_Command outer guardを通過したincoming error wire（status=False） |
+
+Registry Get error outはまずError Gateへ入れる。
+
+### Registry Get Error Gate
+
+selector=`Registry Get.error out.status`。
+
+TRUE：
+
+- ActiveXへ進まない。
+- Base Resultをpass。
+- Measurement Running state=False/last observed。
+- final error=`Registry Get.error out`。
+
+FALSE：
+
+- `Session Out`をpass。
+- `Registry Get.error out`（status=False）をFound Gateへpass。
+
+全output tunnelを明示配線し`Use Default If Unwired`は禁止。
+
+## 15.4 Found Gate
+
+selector=`Registry Get.Found?`。
+
+FALSE：
+
+```text
+status=True
+code=-710102
+source="CANalyzer_Execute_Command.vi / Session Not Found"
+```
+
+ActiveXへ進まない。Base Result / running state / final errorをfinal Result pathへ出す。
+
+TRUE：
+
+`Session Out`をGet Runningへ渡す。
+
+## 15.5 Get actual Running
+
+Session Outからactual GUI field `Measurement Ref`をUnbundle By Name。
+
+`CAN_AX_Get_Measurement_Running.vi`：
+
+| Terminal | Source |
+|---|---|
+| Measurement Ref | Session Out.Measurement Ref |
+| error in | Registry Get success pathの`Registry Get.error out`（status=False） |
+
+`Running`はInitial Running候補。`Cached Measuring?`をStart decisionに使わない。
+
+### Get Running Error Gate
+
+selector=`CAN_AX_Get_Measurement_Running.vi.error out.status`。
+
+TRUE：
+
+- Start Invokeしない。
+- Timeout判定しない。
+- Registry Updateしない。
+- Waitしない。
+- Measurement Running stateはそれ以前のlast observed。初回観測失敗ならFalse。
+- final error=`Get Running.error out`。
+
+FALSE：
+
+- `Running`をInitial Runningとして採用。
+- `Get Running.error out`（status=False）を後段へpass。
+
+## 15.6 Initial Running Case
+
+selector=Initial Running。
+
+TRUE：
+
+- Startなし。
+- Registry Updateなし。
+- Waitなし。
+- ownership preserve。
+- Measurement Running state=True。
+- Base Resultをfinal Result pathへpass。
+
+FALSE：Timeout Caseへ。
+
+## 15.7 Timeout Case
+
+Running=False branch内でのみ`Request.Measurement Timeout ms == U32 0`を評価。
+
+TRUE：
+
+```text
+status=True
+code=-710118
+source="CANalyzer_Execute_Command.vi / Invalid Measurement Timeout"
+```
+
+- Measurement Running=False。
+- no Start。
+- no Registry Update。
+- no Wait。
+- no rollback Stop。
+- final Result / Error pathへ。
+
+FALSE：Start Invokeへ。
+
+## 15.8 Start Invoke
+
+`CAN_AX_Start_Measurement.vi`：
+
+| Terminal | Source |
+|---|---|
+| Measurement Ref | Session Out.Measurement Ref |
+| error in | Get Running success pathの`Get Running.error out`（status=False） |
+
+Start error.status=True：ownership変更なし、Updateなし、Waitなし、Result Running=Falseを保持してfinal path。
+
+Start success：ownership working stateへ。
+
+## 15.9 Ownership Working State
+
+Session OutをbaseにBundle By Name。
+
+| Field | Value |
+|---|---|
+| `Measurement Started By LabVIEW?` | True |
+| `Cached Measuring?` | False |
+| others | preserve |
+
+## 15.10 Stage1 Registry Update
+
+`CANalyzer_Session_Registry.vi`：
+
+| Terminal | Source |
+|---|---|
+| Action | Update |
+| Session ID | Request.Session ID |
+| Session In | ownership working state |
+| error in | No Error constant |
+
+success時は`Session Out`をStage2 base stateとして保持。
+
+## 15.11 Stage1 Update Error Case / Rollback
+
+selector=`Stage1 Registry Update.error out.status`。
+
+TRUE：
+
+- Primary Error=Stage1 Update error。
+- `CAN_AX_Stop_Measurement.vi`をNo Error constantで実行。
+- Stop errorならWait Falseをskipし、primary errorを保持。
+- Stop successならWait Falseを実行。
+
+Rollback Wait False：
+
+| Terminal | Value |
+|---|---|
+| Measurement Ref | same Session Out.Measurement Ref |
+| Expected Running? | False |
+| Timeout ms | Request.Measurement Timeout ms |
+| Poll Interval ms | U32 100 |
+| error in | No Error constant |
+
+Wait Falseがactual observationを成立できた場合は`Actual Running?`をrunning stateへ反映する。観測未成立なら以前のlast observedを保持。rollback errorでprimaryを上書きしない。
+
+FALSE：Wait Running=Trueへ。
+
+## 15.12 Wait Running=True
+
+`CANalyzer_Wait_Measurement_State.vi`：
+
+| Terminal | Value |
+|---|---|
+| Measurement Ref | Session Out.Measurement Ref |
+| Expected Running? | True |
+| Timeout ms | Request.Measurement Timeout ms |
+| Poll Interval ms | U32 100 |
+| error in | Stage1 Registry Update success pathの`error out`（status=False） |
+
+`Actual Running?`をrunning stateへ反映。Wait errorでもautomatic Stopしない。
+
+## 15.13 Stage2 Cache Update
+
+Stage1 Update success時のSession OutをbaseにBundle By Name。
+
+| Field | Value |
+|---|---|
+| `Measurement Started By LabVIEW?` | True |
+| `Cached Measuring?` | Wait Actual Running? |
+
+Registry Update：
+
+| Terminal | Source |
+|---|---|
+| Action | Update |
+| Session ID | Request.Session ID |
+| Session In | Stage2 state |
+| error in | No Error constant |
+
+Wait errorをStage2 Update.error inへ渡さない。
+
+## 15.14 Wait / Cache Error Priority
+
+`Wait error.status`をCase selectorへ。
+
+TRUE：Wait errorをfinal errorへ。  
+FALSE：Stage2 Update.error outをfinal errorへ。
+
+両Case output tunnelを明示配線する。
+
+## 15.15 Result Build
+
+Base ResultをBundle By Name。
+
+| Field | Source |
+|---|---|
+| Session ID | 既にBase ResultでRequest.Session ID |
+| Measurement Running? | final running state |
+| others | default |
+
+final Resultとfinal errorをExecute_Command出力へ。
 
 ---
 
-# 17. Regression Contract
+# 16. Complete Tunnel Tables
 
-Shared typedef変更後も次を固定する。
+| Gate / Case | Branch | Result state | Running state | Session state | Primary error | Next |
+|---|---|---|---|---|---|---|
+| Registry Get Error | TRUE | Base Result | False/last observed | default/pass | Get error | final |
+| Registry Get Error | FALSE | Base Result | unchanged | Session Out | no-error | Found Gate |
+| Found? | FALSE | Base Result | False/last observed | default/pass | -710102 | final |
+| Found? | TRUE | Base Result | unchanged | Session Out | no-error | Get Running |
+| Get Running Error | TRUE | Base Result | last observed/False | Session Out | Get Running error | final |
+| Get Running Error | FALSE | Base Result | Running→Initial | Session Out | no-error | Initial Running |
+| Initial Running | TRUE | Base Result | True | preserve | no-error | final |
+| Initial Running | FALSE | Base Result | False | preserve | no-error | Timeout |
+| Timeout | TRUE | Base Result | False | preserve | -710118 | final |
+| Timeout | FALSE | Base Result | False | preserve | no-error | Start |
+| Start Error | TRUE | Base Result | False/last observed | ownership unchanged | Start error | final |
+| Start Error | FALSE | Base Result | False | working state | no-error | Stage1 Update |
+| Stage1 Update Error | TRUE | Base Result | last observed False | persisted state不成立 | Stage1 error | Rollback Stop |
+| Stage1 Update Error | FALSE | Base Result | False | persisted ownership state | no-error | Wait True |
+| Rollback Stop Error | TRUE | Base Result | last observed | session unchanged | Stage1 error | final |
+| Rollback Stop Error | FALSE | Base Result | pending Wait False | session unchanged | Stage1 error | Wait False |
+| Wait / Cache Merge | Wait error TRUE | Base Result | Wait Actual | Stage2 attempted | Wait error | final |
+| Wait / Cache Merge | Wait error FALSE | Base Result | Wait Actual | Stage2 attempted | Stage2 error/No Error | final |
+
+全Caseで必要なoutput tunnelを明示配線し`Use Default If Unwired`は禁止。
+
+---
+
+# 17. Complete Wiring Table
+
+| From | To | Type | Meaning |
+|---|---|---|---|
+| Request.Session ID | Base Result.Session ID | U32 | Start target identity |
+| False | Base Result.Measurement Running? | Boolean | default unobserved state |
+| Request.Session ID | Registry Get.Session ID | U32 | target session |
+| default Session State | Registry Get.Session In | cluster | required unused content |
+| outer guard success error wire | Registry Get.error in | error cluster | status=False |
+| Registry Get.Session Out.Measurement Ref | Get Running.Measurement Ref | ActiveX Ref | actual state source |
+| Registry Get.error out success wire | Get Running.error in | error cluster | status=False |
+| Get Running.Running | Initial Running selector | Boolean | Start decision |
+| Request.Measurement Timeout ms | Equal? | U32 | timeout compare |
+| U32 0 | Equal? | U32 | invalid timeout threshold |
+| Session Out.Measurement Ref | Start.Measurement Ref | ActiveX Ref | Start target |
+| Get Running.error out success wire | Start.error in | error cluster | status=False |
+| Session Out | Stage1 Bundle input | Session State | ownership working copy base |
+| True | Stage1 Measurement Started By LabVIEW? | Boolean | ownership history |
+| False | Stage1 Cached Measuring? | Boolean | initial actual state |
+| Request.Session ID | Stage1 Update.Session ID | U32 | update key |
+| Stage1 working state | Stage1 Update.Session In | Session State | persist ownership |
+| No Error | Stage1 Update.error in | error cluster | clean execution |
+| Measurement Ref | Rollback Stop.Measurement Ref | ActiveX Ref | rollback target |
+| No Error | Rollback Stop.error in | error cluster | primary isolation |
+| Measurement Ref | Rollback Wait False.Measurement Ref | ActiveX Ref | stopped confirmation |
+| False | Rollback Wait False.Expected Running? | Boolean | target state |
+| Request Timeout | Rollback Wait False.Timeout ms | U32 | timeout |
+| U32 100 | Rollback Wait False.Poll Interval ms | U32 | poll |
+| No Error | Rollback Wait False.error in | error cluster | clean execution |
+| Measurement Ref | Wait True.Measurement Ref | ActiveX Ref | running confirmation |
+| True | Wait True.Expected Running? | Boolean | target state |
+| Request Timeout | Wait True.Timeout ms | U32 | timeout |
+| U32 100 | Wait True.Poll Interval ms | U32 | poll |
+| Stage1 Update success error out | Wait True.error in | error cluster | status=False |
+| Stage1 persisted Session Out | Stage2 Bundle input | Session State | cache state base |
+| Wait True.Actual Running? | Stage2 Cached Measuring? | Boolean | actual cache |
+| True | Stage2 Measurement Started By LabVIEW? | Boolean | preserve ownership |
+| Request.Session ID | Stage2 Update.Session ID | U32 | update key |
+| Stage2 state | Stage2 Update.Session In | Session State | persist actual cache |
+| No Error | Stage2 Update.error in | error cluster | do not bypass on Wait error |
+| final running state | Result.Measurement Running? | Boolean | public useful result |
+| final start error | Execute_Command.error out | error cluster | command status |
+
+---
+
+# 18. Public `CANalyzer_Start.vi` GUI Procedure
+
+## Front Panel
+
+| Label | Type | Direction |
+|---|---|---|
+| `Session ID` | U32 | Control |
+| `Measurement Timeout ms` | U32 | Control |
+| `error in` | error cluster | Control |
+| `Measurement Running?` | Boolean | Indicator |
+| `error out` | error cluster | Indicator |
+
+## Request Build
+
+default `CANalyzer_Execute_Command_Request` cluster + Bundle By Name。
+
+| Field | Value |
+|---|---|
+| `Execute_Command_Type` | Start Measurement |
+| `Session ID` | Public Session ID |
+| `Measurement Timeout ms` | Public input |
+
+## Execute_Command Call
+
+| Terminal | Source |
+|---|---|
+| Request | built request |
+| error in | Public error in |
+
+CloseのようにNo Errorへ置換しない。
+
+## Result Extract
+
+`Execute_Command.Result`をUnbundle By Nameし`Measurement Running?`をPublic indicatorへ。
+
+`Execute_Command.error out`をPublic `error out`へ直結。
+
+Public側にRegistry、ActiveX、Wait、ownership logicを置かない。
+
+## Connector Pane
+
+3 inputs / 2 outputs。exact visual placementは既存Public API patternへ合わせて人手確認する。
+
+---
+
+# 19. Reachable State Matrix
+
+| Case | Expected |
+|---|---|
+| incoming error | command bypass / original error / Default Result Running=False |
+| Registry Get error | no ActiveX / Result.Session ID=Request.Session ID / Get error |
+| Session missing + Timeout=0 | `-710102` / no ActiveX |
+| Get Running error | no Timeout / no Start / Get Running error |
+| Found + Running=True + Timeout=0 | success no-op / ownership preserve / Running=True |
+| Found + Running=False + Timeout=0 | `-710118` / no Start / no rollback / Running=False |
+| Running=False + Start failure | ownership unchanged / Start error / Running=False |
+| Start success + Stage1 persist success + Wait success | ownership=True / cache=True / Running=True / success |
+| Start success + Stage1 persist success + Wait timeout + Actual=False | ownership=True / cache=False / Running=False / Wait error / no rollback |
+| Start success + Stage1 persist success + Wait timeout + Actual=True | ownership=True / cache=True / Running=True / Wait error / no rollback |
+| Start success + Stage1 persist failure + rollback Wait False Actual=False | primary=Registry Update error / Running=False |
+| Start success + Stage1 persist failure + rollback failure | primary=Registry Update error / rollback secondary / Running=last observation |
+| Wait success + Stage2 Update failure | ownership tracked / Running=True / Cache Update error |
+| Wait failure + Stage2 Update failure | ownership tracked / Running=Wait Actual / Wait error |
+
+---
+
+# 20. Regression Contract
 
 ```text
 Read SysVar       = 0
@@ -566,9 +954,7 @@ Start Measurement = 3
 
 ---
 
-# 18. Static Acceptance Gate
-
-実装後は最低限次を確認する。
+# 21. Static Acceptance Gate
 
 ## Shared Typedef
 
@@ -579,39 +965,46 @@ Start Measurement = 3
 
 ## Start Measurement Case
 
-- [ ] incoming error outer guard unchanged
-- [ ] Registry GetがStart Case最初のsession side effect
+- [ ] Base Result.Session ID=Request.Session ID
+- [ ] incoming error outer guard unchanged / bypass時Default Result
+- [ ] Registry Get first
+- [ ] Registry Get errorでActiveXへ進まない
 - [ ] Found=False=`-710102`
 - [ ] actual RunningをStart要否に使用
+- [ ] Get Running errorでTimeout/Startへ進まない
 - [ ] Cached Measuring?をStart要否に使用しない
-- [ ] Running=TrueでStartなし
-- [ ] Running=Trueでownership変更なし
-- [ ] Running=TrueでRegistry Updateなし
-- [ ] Running=False branchだけTimeout検証
+- [ ] Running=True pure no-op
+- [ ] Running=True ownership preserve
+- [ ] Running=True Registry Updateなし
+- [ ] TimeoutはRunning=Falseだけ
 - [ ] Timeout=0=`-710118`
-- [ ] Timeout source=`CANalyzer_Execute_Command.vi / Invalid Measurement Timeout`
+- [ ] Timeout=0でrollback Stopなし
 - [ ] Start successだけownership=True
-- [ ] ownership-first Registry UpdateはWaitより前
-- [ ] Stage1 persist時Cached Measuring?=initial actual False
-- [ ] Stage1 failureでrollback Stop attempt
-- [ ] Stop successならWait False / Poll=100
-- [ ] rollback errorはStage1 errorを上書きしない
-- [ ] Stage1 success後Wait True / Poll=100
-- [ ] Wait failureでautomatic Stopなし
-- [ ] Wait後Actual RunningをResultへ反映
-- [ ] Stage2 cache Updateはclean errorでattempt
-- [ ] Wait error > Stage2 cache Update error
+- [ ] Stage1 persistはWait前
+- [ ] Stage1 Cached Measuring=False
+- [ ] Stage1 failure rollback Stop
+- [ ] Stop successならWait False
+- [ ] Rollback Wait False Actualをcapture
+- [ ] Primary persist error保持
+- [ ] Wait True Expected=True
+- [ ] Poll=100
+- [ ] Wait failure automatic Stopなし
+- [ ] Wait ActualをResultへ
+- [ ] Stage2 cache actual値
+- [ ] Stage2 Update clean error
+- [ ] Wait error > cache error
+- [ ] 全Case output tunnel明示
+- [ ] Use Default If Unwiredなし
 
 ## Public Start
 
 - [ ] I/O=`Session ID`, `Measurement Timeout ms`, `error in` → `Measurement Running?`, `error out`
 - [ ] Request command=`Start Measurement`
-- [ ] Request Session ID / Timeout source正しい
 - [ ] Public error inをExecute_Commandへ通常接続
 - [ ] Result.Measurement Running?をPublicへ返す
 - [ ] Public側にRegistry / ActiveX / Wait / ownership logicなし
 
-## Regression
+## Regression / IDE
 
 - [ ] Read SysVar intact
 - [ ] Write SysVar intact
@@ -620,20 +1013,27 @@ Start Measurement = 3
 - [ ] broken typedefなし
 - [ ] unintended coercion dotなし
 - [ ] required tunnel unwiredなし
-- [ ] Use Default If Unwired依存なし
 
 ---
 
-# 19. Design Freeze Decision
+# 22. Documentation Closure / Next Gate
 
-Final Design CandidateのP1指摘だった次を反映済み。
+Final GUI Documentation Gap Closure：
 
-1. Timeout validationを`Registry Get → Found? → actual Running → Running=False branch`へ移動。
-2. Initial Running=True no-op pathのRegistry cache Updateをskip。
-3. `-710118` sourceをerror生成層`CANalyzer_Execute_Command.vi`へ整合。
-4. `Measurement Running?`未観測時default=Falseを明文化。
+```text
+Get Running error gate = DEFINED
+Base Result State = DEFINED
+Rollback Wait False Actual Running = DEFINED
+Timeout tunnel = CORRECTED
+Exact error wire sources = DEFINED
+Complete tunnel tables = DEFINED
+Use Default If Unwired = FORBIDDEN
 
-Final decision：
+GUI DOCUMENTATION GAP = 0
+GUI RECONSTRUCTION PROCEDURE = FINAL / COMPLETE
+```
+
+Design Freeze：
 
 ```text
 P0 = 0
@@ -648,14 +1048,17 @@ Append-only Regression Contract = DEFINED
 
 CANalyzer_Start / Start Measurement
 FINAL DESIGN = FROZEN
+GUI RECONSTRUCTION PROCEDURE = COMPLETE
 IMPLEMENTATION = PENDING
 RUNTIME / HARDWARE E2E = PENDING
 ```
 
----
+次は本書を基準に、LabVIEW GUIで次の順に手動実装する。
 
-# 20. Next Gate
+1. shared typedef amendment
+2. `CANalyzer_Execute_Command.vi / Start Measurement`
+3. Public `CANalyzer_Start.vi`
+4. Static Human Check
+5. Focused As-Built Review
 
-次は本書を基準に、LabVIEW GUIで第三者が再構築可能な詳細実装手順を作成する。
-
-実装完了後は本書とのFocused As-Built Reviewを実施し、P0=0 / P1=0、observable design drift=0を確認してStatic ImplementationをCloseする。
+実装後は本書とのFocused As-Built Reviewを実施し、P0=0 / P1=0、observable design drift=0を確認してStatic ImplementationをCloseする。
