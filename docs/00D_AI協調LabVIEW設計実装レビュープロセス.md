@@ -1,6 +1,7 @@
 # 00D. AI協調LabVIEW設計・実装・レビュープロセス
 
 **制定日：2026-08-28**  
+**最終更新日：2026-08-28**  
 **Status:** CANONICAL PROCESS / ACTIVE
 
 > 本書を、ChatGPT、Nigel AI、人間実装者を用いてLabVIEW / TestStand関連VIを設計、実装、レビューする際の共通開発プロセスの正本とする。  
@@ -33,16 +34,23 @@ ChatGPT Drift Gate
         ↓
 Final Algorithm-to-Wiring Audit
         ↓
+Nigel Final Model Confirmation
+        ↓
+Nigel Final As-Built GUI Reconstruction Procedure
+        ↓
+Human Static Gate
+        ↓
 STATIC CLOSED
         ↓
 Runtime / Hardware E2E
 ```
 
-基本思想は次の3点である。
+基本思想は次の4点である。
 
 1. **設計、施工手順、実装、レビューを混ぜない。**
 2. **Nigelの強みはlocal LabVIEW VIのactual構造確認に使い、設計正本はGitHubで管理する。**
 3. **Slice単位のPASSだけで完成扱いせず、最後にFrozen Algorithmとactual wiringを全経路で照合する。**
+4. **実装前のGUI施工手順を最終正本にしない。VI完成後、Nigelが最終actual modelを再確認したうえで、Final As-Built GUI Reconstruction Procedureをfresh生成し、GitHub正本へ反映する。**
 
 ---
 
@@ -61,7 +69,7 @@ Runtime / Hardware E2E
 - TestStandから呼び出すVI
 - 複数Case、state mutation、cleanup、timeout、retry、error priorityを持つVI
 
-単純な1入力1出力変換VIではPhaseを統合してよい。ただし、設計根拠、actual確認、Static Acceptanceを省略してよいという意味ではない。
+単純な1入力1出力変換VIではPhaseを統合してよい。ただし、設計根拠、actual確認、Static Acceptance、Final As-Built GUI Reconstructionを省略してよいという意味ではない。
 
 ---
 
@@ -78,6 +86,7 @@ ChatGPTの担当：
 - 設計とactual implementationの差分を判定する。
 - P0 / P1 / P2のclosureを管理する。
 - Design Freeze、As-Built、Static ClosedをGitHub正本へ反映する。
+- Nigelがfinal actual modelから生成したFinal As-Built GUI Reconstruction ProcedureをFrozen Algorithmと照合し、documentation driftがないことを確認してGitHubへ統合する。
 
 ChatGPTが行ってはいけないこと：
 
@@ -85,6 +94,7 @@ ChatGPTが行ってはいけないこと：
 - Nigelのactual VI evidenceより一般知識を優先する。
 - Frozen Designを実装途中に無言で変更する。
 - Runtime未確認をStatic PASSと混同する。
+- 実装前GUI施工手順を、final actual modelの再確認なしにAs-Built正本へ昇格させる。
 
 ## 2.2 Nigel AI：現場調査 / GUI施工図 / As-Built Inspector
 
@@ -95,6 +105,8 @@ Nigelの担当：
 - Frozen AlgorithmをLabVIEW GUIへ落とす施工指示を作る。
 - 実装途中のactual VIを確認し、As-Built Reportを返す。
 - Final Algorithm-to-Wiring Auditでsource-to-destination traceを行う。
+- VI完成後、current active VIをfreshに再確認し、最終モデルがFrozen Algorithmと一致していることを確認する。
+- 最終モデル確認後、そのcurrent actual wiringだけを根拠にFinal As-Built GUI Reconstruction Procedureを生成する。
 
 原則としてNigelへ既存VIの直接編集を依頼しない。
 
@@ -105,6 +117,7 @@ Nigelが行ってはいけないこと：
 - node名や画面位置だけから配線意味を推測する。
 - 「明示wireがない」だけでBundle By Name等のpreserve semanticsを否定する。
 - GitHubへアクセスできる前提の指示を受ける。
+- 実装前のGUI施工手順、過去reviewのUID、過去版node配置をfinal actual modelより優先する。
 
 NigelにGitHub資料を参照させる必要がある場合は、必要な契約・アルゴリズムをPrompt内へ埋め込む。
 
@@ -116,6 +129,7 @@ NigelにGitHub資料を参照させる必要がある場合は、必要な契約
 - Frozen Designと施工指示の採否を確認する。
 - Broken Run Arrow、connector pane、coercion、typedef、visible wiringを確認する。
 - 設計変更が必要な場合にHuman Approvalを与える。
+- Final As-Built GUI Reconstruction Procedureが実際の最終VIを再現する内容であることをHuman Static Gateで確認する。
 
 AIが生成した修正案をそのまま適用するのではなく、対象branchと変更範囲を確認してから実装する。
 
@@ -132,6 +146,7 @@ DESIGN REVIEW
 FROZEN DESIGN / IMPLEMENTATION PENDING
 IMPLEMENTATION IN PROGRESS
 STATIC REVIEW IN PROGRESS
+FINAL AS-BUILT DOCUMENTATION IN PROGRESS
 STATIC IMPLEMENTATION CLOSED
 RUNTIME / HARDWARE PENDING
 RUNTIME VERIFIED
@@ -327,6 +342,9 @@ Nigelは設計を変更しない。
 - Human Choice Required
 
 各手順は`Current Structure`ではなく、Frozen Designから導かれる`Required Structure`を基準にする。
+
+**このPhaseのGUI施工手順はImplementation Aidであり、final canonical reconstruction procedureではない。**  
+実装中にbranch構造、node配置、error source、tunnel、preserve semantics等が修正される可能性があるため、完成後にPhase 6Aでfinal actual modelから再生成する。
 
 ---
 
@@ -524,18 +542,99 @@ Error Priority Match
 No Existing Regression
 ```
 
-成立時のみ：
+成立時：
 
 ```text
 DESIGN ALGORITHM = ACTUAL WIRING
-STATIC IMPLEMENTATION CLOSED
+IMPLEMENTATION SEMANTICS = STATIC CLOSED CANDIDATE
 ```
+
+**この時点では、Final As-Built GUI Reconstruction Procedureが未生成なら正式な`STATIC IMPLEMENTATION CLOSED`へは進めない。**
+
+---
+
+# 12A. Phase 6A：Final Model Confirmation / Final As-Built GUI Reconstruction
+
+Final Algorithm-to-Wiring AuditがPASSした後、Nigelは完成VIをもう一度READ ONLYでfresh確認する。
+
+このPhaseの目的は、**完成したactual modelそのものから最終作成手順を再生成すること**である。
+
+## 12A.1 Final Model Confirmation
+
+Nigelはcurrent active VIについて次を再確認する。
+
+- 対象VI / Case / Public wrapperが最終版であること。
+- P0=0 / P1=0が維持されていること。
+- `DESIGN ALGORITHM = ACTUAL WIRING`が維持されていること。
+- Final Audit後に追加変更が入っていないこと。
+- Result / Error root、state mutation、enum、connector、typedefがcurrent actualと一致すること。
+
+Final Audit reportのnode IDやprior PASSだけを根拠にせず、current active VIをfresh scanする。
+
+## 12A.2 Final As-Built GUI Reconstruction Procedure
+
+Final Model Confirmation後、Nigelはcurrent actual wiringだけを根拠に施工手順を生成する。
+
+この手順はPhase 4のpre-implementation GUI施工指示とは別物であり、**GitHubへ残すfinal canonical reconstruction procedure**とする。
+
+必須内容：
+
+- final Front Panel / connector pane
+- final I/O / typedef / enum
+- actual Case Structure階層
+- selector source / Case label
+- actual SubVI / primitive
+- source terminal / destination terminal
+- wire type
+- Bundle / Unbundle field
+- state base / preserve field / mutation field
+- error in / error out root source
+- Result root source
+- all branch output tunnel
+- `Use Default If Unwired`非依存
+- complete wiring table
+- complete Case / tunnel table
+- reachable state matrix
+- GUI construction order
+- regression guard
+- Human Static checklist
+
+## 12A.3 Freshness Rule
+
+Final procedure生成時は次を禁止する。
+
+- Phase 4施工手順の単純コピー。
+- 修正前のnode / branch / UIDを正として残すこと。
+- prior reviewでfalse positiveとなった構造を記載すること。
+- Final actual modelに存在しないnodeを記載すること。
+- Frozen Algorithmへ実装を合わせるためにactual wiringを省略・美化すること。
+
+actual wiringとFrozen wordingにStyle / Documentation Driftがある場合は、observable semanticsを壊さないactual As-Built表現を採用し、その差を明記する。
+
+## 12A.4 Documentation Gate
+
+次を全て満たすこと。
+
+```text
+FINAL MODEL CONFIRMATION = PASS
+P0 = 0
+P1 = 0
+DESIGN ALGORITHM = ACTUAL WIRING
+GUI RECONSTRUCTION PROCEDURE = FINAL / AS-BUILT
+GUI DOCUMENTATION GAP = 0
+Current Actual Wiring Only
+Third Party Reconstructable
+```
+
+不一致がある場合は、手順側を勝手にFrozenへ合わせずSTOPし、Implementation DriftかDocumentation Driftかを裁定する。
+
+このGateがPASSして初めてHuman Static Gateおよび`STATIC IMPLEMENTATION CLOSED`へ進む。
 
 ---
 
 # 13. Phase 7：Public Wrapper Closure
 
-Internal serviceを持つ設計では、Public wrapperはinternal static closure後に実装する。
+Internal serviceを持つ設計では、Public wrapperはinternal static semantics closure後に実装する。
 
 Public wrapper reviewでは次を確認する。
 
@@ -551,11 +650,13 @@ Public wrapper reviewでは次を確認する。
 
 Thin wrapperにRegistry / ActiveX / ownership / cache / retry / waitを再実装しない。
 
+Public wrapperについてもFinal Algorithm-to-Wiring Audit後にPhase 6Aを適用し、final actual wrapperからFinal As-Built GUI Reconstruction Procedureを生成する。Save As由来のwrapperでも省略しない。
+
 ---
 
 # 14. Human Static Gate
 
-Nigel Static PASS後、人間が最低限次を確認する。
+Nigel Static PASSおよびPhase 6A Documentation Gate PASS後、人間が最低限次を確認する。
 
 - [ ] Broken Run Arrowなし
 - [ ] connector pane正しい
@@ -567,6 +668,7 @@ Nigel Static PASS後、人間が最低限次を確認する。
 - [ ] Case selector正しい
 - [ ] Public I/O正しい
 - [ ] Frozen Design外のlogicを追加していない
+- [ ] Final As-Built GUI Reconstruction Procedureがcurrent final VIを再現する内容である
 
 Human Static Gate後にGitHubのAs-Built状態を更新する。
 
@@ -617,9 +719,13 @@ actual implementationを基に次を更新する。
 IMPLEMENTED / AS-BUILT CLOSED
 Human Static Check
 Observable Design Drift
-GUI Documentation Gap
+GUI Reconstruction Procedure = FINAL / AS-BUILT
+GUI Documentation Gap = 0
+Final Model Confirmation = PASS
 Runtime / Hardware E2E status
 ```
+
+Phase 4のpre-implementation施工手順だけをGitHubへ残してclosureしない。Final actual modelから生成したPhase 6A手順へ置換または統合する。
 
 ---
 
@@ -653,6 +759,16 @@ typedef変更
 
 実装手順作成時は`GUI INSTRUCTION GENERATION ONLY`を追加する。
 
+Final As-Built GUI Reconstruction Procedure生成時はさらに次を追加する。
+
+```text
+FINAL MODEL CONFIRMATION FIRST
+CURRENT ACTUAL WIRING ONLY
+DO NOT COPY PRE-IMPLEMENTATION INSTRUCTIONS
+DO NOT RELY ON PRIOR NODE IDS
+DOCUMENTATION GENERATION ONLY
+```
+
 ---
 
 # 17. STOP条件
@@ -668,6 +784,9 @@ typedef変更
 - Nigel reviewが通信失敗などで途中終了
 - root causeが未裁定
 - Human Choice Requiredが未解決
+- Final Model Confirmationが未完
+- Final As-Built GUI Reconstruction Procedureが未完
+- GUI Documentation Gap > 0
 
 通信失敗時は、返却済みevidenceだけを確定範囲とし、未返却部分を推測でPASS扱いしない。
 
@@ -693,6 +812,9 @@ Design Closed
 Implementation Completed
 As-Built Review PASS
 Final Algorithm-to-Wiring Audit PASS
+Final Model Confirmation PASS
+Final As-Built GUI Reconstruction Procedure PASS
+GUI Documentation Gap = 0
 Human Static Gate PASS
 DESIGN ALGORITHM = ACTUAL WIRING
 ```
@@ -741,6 +863,10 @@ Static ClosedをRuntime Verifiedと表現しない。
 - [ ] all Error roots一致
 - [ ] State mutation policy一致
 - [ ] existing regressionなし
+- [ ] Nigel Final Model Confirmation
+- [ ] Final As-Built GUI Reconstruction Procedure生成
+- [ ] Final procedureをFrozen Algorithmと照合
+- [ ] GUI Documentation Gap=0
 - [ ] Human Static Gate
 - [ ] GitHub As-Built同期
 - [ ] Runtime Pending / Verifiedを明記
@@ -754,14 +880,18 @@ Static ClosedをRuntime Verifiedと表現しない。
 2. Nigelがlocal actual環境を確認し設計検証
 3. ChatGPT / Nigel / HumanでAlgorithmを反復しFreeze
 4. Frozen AlgorithmをGitHub正本へ保存
-5. NigelがFrozen DesignからGUI施工指示を作成
+5. NigelがFrozen Designから実装用GUI施工指示を作成
 6. HumanがSlice単位で実装
 7. Nigelがactual VIをREAD ONLY確認
 8. ChatGPTがFrozen DesignとのDrift Gate
 9. 全Slice完了後にFinal Algorithm-to-Wiring Audit
-10. P0=0 / P1=0ならSTATIC CLOSED
-11. GitHubをAs-Builtへ同期
-12. Runtime / Hardware E2Eへ進む
+10. Nigelがcurrent final VIをfresh確認しFinal Model Confirmation
+11. Nigelがcurrent actual wiringからFinal As-Built GUI Reconstruction Procedureを生成
+12. ChatGPTがFinal procedureとFrozen Algorithm / final actual evidenceを照合
+13. Human Static Gate
+14. P0=0 / P1=0 / Documentation Gap=0ならSTATIC CLOSED
+15. GitHubをAs-Built + Final GUI Reconstruction Procedureへ同期
+16. Runtime / Hardware E2Eへ進む
 ```
 
 この順序を崩す場合は、理由を対象設計正本へ記録する。
