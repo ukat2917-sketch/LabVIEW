@@ -1,13 +1,15 @@
 # 09L. CANalyzer_Start / Execute_Command Start Measurement 最終設計・実装正本
 
-**Status:** FINAL DESIGN / FROZEN / GUI RECONSTRUCTION COMPLETE / IMPLEMENTATION PENDING  
+**Status:** FINAL CANONICAL / STATIC IMPLEMENTATION CLOSED  
 **Design Review:** P0=0 / P1=0  
 **GUI Documentation Gap:** 0  
-**Public `CANalyzer_Start.vi`:** NOT IMPLEMENTED  
-**`CANalyzer_Execute_Command.vi / Start Measurement`:** NOT IMPLEMENTED  
+**`CANalyzer_Execute_Command.vi / Start Measurement`:** IMPLEMENTED / AS-BUILT CLOSED  
+**Public `CANalyzer_Start.vi`:** IMPLEMENTED / AS-BUILT CLOSED  
+**Human Static Check:** PASS  
+**Observable Design Drift:** 0  
 **Runtime / Hardware E2E:** PENDING
 
-> 本書を `CANalyzer_Start.vi` と `CANalyzer_Execute_Command.vi / Start Measurement` の設計、契約、LabVIEW GUI再構築手順、Static Acceptanceの単一正本とする。  
+> 本書を `CANalyzer_Start.vi` と `CANalyzer_Execute_Command.vi / Start Measurement` の設計、契約、LabVIEW GUI再構築手順、Static Acceptance、As-Built状態の単一正本とする。  
 > Production StartのPublic I/O、Command拡張、ownership/cache契約、failure policy、error priority、GUI実装手順は本書を優先する。  
 > `09D_CANalyzer_Execute_Command設計.md` はRead / Write初期Vertical Sliceの正本として残すが、Start Measurement追加に関する差分は本書を優先する。  
 > Session RegistryのAction契約は `09B_CANalyzer_Session_Registry設計.md`、Open時のStart/rollback意味論は `09J_CANalyzer_Open設計.md`、Close時のownership消費契約は `09K_CANalyzer_Close設計.md` を参照する。
@@ -872,6 +874,8 @@ final Resultとfinal errorをExecute_Command出力へ。
 
 # 18. Public `CANalyzer_Start.vi` GUI Procedure
 
+**As-Built Path:** `C:\LabVIEW work\SVS_AutoTestSystem\60_CAN\30_Public\CANalyzer_Start.vi`
+
 ## Front Panel
 
 | Label | Type | Direction |
@@ -958,61 +962,61 @@ Start Measurement = 3
 
 ## Shared Typedef
 
-- [ ] Read=0 / Write=1 / Close=2 / Start=3
-- [ ] Request existing fields不変
-- [ ] Result existing fields不変
-- [ ] `Measurement Running?`末尾Boolean
+- [x] Read=0 / Write=1 / Close=2 / Start=3
+- [x] Request existing fields不変
+- [x] Result existing fields不変
+- [x] `Measurement Running?`末尾Boolean
 
 ## Start Measurement Case
 
-- [ ] Base Result.Session ID=Request.Session ID
-- [ ] incoming error outer guard unchanged / bypass時Default Result
-- [ ] Registry Get first
-- [ ] Registry Get errorでActiveXへ進まない
-- [ ] Found=False=`-710102`
-- [ ] actual RunningをStart要否に使用
-- [ ] Get Running errorでTimeout/Startへ進まない
-- [ ] Cached Measuring?をStart要否に使用しない
-- [ ] Running=True pure no-op
-- [ ] Running=True ownership preserve
-- [ ] Running=True Registry Updateなし
-- [ ] TimeoutはRunning=Falseだけ
-- [ ] Timeout=0=`-710118`
-- [ ] Timeout=0でrollback Stopなし
-- [ ] Start successだけownership=True
-- [ ] Stage1 persistはWait前
-- [ ] Stage1 Cached Measuring=False
-- [ ] Stage1 failure rollback Stop
-- [ ] Stop successならWait False
-- [ ] Rollback Wait False Actualをcapture
-- [ ] Primary persist error保持
-- [ ] Wait True Expected=True
-- [ ] Poll=100
-- [ ] Wait failure automatic Stopなし
-- [ ] Wait ActualをResultへ
-- [ ] Stage2 cache actual値
-- [ ] Stage2 Update clean error
-- [ ] Wait error > cache error
-- [ ] 全Case output tunnel明示
-- [ ] Use Default If Unwiredなし
+- [x] Base Result.Session ID=Request.Session ID
+- [x] incoming error outer guard unchanged / bypass時Default Result
+- [x] Registry Get first
+- [x] Registry Get errorでActiveXへ進まない
+- [x] Found=False=`-710102`
+- [x] actual RunningをStart要否に使用
+- [x] Get Running errorでTimeout/Startへ進まない
+- [x] Cached Measuring?をStart要否に使用しない
+- [x] Running=True pure no-op
+- [x] Running=True ownership preserve
+- [x] Running=True Registry Updateなし
+- [x] TimeoutはRunning=Falseだけ
+- [x] Timeout=0=`-710118`
+- [x] Timeout=0でrollback Stopなし
+- [x] Start successだけownership=True
+- [x] Stage1 persistはWait前
+- [x] Stage1 Cached Measuring=False
+- [x] Stage1 failure rollback Stop
+- [x] Stop successならWait False
+- [x] Rollback Wait False Actualをcapture
+- [x] Primary persist error保持
+- [x] Wait True Expected=True
+- [x] Poll=100
+- [x] Wait failure automatic Stopなし
+- [x] Wait ActualをResultへ
+- [x] Stage2 cache actual値
+- [x] Stage2 Update clean error
+- [x] Wait error > cache error
+- [x] 全Case output tunnel明示
+- [x] Use Default If Unwiredなし
 
 ## Public Start
 
-- [ ] I/O=`Session ID`, `Measurement Timeout ms`, `error in` → `Measurement Running?`, `error out`
-- [ ] Request command=`Start Measurement`
-- [ ] Public error inをExecute_Commandへ通常接続
-- [ ] Result.Measurement Running?をPublicへ返す
-- [ ] Public側にRegistry / ActiveX / Wait / ownership logicなし
+- [x] I/O=`Session ID`, `Measurement Timeout ms`, `error in` → `Measurement Running?`, `error out`
+- [x] Request command=`Start Measurement`
+- [x] Public error inをExecute_Commandへ通常接続
+- [x] Result.Measurement Running?をPublicへ返す
+- [x] Public側にRegistry / ActiveX / Wait / ownership logicなし
 
 ## Regression / IDE
 
-- [ ] Read SysVar intact
-- [ ] Write SysVar intact
-- [ ] Close Session intact
-- [ ] Broken Run Arrowなし
-- [ ] broken typedefなし
-- [ ] unintended coercion dotなし
-- [ ] required tunnel unwiredなし
+- [x] Read SysVar intact
+- [x] Write SysVar intact
+- [x] Close Session intact
+- [x] Broken Run Arrowなし
+- [x] broken typedefなし
+- [x] unintended coercion dotなし
+- [x] required tunnel unwiredなし
 
 ---
 
@@ -1033,32 +1037,31 @@ GUI DOCUMENTATION GAP = 0
 GUI RECONSTRUCTION PROCEDURE = FINAL / COMPLETE
 ```
 
-Design Freeze：
+Design / As-Built Closure：
 
 ```text
 P0 = 0
 P1 = 0
+Observable Design Drift = 0
 Production Serialization = PRESERVED
 Ownership Tracking = PRESERVED
 Pre-existing Ownership = PRESERVED
 Actual Running Source = PRESERVED
-Registry Failure Safety = DEFINED
-Wait Failure Policy = DEFINED
-Append-only Regression Contract = DEFINED
+Registry Failure Safety = CLOSED
+Wait Failure Policy = CLOSED
+Append-only Regression Contract = PRESERVED
+Shared Typedef Amendment = CLOSED
+Start Measurement Internal = IMPLEMENTED / AS-BUILT CLOSED
+Public CANalyzer_Start.vi = IMPLEMENTED / AS-BUILT CLOSED
+Human Static Check = PASS
 
 CANalyzer_Start / Start Measurement
 FINAL DESIGN = FROZEN
 GUI RECONSTRUCTION PROCEDURE = COMPLETE
-IMPLEMENTATION = PENDING
+STATIC IMPLEMENTATION = CLOSED
 RUNTIME / HARDWARE E2E = PENDING
 ```
 
-次は本書を基準に、LabVIEW GUIで次の順に手動実装する。
+Static Closureまで完了した。以後、本書をStart系のFinal Canonical / As-Built Baselineとして扱う。
 
-1. shared typedef amendment
-2. `CANalyzer_Execute_Command.vi / Start Measurement`
-3. Public `CANalyzer_Start.vi`
-4. Static Human Check
-5. Focused As-Built Review
-
-実装後は本書とのFocused As-Built Reviewを実施し、P0=0 / P1=0、observable design drift=0を確認してStatic ImplementationをCloseする。
+次のStart固有GateはRuntime / Hardware E2E。実機確認までは、runtime成功、CANalyzer実機接続成功、Measurement実状態遷移成功を断定しない。
