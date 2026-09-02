@@ -1,27 +1,31 @@
 # 09O. CANalyzer Fault Injection Public API 設計正本
 
 **制定日：2026-08-31**  
-**最終更新日：2026-08-31**  
-**Status:** FROZEN DESIGN / IMPLEMENTATION PENDING  
+**最終更新日：2026-09-02**  
+**Status:** STATIC IMPLEMENTATION CLOSED / RUNTIME PENDING  
 **Design Investigation:** PASS  
+**Design / Algorithm Freeze:** PASS  
+**Combined Final Algorithm-to-Wiring Audit:** PASS  
+**Final Actual Model:** CONFIRMED  
+**Final As-Built Reconstruction:** PASS  
+**Human Static Gate:** PASS  
 **P0:** 0  
 **P1:** 0  
-**Human Freeze Gate:** APPROVED  
 **Runtime / Hardware E2E:** PENDING
 
-> 本書を CANalyzer Fault Injection Public API の Public I/O、Fault authority、support matrix、0/1 mapping、cleanup safety、error policy、Frozen Algorithm、Static Acceptance の単一正本とする。  
+> 本書を CANalyzer Fault Injection Public API の Public I/O、Fault authority、support matrix、0/1 mapping、cleanup safety、error policy、Frozen Algorithm、Static Closure、Runtime Pending 状態の単一正本とする。  
 > 既存 Single SysVar Public API は `09N_CANalyzer_Single_SysVar_Public_API設計.md`、共通AI協調開発プロセスは `00D_AI協調LabVIEW設計実装レビュープロセス.md` に従う。
 
 ---
 
-# 0. Freeze Summary
+# 0. Closure Summary
 
 ```text
 Feature
 = CANalyzer Fault Injection Public API
 
 Status
-= FROZEN DESIGN / IMPLEMENTATION PENDING
+= STATIC IMPLEMENTATION CLOSED / RUNTIME PENDING
 
 Public Target Authority
 = CANalyzer_Fault_Target.ctl typed enum
@@ -59,8 +63,29 @@ Fault registry
 Execute_Command extension
 = NONE
 
-Existing Closed VI / typedef amendment
+Stop / Close Fault Clear ownership
 = NONE
+
+Set Fault static implementation
+= PASS
+
+Clear All static implementation
+= PASS
+
+F6 Combined Final Algorithm-to-Wiring Audit
+= PASS
+
+Final Actual Model
+= CONFIRMED
+
+Final As-Built GUI Reconstruction
+= PASS
+
+Human Static Gate
+= PASS
+
+Runtime / Hardware E2E
+= PENDING
 
 TestStand sequence
 = NOT IMPLEMENTED / FUTURE PHASE
@@ -78,6 +103,14 @@ Human Freeze Gateで次を承認済み。
 2. unsupported Target × Fault TypeはPublic VIで明示pre-validationする。
 3. dedicated error codeは `-710119` とする。
 4. Target enum表示名はactual Namespaceに近いexact raw namespace表記とする。
+
+Human Static Gateで次を確認済み。
+
+1. `CANalyzer_Set_Fault.vi` / `CANalyzer_Clear_All_Faults.vi` のRun ArrowがBrokenでない。
+2. 意図しないcoercion dotがない。特に `CANalyzer_Value_Type=I32` はexplicit enum接続である。
+3. relevant Case出力の `Use Default If Unwired` はOFF。
+4. relevant typedef linkageが維持されている。
+5. Connector PaneのPublic terminal割当が完了している。
 
 ---
 
@@ -116,11 +149,11 @@ Write SysVar
 
 既存 `CANalyzer_Write_SysVar.vi` の責務・Request mapping・verify semanticsは09Nを正とする。
 
-## 1.3 Existing cleanup state
+## 1.3 Existing cleanup state before this feature
 
 TestStand sequenceはまだ未実装。
 
-したがってcurrent actualでは：
+Feature開始時actualでは：
 
 ```text
 Existing TestStand Fault Cleanup
@@ -142,7 +175,7 @@ Current Cleanup Owner
 = NONE
 ```
 
-このgapを埋めるPublic safety primitiveとして `CANalyzer_Clear_All_Faults.vi` を今回のFeatureに含める。
+このgapを埋めるPublic safety primitiveとして `CANalyzer_Clear_All_Faults.vi` を本Featureで実装した。
 
 ---
 
@@ -238,6 +271,8 @@ Nurmeric Value       = DBL carrier 0.0 / 1.0
 
 Existing conversion pipelineで`CANalyzer_Value_Type=I32`の場合、DBL carrierからLong Integerへ変換する。
 
+Static Closure時actualではSet Fault / Clear Allの双方で `CANalyzer_Value_Type` はplain numericではなくexplicit enum `I32` ordinal 1へ接続され、Human Static Gateで意図しないcoercion dotなしを確認済み。
+
 ---
 
 # 3. Fault Support Matrix
@@ -273,7 +308,7 @@ Configurationに他のFault-like SysVarが存在しても、current CAPL behavio
 
 ---
 
-# 4. New Typedef Contract
+# 4. Typedef Contract
 
 ## 4.1 `CANalyzer_Fault_Type.ctl`
 
@@ -323,7 +358,7 @@ Policy：
 
 # 5. Error Contract
 
-## 5.1 New error
+## 5.1 Dedicated error
 
 ```text
 -710119 Unsupported Fault Target / Fault Type
@@ -356,9 +391,9 @@ Resolve SysVarが成功する可能性やSysVar存在有無は、Fault behavior 
 
 ---
 
-# 6. `CANalyzer_Set_Fault.vi` Public Contract
+# 6. `CANalyzer_Set_Fault.vi` Public Contract / As-Built
 
-Path candidate：
+Path：
 
 ```text
 C:\LabVIEW work\SVS_AutoTestSystem\60_CAN\30_Public\CANalyzer_Set_Fault.vi
@@ -369,8 +404,8 @@ C:\LabVIEW work\SVS_AutoTestSystem\60_CAN\30_Public\CANalyzer_Set_Fault.vi
 | Terminal | Type | Default | Contract |
 |---|---|---|---|
 | `Session ID` | U32 | required | target CANalyzer session |
-| `Fault Target` | `CANalyzer_Fault_Target.ctl` | ordinal 0 | typed target authority |
-| `Fault Type` | `CANalyzer_Fault_Type.ctl` | ordinal 0 | typed fault authority |
+| `CANalyzer_Fault_Target` | `CANalyzer_Fault_Target.ctl` | ordinal 0 | typed target authority |
+| `CANalyzer_Fault_Type` | `CANalyzer_Fault_Type.ctl` | ordinal 0 | typed fault authority |
 | `Fault Active?` | Boolean | False | False=Clear, True=Fault ON |
 | `error in` | error cluster | No Error | normal operation error chain |
 
@@ -396,9 +431,13 @@ Read Value
 Requested Value
 ```
 
+## 6.4 Connector Pane
+
+Human Static Gateで全Public terminalの割当済み、未割当・重複なしを確認済み。
+
 ---
 
-# 7. `CANalyzer_Set_Fault.vi` Frozen Algorithm
+# 7. `CANalyzer_Set_Fault.vi` Frozen Algorithm / Final Actual Model
 
 ## 7.1 Incoming error
 
@@ -428,13 +467,15 @@ ID14004807
 unsupported combinationならwrite前に：
 
 ```text
-error = -710119
+error.status = True
+error.code   = -710119
+error.source = "CANalyzer_Set_Fault.vi / Unsupported Fault Target / Fault Type"
 SysVar Verified? = False
 ```
 
 ## 7.3 Target mapping
 
-`Fault Target` → exact Namespace Stringを明示mappingする。
+`CANalyzer_Fault_Target` → exact Namespace Stringを明示mappingする。
 
 ```text
 ID03AD5D62 → "ID03AD5D62"
@@ -458,7 +499,7 @@ Timeout       → "TIMEOUT"
 Default `CANalyzer_SysVar_Value`をseedとする。
 
 ```text
-CANalyzer_Value_Type = I32
+CANalyzer_Value_Type = explicit enum I32, ordinal 1
 Nurmeric Value       = Fault Active? ? 1.0 : 0.0
 Boolean Value        = default preserve
 String Value         = default preserve
@@ -474,10 +515,10 @@ String Value         = default preserve
 Session ID            = public Session ID
 Namespace             = mapped Namespace
 Variable Name         = mapped Variable Name
-Write Value            = built CANalyzer_SysVar_Value
-Verify After Write?    = TRUE constant
-DBL Verify Tolerance   = 0.0 constant
-error in               = current no-error validation chain
+Write Value           = built CANalyzer_SysVar_Value
+Verify After Write?   = TRUE constant
+DBL Verify Tolerance  = 0.0 constant
+error in              = incoming no-error operation path
 ```
 
 ## 7.7 Result mapping
@@ -502,9 +543,9 @@ System Variable write/readback verified
 
 ---
 
-# 8. `CANalyzer_Clear_All_Faults.vi` Public Contract
+# 8. `CANalyzer_Clear_All_Faults.vi` Public Contract / As-Built
 
-Path candidate：
+Path：
 
 ```text
 C:\LabVIEW work\SVS_AutoTestSystem\60_CAN\30_Public\CANalyzer_Clear_All_Faults.vi
@@ -522,9 +563,13 @@ C:\LabVIEW work\SVS_AutoTestSystem\60_CAN\30_Public\CANalyzer_Clear_All_Faults.v
 | Terminal | Type | Contract |
 |---|---|---|
 | `All Cleared?` | Boolean | frozen support matrix上の必要clearがすべて成功した場合のみTrue |
-| `error out` | error cluster | Original Error > First Cleanup Error |
+| `error out` | error cluster | Original Error > First Cleanup Error > No Error |
 
-追加のfailed-array / count / detail clusterは今回Publicへ出さない。
+追加のfailed-array / count / detail clusterはPublicへ出さない。
+
+## 8.3 Connector Pane
+
+Human Static Gateで全Public terminalの割当済み、未割当・重複なしを確認済み。
 
 ---
 
@@ -579,7 +624,7 @@ ID14004807
 
 ---
 
-# 10. `CANalyzer_Clear_All_Faults.vi` Frozen Algorithm
+# 10. `CANalyzer_Clear_All_Faults.vi` Frozen Algorithm / Final Actual Model
 
 ## 10.1 Error initialization
 
@@ -589,14 +634,11 @@ ID14004807
 Original Error
 = error inを保存
 
-Working Cleanup Error
-= No Error
-
 First Cleanup Error
 = No Error
 
-All Cleared?
-= True candidate state
+All Cleared Candidate
+= True
 ```
 
 incoming `error in.status=True`でもcleanup operationをskipしない。
@@ -606,7 +648,7 @@ incoming `error in.status=True`でもcleanup operationをskipしない。
 全Fault Clear writeで：
 
 ```text
-CANalyzer_Value_Type = I32
+CANalyzer_Value_Type = explicit enum I32, ordinal 1
 Nurmeric Value       = 0.0
 Verify After Write?  = TRUE
 DBL Verify Tolerance = 0.0
@@ -614,9 +656,22 @@ DBL Verify Tolerance = 0.0
 
 各writeは既存`CANalyzer_Write_SysVar.vi`を使用する。
 
-cleanupをincoming errorで抑止しないため、各cleanup writeへ渡すoperation-side errorはNo Error pathとする。
+各cleanup writeの `error in` はfresh No Errorとし、Original Error、First Cleanup Error、previous write error outを実行制御へ流さない。
 
-## 10.3 Full target operation
+## 10.3 Support matrix representation
+
+current actualは次の4配列を固定13行で保持する。
+
+```text
+Namespace[]
+Supports Alive?[]
+Supports Checksum?[]
+Supports Timeout?[]
+```
+
+全配列length=13、§3と同じindex orderをauthorityとする。
+
+## 10.4 Full target operation
 
 各full targetについて：
 
@@ -624,64 +679,128 @@ cleanupをincoming errorで抑止しないため、各cleanup writeへ渡すoper
 
 ```text
 write Namespace::<ALIVE_COUNTER> = I32 0
-verify = TRUE
+Verify = TRUE
+Tolerance = 0.0
+error in = fresh No Error
 ```
 
-success flagを保持。
+success predicate：
 
-failure時：
+```text
+Alive Success
+= Verified? AND NOT(error out.status)
+```
 
-- `All Cleared? = False`
-- First Cleanup Errorが未設定ならこのerrorを保存
-- 後続Checksumは実行する
+failure時も後続Checksumは実行する。
 
 ### Step B: Checksum
 
 ```text
 write Namespace::<CHECKSUM> = I32 0
-verify = TRUE
+Verify = TRUE
+Tolerance = 0.0
+error in = fresh No Error
 ```
 
-success flagを保持。
+success predicate：
 
-failure時：
-
-- `All Cleared? = False`
-- First Cleanup Errorが未設定ならこのerrorを保存
+```text
+Checksum Success
+= Verified? AND NOT(error out.status)
+```
 
 ### Step C: Timeout gate
 
 ```text
-Alive success AND Checksum success
+TimeoutEligible
+= Alive Success
+  AND Checksum Success
+  AND Supports Timeout?
 ```
 
-がTrueの場合のみ：
+Trueの場合のみ：
 
 ```text
 write Namespace::<TIMEOUT> = I32 0
-verify = TRUE
+Verify = TRUE
+Tolerance = 0.0
+error in = fresh No Error
+```
+
+success predicate：
+
+```text
+Timeout Success
+= Verified? AND NOT(error out.status)
 ```
 
 FalseならTimeout writeを実行せず：
 
 ```text
-All Cleared? = False
+Timeout Success = False
+synthetic error = NONE
 ```
 
-Timeout write failure時もFirst Cleanup Error retention ruleを適用する。
+## 10.5 Timeout-only target operation
 
-## 10.4 Timeout-only target operation
-
-`ID14003807`、`ID14004807`は：
+`ID14003807`、`ID14004807`はunsupported Alive / Checksumをsuccess=Trueへ正規化するため：
 
 ```text
-write Namespace::<TIMEOUT> = I32 0
-verify = TRUE
+Alive Success    = True
+Checksum Success = True
+Supports Timeout = True
 ```
 
-を直接attemptする。
+となりTimeout clearを直接attemptする。
 
-## 10.5 Best effort across targets
+## 10.6 Current Target Cleared
+
+```text
+Current Target Cleared
+= Alive Success
+  AND Checksum Success
+  AND Timeout Success
+```
+
+## 10.7 All Cleared sticky state
+
+initial：
+
+```text
+All Cleared Candidate = True
+```
+
+update：
+
+```text
+Next All Cleared
+= Previous All Cleared
+  AND Current Target Cleared
+```
+
+一度Falseになった後、later successでTrueへ戻らない。
+
+## 10.8 First Cleanup Error sticky state
+
+initial：
+
+```text
+First Cleanup Error = No Error
+```
+
+execution order：
+
+```text
+Alive
+→ Checksum
+→ Timeout
+```
+
+最初のcleanup failureだけを保持し、later failureでoverwriteしない。
+
+このretained stateはwrite `error in`へ接続しない。
+
+## 10.9 Best effort across targets
 
 1 targetでfailureしても残りtarget cleanupを継続する。
 
@@ -689,7 +808,7 @@ verify = TRUE
 
 per-target gateをauthorityとする。
 
-## 10.6 Final error priority
+## 10.10 Final error priority
 
 最終：
 
@@ -733,7 +852,7 @@ Future optimizationとして必要になった場合は別Feature / Design Gate�
 
 # 12. Execute_Command / Existing Closed Boundary
 
-今回変更しない。
+本Featureでは変更しない契約。
 
 ```text
 CANalyzer_Execute_Command_Type.ctl
@@ -748,6 +867,8 @@ CANalyzer_Close.vi
 Fault Set / Clearは既存Write SysVar primitive上の用途別Public abstractionとして実装する。
 
 new Execute_Command commandは追加しない。
+
+F6 local static auditではFault Injection VIs内にRegistry / Execute_Command extension / Stop / Close cleanup ownershipを導入した evidence はなかった。既存Infrastructureファイル自体の変更有無はlocal static inspectionだけではNOT OBSERVABLEであり、Fault Injection wiring authorityとしては導入されていないことを確認した。
 
 ---
 
@@ -775,7 +896,7 @@ Cleanup / Abort-safe path
 
 # 14. Non-Goals
 
-今回のFeatureでは次を実施しない。
+本Featureでは次を実施しない。
 
 - Batch Fault API
 - auto-duration Fault API
@@ -790,40 +911,129 @@ Cleanup / Abort-safe path
 
 ---
 
-# 15. Implementation Slices
+# 15. Implementation / Review Closure
 
-00Dに従い、Design Freeze後は次の順でHuman implementationする。
+00DのPhase分離に従い、次を完了した。
 
 ```text
 F1
 CANalyzer_Fault_Type.ctl
 CANalyzer_Fault_Target.ctl
+= IMPLEMENTED
 
 F2
 CANalyzer_Set_Fault.vi
+= IMPLEMENTED
 
-F3
+F3 / F3.1
 Nigel Focused As-Built Inspection
 + ChatGPT Drift Gate
+= PASS
 
 F4
 CANalyzer_Clear_All_Faults.vi
+= IMPLEMENTED
 
-F5
+F5 / F5.1 / F5.2
 Nigel Focused As-Built Inspection
++ root-drift closure re-review
 + ChatGPT Drift Gate
+= PASS
 
 F6
 Combined Final Algorithm-to-Wiring Audit
+= PASS
 
 Post completion
-Nigel Final Model Confirmation
-→ Final As-Built GUI Reconstruction Procedure
-→ Human Static Gate
-→ STATIC IMPLEMENTATION CLOSED
+Final Model Confirmation
+= CONFIRMED
+
+Final As-Built GUI Reconstruction Procedure
+= PASS
+
+Human Static Gate
+= PASS
+
+Final Feature Status
+= STATIC IMPLEMENTATION CLOSED / RUNTIME PENDING
 ```
 
-GUI Construction ProcedureはこのFrozen Designを基にPhase 4でfresh生成する。
+## 15.1 F5 closure history
+
+F5 initial reviewで次のroot driftを検出し、Human修正後にclosureした。
+
+```text
+1. CANalyzer_Value_Type plain numeric → explicit enum I32
+2. Verify After Write? dynamic state → TRUE fixed
+3. Clear All write error in retained error → fresh No Error
+4. All Cleared equation → Previous AND Current Target Cleared
+```
+
+F5.2 final closure：
+
+```text
+ROOT-1 = CLOSED
+Set Fault Regression = NONE
+Clear All Regression = NONE
+P0 = 0
+P1 = 0
+F4 AS-BUILT = PASS
+Observable Design Drift = 0
+```
+
+## 15.2 F6 combined final audit
+
+```text
+Fault Injection Combined Wiring = PASS
+Set Fault = PASS
+Clear All = PASS
+Safety Invariants = PASS
+Cross-VI Consistency = PASS
+Observable Design Drift = 0
+P0 = 0
+P1 = 0
+P2 = 0
+```
+
+## 15.3 Final Model Confirmation
+
+```text
+Final Actual Model = CONFIRMED
+Internal Contradiction = 0
+Unresolved Actual Ambiguity = 0
+Observable Design Drift = 0
+P0 = 0
+P1 = 0
+```
+
+## 15.4 Final As-Built Reconstruction
+
+current actual onlyをauthorityとして、completed actualからGUI reconstruction procedureをfresh生成し、次を確認した。
+
+```text
+Final As-Built Reconstruction = PASS
+Missing Actual Node = 0
+Invented Node = 0
+Wrong Terminal = 0
+Wrong Constant = 0
+Wrong Type = 0
+Wrong Case Behavior = 0
+Wrong State Equation = 0
+Documentation Ambiguity = 0
+Observable Design Drift = 0
+```
+
+## 15.5 Human Static Gate
+
+HumanがLabVIEW Editor上で次を確認しPASSした。
+
+```text
+H1 Broken Run Arrow = PASS
+H2 Coercion Dots = PASS
+H3 Use Default If Unwired = PASS
+H4 Typedef Linkage = PASS
+H5 Connector Pane = PASS
+```
 
 ---
 
@@ -835,6 +1045,7 @@ GUI Construction ProcedureはこのFrozen Designを基にPhase 4でfresh生成�
 - ordinal 1=`Checksum`
 - ordinal 2=`Timeout`
 - append-only
+- Static Acceptance = PASS
 
 ## 16.2 `CANalyzer_Fault_Target.ctl`
 
@@ -842,6 +1053,7 @@ GUI Construction ProcedureはこのFrozen Designを基にPhase 4でfresh生成�
 - ordinal / display textが§4.2と一致
 - unsupported / evidence未確認targetなし
 - append-only
+- Static Acceptance = PASS
 
 ## 16.3 `CANalyzer_Set_Fault.vi`
 
@@ -850,29 +1062,35 @@ GUI Construction ProcedureはこのFrozen Designを基にPhase 4でfresh生成�
 - invalid combinationは`-710119`
 - target enum → exact Namespace mapping
 - fault enum → exact Variable Name mapping
-- `CANalyzer_Value_Type=I32`
+- `CANalyzer_Value_Type=explicit enum I32`
 - `Nurmeric Value=0.0 / 1.0`
 - Verify=True固定
 - DBL tolerance=0.0固定
 - `SysVar Verified?`はWrite `Verified?`のみ
 - CAN behavior verifiedと表現しない
-- existing Closed VI / typedef変更なし
+- Human Static Gate PASS
+- Static Acceptance = PASS
 
 ## 16.4 `CANalyzer_Clear_All_Faults.vi`
 
 - incoming errorありでもcleanup実行
 - Original Error保存
-- First Cleanup Error retention
+- operation-side write error in=fresh No Error
+- First Cleanup Error sticky-first retention
 - full targetでAlive / Checksumを両方attempt
 - same-target Alive+Checksum成功時だけTimeout clear
 - prerequisite failure時Timeout skip
 - Timeout-only targetは直接Timeout clear
 - target failure後も他targetをbest effortで継続
-- clear value=I32 0
+- clear value=explicit enum I32 + DBL 0.0
 - Verify=True固定
+- `Current Target Cleared = Alive Success AND Checksum Success AND Timeout Success`
+- `Next All Cleared = Previous All Cleared AND Current Target Cleared`
 - `All Cleared?`は必要clear全成功時のみTrue
 - final priority Original Error > First Cleanup Error > No Error
 - registryなし
+- Human Static Gate PASS
+- Static Acceptance = PASS
 
 ---
 
@@ -900,11 +1118,18 @@ Static Closure後に最低限次を確認する。
 
 Static PASSはRuntime verifiedを意味しない。
 
+Current canonical runtime status：
+
+```text
+Runtime / Hardware E2E
+= PENDING
+```
+
 ---
 
 # 18. Frozen Decisions
 
-次はHuman Approval済みFrozen領域であり、実装途中に無言変更しない。
+次はHuman Approval済みFrozen領域であり、今後も別Design Gateなしに無言変更しない。
 
 ```text
 Fault Target = typed enum
@@ -935,6 +1160,8 @@ Frozen Design変更が必要になった場合は00Dに従い実装を停止し�
 
 # 19. Design Freeze Gate
 
+Design Freeze時の承認結果を履歴として保持する。
+
 | Gate | Result |
 |---|---|
 | Evidence sufficient | PASS |
@@ -963,8 +1190,49 @@ DESIGN / ALGORITHM
 = FROZEN
 
 IMPLEMENTATION
+= STATIC CLOSED
+
+RUNTIME / HARDWARE E2E
 = PENDING
 
 NEXT
-= Nigel GUI CONSTRUCTION INSTRUCTIONS
+= Runtime / Hardware Validation or downstream TestStand Design Phase
+```
+
+---
+
+# 20. Static Implementation Closure Gate
+
+| Gate | Result |
+|---|---|
+| F1 Typedef implementation | PASS |
+| F2 Set Fault implementation | PASS |
+| F3 Set Fault As-Built / Drift Gate | PASS |
+| F4 Clear All implementation | PASS |
+| F5 Clear All As-Built / closure re-review | PASS |
+| F6 Combined Final Algorithm-to-Wiring Audit | PASS |
+| Final Actual Model | CONFIRMED |
+| Final As-Built GUI Reconstruction | PASS |
+| Human Static Gate | PASS |
+| Broken Run Arrow | PASS |
+| Coercion dots | PASS |
+| Use Default If Unwired | PASS |
+| Typedef linkage | PASS |
+| Connector Pane | PASS |
+| Observable Design Drift | 0 |
+| P0 | 0 |
+| P1 | 0 |
+| Runtime / Hardware E2E | PENDING |
+
+```text
+CANalyzer Fault Injection Public API
+
+STATIC IMPLEMENTATION
+= CLOSED
+
+RUNTIME / HARDWARE E2E
+= PENDING
+
+TESTSTAND INTEGRATION
+= FUTURE PHASE
 ```
