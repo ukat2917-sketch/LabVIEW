@@ -93,29 +93,139 @@ Get Model / Firmware / Driver Version
 
 ---
 
-# 4. Yokogawa MX100
+# 4. Yokogawa SMARTDAC+ GM10 / GX20 と MX100 Legacy
 
-MX100は温度など低〜中速DAQを担当する。
+温度DAQの詳細正本は[`06_温度DAQ_SMARTDAC+_GX_GM_MX100比較と仕様.md`](./06_温度DAQ_SMARTDAC+_GX_GM_MX100比較と仕様.md)とする。
 
-## 必須機能
+## 4.1 採用候補
+
+- **第一候補:** SMARTDAC+ `GM10 + GX90XA`
+- **Alternative:** `GX20 + GX90XA`。Local displayが必要な場合
+- **Legacy:** MX100。既設流用時のみ優先度を上げる
+
+MX100は2019-03-31販売終了で、メーカー推奨代替はSMARTDAC+ GM。新規設備の標準温度DAQとしてはSMARTDAC+を優先する。
+
+IS8000統合では`/MB1` Modbus/TCPを第一候補とし、GM10はYokogawaがIS8000用通信設定ファイルを提供するため統合リスクが低い。
+
+## 4.2 入手済みLabVIEW Driver
+
+`yokogawa_gx_series.zip`から次を確認済み。
+
+```text
+Driver: Yokogawa GX/GP/GM Series LabVIEW Plug and Play
+Revision: 4.2.1
+Supported: GX10 / GP10 / GX20 / GP20 / GM10
+Tested: GM10 / GX20
+Interfaces: LAN / RS-232C / RS-422A / USB / Bluetooth
+VISA: 5.0 or later
+Source code: Available
+Certified: No
+NI Supported: No
+```
+
+LabVIEW 2016時代のDriverであるため、LabVIEW 2026 Q3 64bitでMass Compile/Connector Pane/ExampleをPoCする。
+
+## 4.3 Native Driverで確認済みの主要VI
+
+```text
+Initialize.vi
+Close.vi
+Revision Query.vi
+
+Configure Channel (TC Normal).vi
+Configure Channel (RTD Normal).vi
+Configure Burnout RJC.vi
+Configure AI Filter.vi
+Configure AI Moving Average.vi
+Configure Interval.vi
+Configure Scan Group.vi
+Configure Master Scan Interval Group.vi
+
+Configure Data Save.vi
+Configure Memory.vi
+Configure Record Data (Display).vi
+Configure Record Data (Event).vi
+
+Data/Low Level/Initiate.vi
+Data/Low Level/Abort.vi
+Read Measurement Data (Analog NChan).vi
+Read Measurement Data (Unit NChan).vi
+
+Write Display Message.vi
+Get Internal Dir.vi
+```
+
+Native Connector Pane/型は対象LabVIEWでDriver Helpを開いて確定する。
+
+## 4.4 Project Public API
+
+```text
+SMARTDAC_Connect.vi
+SMARTDAC_Get_Version.vi
+SMARTDAC_Configure_Temperature_Channels.vi
+SMARTDAC_Configure_Scan.vi
+SMARTDAC_Configure_Burnout_RJC.vi
+SMARTDAC_Configure_Recording.vi
+SMARTDAC_Start.vi
+SMARTDAC_Read_Selected_Values.vi
+SMARTDAC_Write_Event_Marker.vi
+SMARTDAC_Get_Status.vi
+SMARTDAC_Stop.vi
+SMARTDAC_Get_Recording_Artifact.vi
+SMARTDAC_Close.vi
+```
+
+Public API名はGM10/GX20共通とし、TestStandがHardware model差を直接扱わない。
+
+## 4.5 初期Module候補
+
+一般温度用途:
+
+```text
+GX90XA-10-U2
+10ch Universal Input
+TC / RTD / DCV / DI
+Shortest scan: 100 ms
+```
+
+Noise耐性優先では`GX90XA-10-T1`、高速特殊用途では`GX90XA-04-H0`を比較する。
+
+## 4.6 Ownership
+
+第一候補:
+
+```text
+Setup:
+LabVIEW GX/GM Driver → Configure / Verify → Session Close
+
+Runtime:
+IS8000 /MB1 → GM10 Modbus/TCP → Temperature acquisition
+
+Cleanup/Artifact:
+IS8000 Stop → 必要ならLabVIEW再接続 → Native artifact確認
+```
+
+LabVIEW DriverとIS8000が同一GM10へ常時同時アクセスする構成は、競合/負荷PoC前に標準としない。
+
+## 4.7 必須機能
 
 ```text
 Connect / Close
+Get Model / Firmware / Driver Revision
 Get Module / Channel Inventory
-Configure Channel Type
-Configure Range
+Configure TC / RTD / DCV Channel
+Configure Range / Scaling / Unit / Tag
+Configure Burnout / RJC
 Configure Scan Interval
-Start Measurement
-Read Block / Stream
-Get Device Time / Timestamp
-Stop Measurement
+Configure Native Recording
+Start / Stop
+Read N Channel Values + Data Status
+Write Event Marker (Native recording使用時)
+Get Recording Artifact
 Get Status / Error
-Get Version
 ```
 
-**設計候補:** MX100/DARWIN API DLLをLabVIEW Adapterから呼ぶ。CLFN直結かC# Bridgeかは入手したAPI packageとbit数で決定する。
-
-**未確定:** API DLLの実シグネチャ、timestamp基準、外部Trigger可否。
+SMARTDAC+ Modbus acquisitionの精密同期は別途PoCし、DL950/SL2000等の高精度同期と同一Classとして扱わない。
 
 ---
 
@@ -176,14 +286,14 @@ DLM5000_Close.vi
 
 ## 4A.4 未確定
 
-- DLM5000公式LabVIEW Driver/IVI Driver packageと実VI名
+- DLM5000公式LabVIEW Driverの実Connector Pane / LabVIEW 2026 Q3互換性
 - Communication Interface Manual revision
 - VISA transport / Ethernet / USB等の採用Interface
 - Waveform transfer data type / block size / throughput
 - Native waveform file formatと外部指定可能な保存Path/File name
 - External Trigger端子、Trigger Out、時刻基準
 - IS8000からの設定/記録/波形取得範囲
-- Hardware Trigger時のWT5000/MX100/RAMScope/CANalyzer/INCAとの相関方法
+- Hardware Trigger時のWT5000/SMARTDAC+/RAMScope/CANalyzer/INCAとの相関方法
 
 ---
 
@@ -306,6 +416,8 @@ INumericMonitorAcquisition (推奨)
 
 RAMScopeをIS8000へ取り込む場合は、RAMScope Service/User LibraryがこれらInterfaceを実装する。
 
+SMARTDAC+ GM10はUser Library新規開発ではなく、`/MB1` Modbus/TCP経路を第一候補とする。
+
 ## 7.2 IS8000 Control API
 
 外部ApplicationからIS8000を操作するgRPC API。User Applicationには`IS8000SDK.dll`は不要。
@@ -333,11 +445,27 @@ Close
 
 `OpenNotificationStream`でRecording開始/停止成立を観測できるため、Host command送信時刻だけより良いRuntime Eventとして利用する。
 
-## 7.3 未確定
+## 7.3 Modbus/TCP `/MB1`
 
-- IS8000の`MDF`記録が対象VersionでMDF4/.mf4か
+Projectでは温度DAQ用に次を要求する。
+
+```text
+GM10 Modbus/TCP Data Source追加
+Temperature channel mapping
+Polling/recording interval設定
+Channel name/unit/status保持
+IS8000 recordingへのChannel inclusion確認
+Modbus communication error/status取得
+```
+
+GM10用Read fileはYokogawa標準提供物を優先し、独自file作成は必要差分だけに限定する。
+
+## 7.4 未確定
+
+- IS8000 recordingの対象VersionでのMF4 artifact仕様
 - Recording file nameの外部指定可否
 - Recorder内部の絶対時刻基準
+- SMARTDAC+ Modbus channelのtimestamp/polling model
 - DLM5000を標準Data Sourceとして扱える範囲とControl APIでの設定可能範囲
 - RAMScope User Libraryとのbitness/性能整合
 
