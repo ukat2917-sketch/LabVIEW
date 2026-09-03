@@ -10,7 +10,9 @@
 
 ## 1. Project目的
 
-V2L / OBC / 12V DCDCを含むDUTについて、Chroma電源・負荷装置、横河計測器、CANalyzer、RAMScopeまたはINCA/ETKをLabVIEW + TestStandから自動制御し、試験条件、計測データ、イベント、判定結果を**1つのRunとして一貫管理**する。
+V2L / OBC / 12V DCDCを含むDUTについて、Chroma電源・負荷装置、横河WT5000/MX100/**DLM5000**、CANalyzer、RAMScopeまたはINCA/ETKをLabVIEW + TestStandから自動制御し、試験条件、計測データ、イベント、判定結果を**1つのRunとして一貫管理**する。
+
+**オシロスコープは本ProjectではYokogawa DLM5000シリーズを採用機種として一旦Fixする。** 詳細型式、Option、Firmware、制御Driver/API、IS8000統合可否は一次資料と実機PoCで確定するが、他シリーズを前提としたAdapter設計は行わない。
 
 Chroma ATSは試験シーケンス用途として利用可能でも、今回必要な多機器の時系列データ統合・同期・Run単位管理には不足があるため、ATSをシステム中核には置かない。
 
@@ -21,7 +23,7 @@ Chroma ATSは試験シーケンス用途として利用可能でも、今回必�
 | No. | File | 内容 |
 |---|---|---|
 | 01 | [01_システム要求とアーキテクチャ.md](./01_システム要求とアーキテクチャ.md) | 対象構成、LabVIEW/TestStand責務、Direct/IS8000/Hybrid案 |
-| 02 | [02_機器Adapter_API要求.md](./02_機器Adapter_API要求.md) | Chroma、WT5000、MX100、CANalyzer、RAMScope、IS8000、INCAの必須API |
+| 02 | [02_機器Adapter_API要求.md](./02_機器Adapter_API要求.md) | Chroma、WT5000、MX100、DLM5000、CANalyzer、RAMScope、IS8000、INCAの必須API |
 | 03 | [03_データ統合と時刻同期.md](./03_データ統合と時刻同期.md) | TDMS/MDF/MF4、Run Manifest、同期イベント、保存構成 |
 | 04 | [04_既存資産流用と外注仕様.md](./04_既存資産流用と外注仕様.md) | 本編から流用する設計、外注成果物、PoC/受入条件 |
 | 05 | [05_一次資料と未確定事項.md](./05_一次資料と未確定事項.md) | 入手済み一次資料、Source Authority、API調査Gap、実機確認項目 |
@@ -60,14 +62,16 @@ Chroma ATSは試験シーケンス用途として利用可能でも、今回必�
    Chroma / VISA       IS8000 gRPC       CANalyzer / INCA
    Device Adapter      Control Adapter      Automation API
           │                  │                  │
-          ▼            WT5000 / MX100          ├─ CAN / MF4
-      DUT I/O            / optional             └─ ETK / MF4
+          ▼          WT5000 / MX100 /          ├─ CAN / MF4
+      DUT I/O          DLM5000 / optional       └─ ETK / MF4
                          RAMScope
 
                          Run Manifest
                              │
           TDMS / MDF / MF4 / Test Result / Event Timeline
 ```
+
+DLM5000は採用機種をFixするが、**Direct LabVIEW/VISA制御とIS8000経由制御のどちらを主経路にするかは、Driver/API/Trigger/recording仕様確認後に決定**する。
 
 物理ファイルを必ず1本にすることよりも、**同一Run ID・時刻基準・条件Snapshot・同期イベントで追跡可能であること**を優先する。最終的な単一MF4化はPost Processとして別途評価する。
 
@@ -83,3 +87,4 @@ Chroma ATSは試験シーケンス用途として利用可能でも、今回必�
 6. 各Recorderに同一`Run ID`と可能な限り同一`Sync Event ID`を残す。
 7. Project固有Adapterの公開APIは、ベンダーAPIを隠蔽し、TestStandへ安定した型だけを公開する。
 8. 実機・対象Versionで未確認のAPI名、ファイル形式、時刻基準は`未確定`として扱う。
+9. オシロスコープ機種は`Yokogawa DLM5000`シリーズをProject標準とし、機種変更は設計変更として扱う。
