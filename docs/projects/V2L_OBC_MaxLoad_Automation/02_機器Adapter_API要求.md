@@ -119,6 +119,74 @@ Get Version
 
 ---
 
+# 4A. Yokogawa DLM5000
+
+## 4A.1 採用機種
+
+**本Projectのオシロスコープは`Yokogawa DLM5000`シリーズで一旦Fixする。**
+
+- 他シリーズを前提としたAdapterは設計しない。
+- 詳細型式、Channel数、搭載Option、Firmwareは設備確定時にManifest/Configurationへ固定する。
+- Native API名はDLM5000用の公式Driver Help / Communication Interface Manual / 対象PC上の実Driverを確認してから確定する。
+- 制御経路は`LabVIEW Direct Driver/VISA`と`IS8000経由`をPoC比較し、最終的に主経路を1つへFreezeする。
+
+## 4A.2 必須要求機能
+
+| Requirement | Priority | Notes |
+|---|---:|---|
+| Connect / Close | 必須 | Session/ReferenceはAdapter内部へ隠蔽 |
+| Get Model / Serial / Firmware / Driver Version | 必須 | Run Manifestへ保存 |
+| Channel Enable/Disable | 必須 | 使用Channelだけ有効化 |
+| Vertical設定 | 必須 | Range/Scale、Offset、Coupling、Probe/Attenuation等。実APIは一次資料で確定 |
+| Horizontal設定 | 必須 | Timebase、Sample Rate、Record Length等 |
+| Trigger設定 | 必須 | Source、Type、Level、Slope、Mode等 |
+| External Trigger I/O | 要確認 | Cross-recorder hardware sync候補 |
+| Arm / Single / Run / Stop | 必須 | TestStand Sequenceから制御 |
+| Wait Acquisition Complete / Triggered State | 必須 | Software wait固定値に依存しない |
+| Waveform Read | 必須 | 指定Channel、Timebase/scale metadata込み |
+| Measurement/Statistic Read | 推奨 | 判定用Scalarを全波形再演算せず取得できる場合利用 |
+| Save Waveform Artifact | 必須 | Native formatまたはVendor-supported waveform artifact |
+| Save Setup | 推奨 | Run再現性確保 |
+| Save Screen Image | Option | エビデンス用途 |
+| Get Trigger/Acquisition Timestamp | 要確認 | Sync設計の重要PoC項目 |
+| Get Status / Error | 必須 | Acquisition/Trigger/Storage Errorを取得 |
+
+## 4A.3 公開API候補
+
+Native VI名ではなくProject側の安定した公開責務として次を要求する。
+
+```text
+DLM5000_Connect.vi
+DLM5000_Get_Version.vi
+DLM5000_Configure_Channel.vi
+DLM5000_Configure_Timebase.vi
+DLM5000_Configure_Trigger.vi
+DLM5000_Arm.vi
+DLM5000_Start.vi
+DLM5000_Wait_Acquisition.vi
+DLM5000_Read_Waveform.vi
+DLM5000_Read_Measurements.vi
+DLM5000_Save_Artifact.vi
+DLM5000_Get_Status.vi
+DLM5000_Stop.vi
+DLM5000_Close.vi
+```
+
+上記は外注/Project公開API候補名であり、Yokogawa Native API名ではない。
+
+## 4A.4 未確定
+
+- DLM5000公式LabVIEW Driver/IVI Driver packageと実VI名
+- Communication Interface Manual revision
+- VISA transport / Ethernet / USB等の採用Interface
+- Waveform transfer data type / block size / throughput
+- Native waveform file formatと外部指定可能な保存Path/File name
+- External Trigger端子、Trigger Out、時刻基準
+- IS8000からの設定/記録/波形取得範囲
+- Hardware Trigger時のWT5000/MX100/RAMScope/CANalyzer/INCAとの相関方法
+
+---
+
 # 5. CANalyzer
 
 CANalyzerは既存本編のActiveX設計を流用する。Project固有の別実装を新規に作らない。
@@ -270,6 +338,7 @@ Close
 - IS8000の`MDF`記録が対象VersionでMDF4/.mf4か
 - Recording file nameの外部指定可否
 - Recorder内部の絶対時刻基準
+- DLM5000を標準Data Sourceとして扱える範囲とControl APIでの設定可能範囲
 - RAMScope User Libraryとのbitness/性能整合
 
 ---
